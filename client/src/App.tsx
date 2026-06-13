@@ -1,5 +1,4 @@
 import { BrowserRouter, NavLink, Navigate, Route, Routes } from "react-router-dom";
-import { LogSession } from "./pages/LogSession";
 import { Bodyweight } from "./pages/Bodyweight";
 import { History } from "./pages/History";
 import { Dashboard } from "./pages/Dashboard";
@@ -11,7 +10,6 @@ import { BottomNav } from "./components/BottomNav";
 
 const NAV: Array<{ to: string; label: string; end?: boolean }> = [
   { to: "/dashboard", label: "Dashboard", end: true },
-  { to: "/log", label: "Registrar sesión", end: true },
   { to: "/weight", label: "Peso / Nutrición", end: true },
   { to: "/history", label: "Historial", end: true },
   { to: "/programs", label: "Programas" },
@@ -67,14 +65,6 @@ export function App() {
           element={
             <RootLayout>
               <Dashboard />
-            </RootLayout>
-          }
-        />
-        <Route
-          path="/log"
-          element={
-            <RootLayout>
-              <LogSession />
             </RootLayout>
           }
         />
