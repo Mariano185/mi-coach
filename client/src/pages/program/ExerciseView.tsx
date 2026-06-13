@@ -246,6 +246,8 @@ function RealGrid({
 }
 
 // Fragment helper: una fila es solo los 6 hijos directos del grid.
+// En desktop usa display:contents para que sus hijos participen del grid del .sets-table.
+// En mobile el CSS lo convierte en una card apilada.
 function Row({ children }: { children: React.ReactNode }) {
-  return <>{children}</>;
+  return <div className="set-row">{children}</div>;
 }

@@ -528,6 +528,9 @@ tbody tr:hover { background: var(--panel-2); }
   gap: 8px;
   align-items: center;
 }
+/* Cada set es un .set-row (div) que en desktop se "aplana" con display:contents
+   para que sus hijos participen del grid del .sets-table. En mobile se vuelve card. */
+.set-row { display: contents; }
 .sets-table .sh {
   font-family: var(--font-display);
   font-size: 11px;
@@ -622,6 +625,176 @@ tbody tr:hover { background: var(--panel-2); }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+
+/* ============================================================
+   Mobile (< 600px)
+   - topbar sticky + compacto
+   - nav-tabs top se oculta (reemplazado por bottom-nav)
+   - panels con padding reducido
+   - inputs 16px / 44px (evita zoom iOS + touch target)
+   ============================================================ */
+@media (max-width: 600px) {
+  .app {
+    padding: 0 14px 96px;
+  }
+
+  header.topbar {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    padding: 14px 0 12px;
+    margin: 0 -14px 8px;
+    padding-left: 14px;
+    padding-right: 14px;
+    background: rgba(10, 11, 13, 0.85);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--border-soft);
+  }
+  header.topbar .sub { display: none; }
+  header.topbar h1 { font-size: 20px; }
+
+  nav.tabs { display: none; }
+
+  .panel { padding: 14px; margin-bottom: 14px; }
+  .panel h2 { font-size: 15px; }
+
+  /* touch targets: inputs más altos, font 16px (evita zoom iOS) */
+  input, select, textarea {
+    font-size: 16px;
+    padding: 11px 12px;
+    min-height: 44px;
+  }
+  textarea { min-height: 88px; }
+
+  /* botón del "registrar día" full-width en mobile */
+  .panel > div > .btn { width: 100%; }
+
+  /* tiles un poco más densos */
+  .tile { padding: 14px; }
+  .tile .tile-name { font-size: 17px; }
+
+  /* cards de stats y mini-stats un poco más chicas */
+  .stat-card { padding: 14px; }
+  .stat-card .big { font-size: 26px; }
+  .mini-stats { gap: 18px; padding: 14px; }
+  .mini-stats .ms .v { font-size: 22px; }
+
+  /* topbar invisible: dar más aire al h1 del contenido */
+  .prog-title { font-size: 24px; margin: 0 0 14px; }
+
+  /* back del programa más chico pero ≥ 44px (touch target) */
+  .prog-back { width: 44px; height: 44px; }
+
+  /* === sets-table (ExerciseView) → cards apiladas === */
+  .sets-table { display: block; }
+  .sets-table .sh { display: none; }
+  .set-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 44px;
+    gap: 8px;
+    padding: 12px;
+    margin-bottom: 10px;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    align-items: stretch;
+  }
+  .set-row .serie-n {
+    grid-column: 1 / -1;
+    text-align: left;
+    color: var(--lime);
+    font-size: 13px;
+    margin-bottom: 2px;
+  }
+  .set-row .target-cell {
+    padding: 9px 8px;
+    font-size: 13px;
+  }
+  /* la celda "Carga sugerida" (span 2 en desktop) se normaliza en mobile */
+  .set-row .target-cell[style*="span"] { grid-column: auto; }
+  /* la celda "Obj." del RealGrid va como línea de contexto, full width */
+  .set-row .target-cell[title="objetivo"] {
+    grid-column: 1 / -1;
+    background: transparent;
+    border: 1px dashed var(--border-soft);
+    font-size: 12px;
+    color: var(--faint);
+  }
+  .set-row .check {
+    align-self: center;
+    justify-self: center;
+    width: 44px;
+    height: 44px;
+  }
+
+  /* === set-grid (LogSession) → 2 col + ocultar header de labels === */
+  .set-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+  /* el header de labels (primer set-grid de cada exercise-block) se oculta en mobile;
+     los placeholders de los inputs hacen de label */
+  .set-grid-head { display: none; }
+  .set-grid .set-n {
+    grid-column: 1 / -1;
+    color: var(--lime);
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 13px;
+    padding: 2px 0 4px;
+  }
+  .set-grid .set-del {
+    grid-column: 1 / -1;
+    min-height: 36px;
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+}
+
+/* === Bottom nav: oculto en desktop, fijo en mobile === */
+.bottom-nav {
+  display: none;
+}
+@media (max-width: 600px) {
+  .bottom-nav {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 30;
+    background: rgba(10, 11, 13, 0.95);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-top: 1px solid var(--border);
+    padding: 6px 4px calc(env(safe-area-inset-bottom, 0) + 6px);
+  }
+  .bottom-nav a {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    min-height: 52px;
+    color: var(--muted);
+    text-decoration: none;
+    font-family: var(--font-display);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    border-radius: var(--radius-sm);
+    transition: color 0.15s ease, background 0.15s ease;
+  }
+  .bottom-nav a:active { background: var(--panel-2); }
+  .bottom-nav a.active { color: var(--lime); }
+  .bottom-nav a:focus-visible {
+    outline: 2px solid var(--lime);
+    outline-offset: -2px;
+  }
 }
 
 /* legacy: rutina markdown plana (fallback) */

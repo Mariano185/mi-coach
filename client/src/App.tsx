@@ -7,6 +7,7 @@ import { ProgramIndexRedirect, Programs } from "./pages/Programs";
 import { WeekView } from "./pages/program/WeekView";
 import { DayView } from "./pages/program/DayView";
 import { ExerciseView } from "./pages/program/ExerciseView";
+import { BottomNav } from "./components/BottomNav";
 
 const NAV: Array<{ to: string; label: string; end?: boolean }> = [
   { to: "/dashboard", label: "Dashboard", end: true },
@@ -40,6 +41,8 @@ function RootLayout({ children }: { children: React.ReactNode }) {
       </nav>
 
       {children}
+
+      <BottomNav />
     </div>
   );
 }

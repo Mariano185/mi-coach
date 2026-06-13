@@ -186,7 +186,7 @@ export function LogSession() {
                 <strong>{ex?.nombre ?? "—"}{ex?.es_basico ? " ⭐" : ""}</strong>
                 <button className="btn danger" onClick={() => removeBlock(bi)}>Quitar</button>
               </div>
-              <div className="set-grid">
+              <div className="set-grid set-grid-head">
                 <span className="lbl">#</span>
                 <span className="lbl">Peso (kg)</span>
                 <span className="lbl">Reps</span>
@@ -196,17 +196,17 @@ export function LogSession() {
               </div>
               {blk.sets.map((s, si) => (
                 <div className="set-grid" key={si}>
-                  <span className="muted">{si + 1}</span>
-                  <input type="number" step={0.5} value={s.peso}
+                  <span className="muted set-n">{si + 1}</span>
+                  <input type="number" step={0.5} value={s.peso} placeholder="kg"
                     onChange={(e) => updateSet(bi, si, "peso", e.target.value)} />
-                  <input type="number" value={s.reps}
+                  <input type="number" value={s.reps} placeholder="reps"
                     onChange={(e) => updateSet(bi, si, "reps", e.target.value)} />
-                  <input type="number" step={0.5} value={s.rpe}
+                  <input type="number" step={0.5} value={s.rpe} placeholder="rpe"
                     onChange={(e) => updateSet(bi, si, "rpe", e.target.value)} />
-                  <input type="number" step={0.5} value={s.rir}
+                  <input type="number" step={0.5} value={s.rir} placeholder="rir"
                     onChange={(e) => updateSet(bi, si, "rir", e.target.value)}
                     onKeyDown={(e) => onSetKeyDown(e, bi, si)} />
-                  <button className="btn danger" title="quitar set"
+                  <button className="btn danger set-del" title="quitar set"
                     onClick={() => removeSet(bi, si)}>×</button>
                 </div>
               ))}
