@@ -531,6 +531,8 @@ tbody tr:hover { background: var(--panel-2); }
 /* Cada set es un .set-row (div) que en desktop se "aplana" con display:contents
    para que sus hijos participen del grid del .sets-table. En mobile se vuelve card. */
 .set-row { display: contents; }
+/* .obj-row agrupa "obj" + check; en desktop se aplana también, en mobile es flex. */
+.obj-row { display: contents; }
 .sets-table .sh {
   font-family: var(--font-display);
   font-size: 11px;
@@ -692,7 +694,7 @@ tbody tr:hover { background: var(--panel-2); }
   .sets-table .sh { display: none; }
   .set-row {
     display: grid;
-    grid-template-columns: 1fr 1fr 1fr 44px;
+    grid-template-columns: 1fr 1fr 1fr;
     gap: 8px;
     padding: 12px;
     margin-bottom: 10px;
@@ -714,17 +716,22 @@ tbody tr:hover { background: var(--panel-2); }
   }
   /* la celda "Carga sugerida" (span 2 en desktop) se normaliza en mobile */
   .set-row .target-cell[style*="span"] { grid-column: auto; }
-  /* la celda "Obj." del RealGrid va como línea de contexto, full width */
-  .set-row .target-cell[title="objetivo"] {
+  /* obj + check agrupados en flex: obj a la izquierda, check a la derecha */
+  .set-row .obj-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
     grid-column: 1 / -1;
+  }
+  .set-row .target-cell[title="objetivo"] {
+    flex: 1;
     background: transparent;
     border: 1px dashed var(--border-soft);
     font-size: 12px;
     color: var(--faint);
   }
   .set-row .check {
-    align-self: center;
-    justify-self: center;
+    flex-shrink: 0;
     width: 44px;
     height: 44px;
   }

@@ -228,16 +228,18 @@ function RealGrid({
             ariaLabel={`RPE serie ${s.n_serie}`}
             onCommit={(v) => onPatch(s, { real_rpe: v })}
           />
-          <button
-            className={`check ${s.hecha ? "on" : ""}`}
-            aria-pressed={s.hecha === 1}
-            aria-label={`Marcar serie ${s.n_serie} como hecha`}
-            onClick={() => onToggle(s)}
-          >
-            {s.hecha ? <IconCheck width={18} height={18} /> : null}
-          </button>
-          <div className="target-cell" title="objetivo">
-            {data.reps_text ?? "—"}×@{data.rpe_text ?? "—"}
+          <div className="obj-row">
+            <div className="target-cell" title="objetivo">
+              {data.reps_text ?? "—"}×@{data.rpe_text ?? "—"}
+            </div>
+            <button
+              className={`check ${s.hecha ? "on" : ""}`}
+              aria-pressed={s.hecha === 1}
+              aria-label={`Marcar serie ${s.n_serie} como hecha`}
+              onClick={() => onToggle(s)}
+            >
+              {s.hecha ? <IconCheck width={18} height={18} /> : null}
+            </button>
           </div>
         </Row>
       ))}
