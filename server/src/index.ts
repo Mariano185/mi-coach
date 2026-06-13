@@ -11,6 +11,7 @@ import { bodyweightRouter } from "./routes/bodyweight.js";
 import { programsRouter } from "./routes/programs.js";
 import { programRouter } from "./routes/program.js";
 import { statsRouter } from "./routes/stats.js";
+import { coachRouter } from "./routes/coach.js";
 
 const PORT = Number(process.env.PORT) || 3001;
 
@@ -28,6 +29,7 @@ app.use("/api/bodyweight", bodyweightRouter);
 app.use("/api/programs", programsRouter);
 app.use("/api/program", programRouter);
 app.use("/api/stats", statsRouter);
+app.use("/api/coach", coachRouter);
 
 // En producción, servir el frontend buildeado (client/dist) desde el mismo proceso.
 // Así no hace falta vite ni nginx: un solo server en :3001 sirve API + SPA.
