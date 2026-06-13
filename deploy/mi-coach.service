@@ -1,0 +1,21 @@
+[Unit]
+Description=Powerbuilding Coach (mi-coach) — Express API + SPA
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Ajustar si clonás el repo en otra ruta:
+WorkingDirectory=/opt/mi-coach
+# coach.db persistente fuera del repo (sobrevive a git pull y entra en backups del CT):
+Environment=NODE_ENV=production
+Environment=PORT=3001
+Environment=COACH_DB_PATH=/var/lib/mi-coach/coach.db
+ExecStart=/usr/bin/node server/dist/index.js
+Restart=always
+RestartSec=3
+User=micoach
+Group=micoach
+
+[Install]
+WantedBy=multi-user.target
