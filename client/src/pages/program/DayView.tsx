@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { api } from "../../api";
 import type { ProgramDayDetail, ProgramExerciseCard, Seccion } from "../../types";
 import { IconBack, IconLayers } from "../../components/icons";
@@ -10,25 +11,30 @@ const SECCION_LABEL: Record<Seccion, string> = {
 };
 const SECCION_ORDER: Seccion[] = ["main", "accesorio", "core"];
 
-export function DayView({
-  dayId,
-  onBack,
-  onOpenExercise,
-  onCompleted,
-}: {
-  dayId: number;
-  onBack: () => void;
-  onOpenExercise: (exerciseId: number) => void;
-  onCompleted: (msg: string) => void;
-}) {
+export function DayView() {
+  const { dayId: dayIdParam } = useParams();
+  const dayId = Number(dayIdParam);
+  const navigate = useNavigate();
   const [data, setData] = useState<ProgramDayDetail | null>(null);
   const [err, setErr] = useState("");
   const [saving, setSaving] = useState(false);
+  const [toast, setToast] = useState("");
 
   function load() {
+    if (!Number.isInteger(dayId)) {
+      setErr("día inválido");
+      return;
+    }
     api.getProgramDay(dayId).then(setData).catch((e) => setErr(e.message));
   }
   useEffect(load, [dayId]);
+
+  // Toast efímero al registrar un día.
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(""), 2600);
+    return () => clearTimeout(t);
+  }, [toast]);
 
   const grouped = useMemo(() => {
     const map = new Map<Seccion, ProgramExerciseCard[]>();
@@ -53,7 +59,7 @@ export function DayView({
     setErr("");
     try {
       const r = await api.completeProgramDay(dayId, {});
-      onCompleted(`Día ${data.dia} registrado · ${r.sets} series → historial`);
+      setToast(`Día ${data.dia} registrado · ${r.sets} series → historial`);
       load();
     } catch (e) {
       setErr((e as Error).message);
@@ -68,7 +74,11 @@ export function DayView({
   return (
     <div>
       <div className="prog-nav">
-        <button className="prog-back" onClick={onBack} aria-label="Volver a la semana">
+        <button
+          className="prog-back"
+          onClick={() => navigate(`/programs/weeks/${data.week_id}`)}
+          aria-label="Volver a la semana"
+        >
           <IconBack width={18} height={18} />
         </button>
         <span className="prog-crumb">
@@ -101,7 +111,7 @@ export function DayView({
                 <button
                   key={ex.id}
                   className={`tile ${complete ? "complete" : ""}`}
-                  onClick={() => onOpenExercise(ex.id)}
+                  onClick={() => navigate(`/programs/days/${dayId}/exercises/${ex.id}`)}
                 >
                   <span className="edge">
                     <span className="fill" style={{ height: `${pct * 100}%` }} />
@@ -148,6 +158,8 @@ export function DayView({
           {saving ? "Guardando…" : data.session_id ? "Actualizar historial" : "Registrar día"}
         </button>
       </div>
+
+      {toast ? <div className="toast">{toast}</div> : null}
     </div>
   );
 }

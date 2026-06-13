@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { api } from "../../api";
 import type { ProgramExerciseDetail, ProgramSet } from "../../types";
 import { IconBack, IconCheck } from "../../components/icons";
@@ -39,18 +40,21 @@ function SetCell({
   );
 }
 
-export function ExerciseView({
-  exerciseId,
-  onBack,
-}: {
-  exerciseId: number;
-  onBack: () => void;
-}) {
+export function ExerciseView() {
+  const { exerciseId: exerciseIdParam } = useParams();
+  const exerciseId = Number(exerciseIdParam);
+  const { dayId: dayIdParam } = useParams();
+  const dayId = Number(dayIdParam);
+  const navigate = useNavigate();
   const [data, setData] = useState<ProgramExerciseDetail | null>(null);
   const [tab, setTab] = useState<Tab>("real");
   const [err, setErr] = useState("");
 
   useEffect(() => {
+    if (!Number.isInteger(exerciseId)) {
+      setErr("ejercicio inválido");
+      return;
+    }
     api.getProgramExercise(exerciseId).then(setData).catch((e) => setErr(e.message));
   }, [exerciseId]);
 
@@ -93,7 +97,11 @@ export function ExerciseView({
   return (
     <div>
       <div className="prog-nav">
-        <button className="prog-back" onClick={onBack} aria-label="Volver al día">
+        <button
+          className="prog-back"
+          onClick={() => navigate(`/programs/days/${dayId}`)}
+          aria-label="Volver al día"
+        >
           <IconBack width={18} height={18} />
         </button>
         <span className="prog-crumb">
@@ -169,7 +177,7 @@ function ObjetivoGrid({ data }: { data: ProgramExerciseDetail }) {
       {data.sets.map((s) => (
         <Row key={s.id}>
           <div className="serie-n">{s.n_serie}</div>
-          <div className="target-cell">{s.target_reps ?? "—"}</div>
+          <div className="target-cell">{data.reps_text ?? "—"}</div>
           <div className="target-cell">{s.target_rpe ?? "—"}</div>
           <div className="target-cell" style={{ gridColumn: "span 2" }}>
             {data.carga_text ?? "—"}
@@ -221,7 +229,7 @@ function RealGrid({
             onCommit={(v) => onPatch(s, { real_rpe: v })}
           />
           <div className="target-cell" title="objetivo">
-            {s.target_reps ?? "—"}×@{s.target_rpe ?? "—"}
+            {data.reps_text ?? "—"}×@{data.rpe_text ?? "—"}
           </div>
           <button
             className={`check ${s.hecha ? "on" : ""}`}

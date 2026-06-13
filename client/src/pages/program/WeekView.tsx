@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { api } from "../../api";
-import type { ProgramWeek, ProgramWeekDetail } from "../../types";
+import type { ProgramWeekDetail } from "../../types";
+import { useProgramsContext } from "../Programs";
 import { CoachNotes } from "../../components/CoachNotes";
 import { IconList, IconCalendar } from "../../components/icons";
 
@@ -10,21 +12,19 @@ function fmtFecha(iso: string | null): string | null {
   return d.toLocaleDateString("es-AR", { day: "numeric", month: "numeric", year: "2-digit" });
 }
 
-export function WeekView({
-  weeks,
-  weekId,
-  onSelectWeek,
-  onOpenDay,
-}: {
-  weeks: ProgramWeek[];
-  weekId: number;
-  onSelectWeek: (id: number) => void;
-  onOpenDay: (dayId: number) => void;
-}) {
+export function WeekView() {
+  const { weekId: weekIdParam } = useParams();
+  const weekId = Number(weekIdParam);
+  const { weeks } = useProgramsContext();
+  const navigate = useNavigate();
   const [detail, setDetail] = useState<ProgramWeekDetail | null>(null);
   const [err, setErr] = useState("");
 
   useEffect(() => {
+    if (!Number.isInteger(weekId)) {
+      setErr("semana inválida");
+      return;
+    }
     setDetail(null);
     api.getProgramWeek(weekId).then(setDetail).catch((e) => setErr(e.message));
   }, [weekId]);
@@ -38,8 +38,8 @@ export function WeekView({
           <label htmlFor="week-sel">Semana</label>
           <select
             id="week-sel"
-            value={weekId}
-            onChange={(e) => onSelectWeek(Number(e.target.value))}
+            value={Number.isInteger(weekId) ? weekId : ""}
+            onChange={(e) => navigate(`/programs/weeks/${e.target.value}`)}
           >
             {weeks.map((w) => (
               <option key={w.id} value={w.id}>
@@ -67,7 +67,7 @@ export function WeekView({
                 <button
                   key={d.id}
                   className={`tile ${complete ? "complete" : ""}`}
-                  onClick={() => onOpenDay(d.id)}
+                  onClick={() => navigate(`/programs/days/${d.id}`)}
                 >
                   <span className="edge">
                     <span className="fill" style={{ height: `${pct * 100}%` }} />

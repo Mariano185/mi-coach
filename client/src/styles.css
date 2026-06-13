@@ -113,6 +113,7 @@ nav.tabs {
   border-bottom: 1px solid var(--border);
   margin-bottom: 26px;
 }
+nav.tabs a,
 nav.tabs button {
   background: none;
   border: none;
@@ -126,12 +127,17 @@ nav.tabs button {
   text-transform: uppercase;
   border-bottom: 2px solid transparent;
   transition: color 0.15s ease, border-color 0.15s ease;
+  text-decoration: none;
+  display: inline-block;
 }
+nav.tabs a:hover,
 nav.tabs button:hover { color: var(--text); }
+nav.tabs a.active,
 nav.tabs button.active {
   color: var(--lime);
   border-bottom-color: var(--lime);
 }
+nav.tabs a:focus-visible,
 nav.tabs button:focus-visible {
   outline: 2px solid var(--lime);
   outline-offset: -2px;
