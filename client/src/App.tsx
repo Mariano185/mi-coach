@@ -1,12 +1,23 @@
-import { BrowserRouter, NavLink, Navigate, Route, Routes } from "react-router-dom";
+import { useEffect, useState } from "react";
+import {
+  BrowserRouter,
+  NavLink,
+  Navigate,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+} from "react-router-dom";
 import { Bodyweight } from "./pages/Bodyweight";
 import { History } from "./pages/History";
 import { Dashboard } from "./pages/Dashboard";
+import { Login } from "./pages/Login";
 import { ProgramIndexRedirect, Programs } from "./pages/Programs";
 import { WeekView } from "./pages/program/WeekView";
 import { DayView } from "./pages/program/DayView";
 import { ExerciseView } from "./pages/program/ExerciseView";
 import { BottomNav } from "./components/BottomNav";
+import { api } from "./api";
 
 const NAV: Array<{ to: string; label: string; end?: boolean }> = [
   { to: "/dashboard", label: "Dashboard", end: true },
@@ -16,6 +27,17 @@ const NAV: Array<{ to: string; label: string; end?: boolean }> = [
 ];
 
 function RootLayout({ children }: { children: React.ReactNode }) {
+  const navigate = useNavigate();
+
+  async function logout() {
+    try {
+      await api.logout();
+    } catch {
+      /* ignore */
+    }
+    navigate("/login", { replace: true });
+  }
+
   return (
     <div className="app">
       <header className="topbar">
@@ -23,6 +45,9 @@ function RootLayout({ children }: { children: React.ReactNode }) {
           Powerbuilding <span className="accent">Coach</span>
         </h1>
         <span className="sub">app local · un solo atleta</span>
+        <button className="topbar-logout" onClick={logout} aria-label="Cerrar sesión">
+          Salir
+        </button>
       </header>
 
       <nav className="tabs" aria-label="Secciones principales">
@@ -45,6 +70,37 @@ function RootLayout({ children }: { children: React.ReactNode }) {
   );
 }
 
+function RequireAuth({ children }: { children: React.ReactNode }) {
+  const [status, setStatus] = useState<"loading" | "ok" | "no">("loading");
+  const location = useLocation();
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .authStatus()
+      .then((s) => {
+        if (!cancelled) setStatus(s.authenticated ? "ok" : "no");
+      })
+      .catch(() => {
+        if (!cancelled) setStatus("no");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  if (status === "loading") {
+    return (
+      <p className="muted" style={{ padding: 40, textAlign: "center" }}>
+        Cargando…
+      </p>
+    );
+  }
+  if (status === "no") {
+    const next = encodeURIComponent(location.pathname + location.search);
+    return <Navigate to={`/login?next=${next}`} replace />;
+  }
+  return <>{children}</>;
+}
+
 function NotFound() {
   return (
     <div className="panel">
@@ -60,37 +116,46 @@ export function App() {
       <Routes>
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
+        <Route path="/login" element={<Login />} />
+
         <Route
           path="/dashboard"
           element={
-            <RootLayout>
-              <Dashboard />
-            </RootLayout>
+            <RequireAuth>
+              <RootLayout>
+                <Dashboard />
+              </RootLayout>
+            </RequireAuth>
           }
         />
         <Route
           path="/weight"
           element={
-            <RootLayout>
-              <Bodyweight />
-            </RootLayout>
+            <RequireAuth>
+              <RootLayout>
+                <Bodyweight />
+              </RootLayout>
+            </RequireAuth>
           }
         />
         <Route
           path="/history"
           element={
-            <RootLayout>
-              <History />
-            </RootLayout>
+            <RequireAuth>
+              <RootLayout>
+                <History />
+              </RootLayout>
+            </RequireAuth>
           }
         />
-
         <Route
           path="/programs"
           element={
-            <RootLayout>
-              <Programs />
-            </RootLayout>
+            <RequireAuth>
+              <RootLayout>
+                <Programs />
+              </RootLayout>
+            </RequireAuth>
           }
         >
           <Route index element={<ProgramIndexRedirect />} />
@@ -105,9 +170,11 @@ export function App() {
         <Route
           path="*"
           element={
-            <RootLayout>
-              <NotFound />
-            </RootLayout>
+            <RequireAuth>
+              <RootLayout>
+                <NotFound />
+              </RootLayout>
+            </RequireAuth>
           }
         />
       </Routes>

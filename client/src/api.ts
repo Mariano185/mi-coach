@@ -18,11 +18,27 @@ import type {
   UpdateProgramSetInput,
 } from "./types";
 
+// Flag para evitar loops infinitos cuando /api/auth/status devuelve 401.
+let redirectingToLogin = false;
+
+function redirectToLogin(): void {
+  if (redirectingToLogin) return;
+  if (location.pathname === "/login") return;
+  redirectingToLogin = true;
+  const next = encodeURIComponent(location.pathname + location.search);
+  location.href = `/login?next=${next}`;
+}
+
 async function req<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(url, {
     headers: { "Content-Type": "application/json" },
+    credentials: "include", // enviar/recibir cookie de sesión
     ...options,
   });
+  if (res.status === 401) {
+    redirectToLogin();
+    throw new Error("no autenticado");
+  }
   if (!res.ok) {
     const body = (await res.json().catch(() => ({}))) as { error?: string };
     throw new Error(body.error ?? `Error ${res.status}`);
@@ -63,4 +79,11 @@ export const api = {
       method: "POST",
       body: JSON.stringify(input),
     }),
+
+  // Auth
+  login: (password: string) =>
+    req<{ ok: true }>("/api/auth/login", { method: "POST", body: JSON.stringify({ password }) }),
+  logout: () => req<{ ok: true }>("/api/auth/logout", { method: "POST" }),
+  authStatus: () =>
+    req<{ authenticated: boolean; password_configured: boolean }>("/api/auth/status"),
 };

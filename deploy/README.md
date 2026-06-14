@@ -73,7 +73,13 @@ journalctl -u mi-coach -f      # ver logs en vivo
 
 App disponible en `http://192.168.0.110:3001` dentro de la red WireGuard.
 
-## 6. Actualizar a una versión nueva
+## 6. Exponer al exterior con Tailscale Funnel (opcional)
+
+Para usar la app desde el celular del gym sin cliente VPN, seguí
+[`deploy/TAILSCALE.md`](./TAILSCALE.md). Pasos: instalar Tailscale en el CT,
+activar Funnel en :3001, agregar la URL a Safari como PWA.
+
+## 7. Actualizar a una versión nueva
 
 ```bash
 cd /opt/mi-coach

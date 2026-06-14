@@ -808,3 +808,53 @@ tbody tr:hover { background: var(--panel-2); }
 details { margin-bottom: 8px; }
 summary { cursor: pointer; padding: 8px 0; }
 .program-md { white-space: pre-wrap; font-family: ui-monospace, monospace; font-size: 13px; line-height: 1.5; }
+
+/* === Login === */
+.login-shell {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.login-card {
+  width: 100%;
+  max-width: 380px;
+  padding: 28px 24px;
+}
+.login-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 26px;
+  margin: 0 0 8px;
+  color: var(--lime);
+}
+.login-err {
+  color: var(--danger);
+  font-size: 13px;
+  margin: 0 0 12px;
+}
+
+/* === Botón "Salir" del topbar (desktop y mobile) === */
+.topbar-logout {
+  margin-left: auto;
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 6px 12px;
+  border-radius: 99px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+.topbar-logout:hover { color: var(--danger); border-color: var(--danger); }
+.topbar-logout:focus-visible { outline: 2px solid var(--lime); outline-offset: 2px; }
+@media (max-width: 600px) {
+  .topbar-logout { font-size: 10px; padding: 5px 10px; }
+}

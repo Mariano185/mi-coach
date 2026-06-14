@@ -206,6 +206,17 @@ function exId(nombre: string): number {
   return (db.prepare("SELECT id FROM exercises WHERE nombre = ?").get(nombre) as { id: number }).id;
 }
 
+// === Settings (clave/valor, reusado por auth) ===
+export function getSetting(clave: string): string | null {
+  const row = db
+    .prepare("SELECT valor FROM settings WHERE clave = ?")
+    .get(clave) as { valor: string } | undefined;
+  return row ? row.valor : null;
+}
+export function setSetting(clave: string, valor: string): void {
+  db.prepare("INSERT OR REPLACE INTO settings (clave, valor) VALUES (?, ?)").run(clave, valor);
+}
+
 // --- Seed mínimo: ~2 semanas de sesiones A/B + bodyweight, para que el dashboard no esté vacío. ---
 function seedSampleData(): void {
   const count = (db.prepare("SELECT COUNT(*) AS n FROM sessions").get() as { n: number }).n;

@@ -11,6 +11,9 @@ WorkingDirectory=/opt/mi-coach
 Environment=NODE_ENV=production
 Environment=PORT=3001
 Environment=COACH_DB_PATH=/var/lib/mi-coach/coach.db
+# Password de un solo usuario (se hashea con bcrypt al primer boot).
+# Ver deploy/TAILSCALE.md para resetearlo.
+Environment=AUTH_PASSWORD=changeme
 ExecStart=/usr/bin/node server/dist/index.js
 Restart=always
 RestartSec=3
