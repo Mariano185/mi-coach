@@ -13,25 +13,27 @@ const SETTING_KEY: Record<string, string> = {
 // GET /api/stats — e1RM por básico, tendencia de peso (PM 7d), volumen semanal.
 statsRouter.get("/", (_req, res) => {
   // 1) Mejor e1RM por básico vs 1RM inicial (settings).
+  // LEFT JOIN para incluir básicos sin sets aún (mejor_e1rm = null → fallback a rm_inicial).
   const basicosRaw = db
     .prepare(
       `SELECT e.id AS exercise_id, e.nombre, MAX(v.e1rm) AS mejor_e1rm
        FROM exercises e
-       JOIN v_sets_e1rm v ON v.exercise_id = e.id
+       LEFT JOIN v_sets_e1rm v ON v.exercise_id = e.id
        WHERE e.es_basico = 1
        GROUP BY e.id, e.nombre`
     )
-    .all() as Array<{ exercise_id: number; nombre: string; mejor_e1rm: number }>;
+    .all() as Array<{ exercise_id: number; nombre: string; mejor_e1rm: number | null }>;
 
   const getSetting = db.prepare("SELECT valor FROM settings WHERE clave = ?");
   const basicos: BasicE1rm[] = basicosRaw.map((b) => {
     const key = SETTING_KEY[b.nombre];
     const row = key ? (getSetting.get(key) as { valor: string } | undefined) : undefined;
+    const rm_inicial = row ? Number(row.valor) : null;
     return {
       exercise_id: b.exercise_id,
       nombre: b.nombre,
-      mejor_e1rm: b.mejor_e1rm,
-      rm_inicial: row ? Number(row.valor) : null,
+      mejor_e1rm: b.mejor_e1rm ?? rm_inicial ?? 0,
+      rm_inicial,
     };
   });
 
