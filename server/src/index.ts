@@ -26,11 +26,14 @@ app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 app.use(cookieParser());
 
-// Auth: /api/auth/* es público; el resto de /api/* requiere cookie válida.
+// Healthcheck público (antes del guard) para monitoreo sin cookie.
+app.get("/api/health", (_req, res) => res.json({ ok: true }));
+
+// Auth: /api/auth/* es público; el resto de /api/* requiere cookie válida
+// (o el header X-Coach-Key del coach).
 app.use("/api/auth", authRouter);
 app.use("/api", requireAuth);
 
-app.get("/api/health", (_req, res) => res.json({ ok: true }));
 app.use("/api/exercises", exercisesRouter);
 app.use("/api/sessions", sessionsRouter);
 app.use("/api/sets", setsRouter);

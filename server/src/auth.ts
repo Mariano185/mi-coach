@@ -13,11 +13,15 @@ const BCRYPT_ROUNDS = 12;
 
 const PASSWORD_KEY = "auth_password_hash";
 const SECRET_KEY = "auth_session_secret";
+const COACH_KEY = "coach_api_key";
+const COACH_HEADER = "x-coach-key";
 
 // Bootstrap: si no hay hash en DB pero hay AUTH_PASSWORD en env, hashearlo.
 // (Single-user: una sola fuente de verdad — el hash en DB. El env var es solo
 //  el "seed" para la primera corrida.)
 export function bootstrapAuth(): void {
+  // Asegurar el coach key desde el arranque (lo imprime una vez si lo genera).
+  getCoachKey();
   if (getSetting(PASSWORD_KEY)) return;
   const envPwd = process.env.AUTH_PASSWORD;
   if (!envPwd) {
@@ -39,6 +43,33 @@ function getSecret(): string {
     setSetting(SECRET_KEY, s);
   }
   return s;
+}
+
+// API key del coach: secret estable en settings, auto-generado en el primer
+// arranque. El coach (caja negra) lo manda en el header X-Coach-Key para leer/
+// escribir sin login de browser. Se imprime una vez al generarlo.
+export function getCoachKey(): string {
+  let k = getSetting(COACH_KEY);
+  if (!k) {
+    k = randomBytes(24).toString("hex");
+    setSetting(COACH_KEY, k);
+    console.log(`[auth] coach_api_key generado: ${k}`);
+  }
+  return k;
+}
+
+// Compara el header del coach contra el key en tiempo constante.
+function coachKeyMatches(header: unknown): boolean {
+  if (typeof header !== "string" || !header) return false;
+  const expected = getCoachKey();
+  const a = Buffer.from(header);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length) return false;
+  try {
+    return timingSafeEqual(a, b);
+  } catch {
+    return false;
+  }
 }
 
 // Token = sessionId + "." + HMAC(secret, sessionId).
@@ -68,6 +99,12 @@ export function isAuthConfigured(): boolean {
 }
 
 export function requireAuth(req: Request, res: Response, next: NextFunction): void {
+  // Vía coach (caja negra): header X-Coach-Key. Bypassa el login de browser.
+  if (coachKeyMatches(req.headers[COACH_HEADER])) {
+    next();
+    return;
+  }
+  // Vía browser: cookie de sesión firmada.
   const token = req.cookies?.[SESSION_COOKIE];
   if (!token) {
     res.status(401).json({ error: "no autenticado" });
