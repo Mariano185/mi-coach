@@ -560,7 +560,6 @@ export function initDb(): void {
   migrate();
   seedExercises();
   seedSettings();
-  seedSampleData();
   migrateMarkdownPrograms();
   console.log(`[db] listo en ${DB_PATH}`);
 }
