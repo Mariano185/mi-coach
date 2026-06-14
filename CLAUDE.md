@@ -91,16 +91,36 @@ Cascadas `ON DELETE CASCADE` week→day→exercise→set. `program_days.session_
 | **POST** | `/program/days/:id/complete` | idempotente: crea/reusa `session` + inserta `sets` reales → historial |
 | **POST** | `/program/weeks` | crea semana estructurada completa desde JSON |
 
-**Crear semana** (la usa el coach; detalle del JSON en la skill `nueva-semana`):
+**Crear semana** (la usa el coach; detalle del JSON en la skill `nueva-semana`).
+Requiere auth: header `X-Coach-Key` (o cookie de sesión). Ver sección **Auth**.
 ```bash
 curl -s -X POST http://192.168.0.110:3001/api/program/weeks \
-  -H "Content-Type: application/json" \
+  -H "X-Coach-Key: $COACH_API_KEY" -H "Content-Type: application/json" \
   -d '{ "semana": 7, "nombre": "...", "bloque": "...", "notas": "...", "days": [ ... ] }'
 ```
 
 **Flujo completar día → historial:** UI edita `program_sets` reales (PATCH) → "Registrar día"
 (`POST /days/:id/complete`) → crea `session` + `sets`, linkea `program_days.session_id`.
 Re-registrar es idempotente (reusa la session). Esto reemplaza LogSession para días planificados.
+
+---
+
+## Auth (single-user, `server/src/auth.ts`)
+
+Login con password único. Hash **bcrypt** en `settings["auth_password_hash"]`; cookie de sesión
+firmada con HMAC (secret en `settings["auth_session_secret"]`).
+
+- `app.use("/api", requireAuth)` protege **todo** `/api/*`. Excepciones públicas montadas **antes**
+  del guard: `/api/health` y `/api/auth/*` (login/logout/status).
+- **Bootstrap del password:** `bootstrapAuth()` hashea `AUTH_PASSWORD` (env) en el primer arranque
+  si no hay hash en DB. Después la DB es la fuente de verdad.
+- **Coach key:** `requireAuth` también acepta el header `X-Coach-Key` contra
+  `settings["coach_api_key"]` (auto-generado al arrancar, se imprime una vez en el log; compare
+  timing-safe). Es la vía del coach (caja negra) para leer/escribir sin sesión de browser.
+  Recuperarlo: `journalctl -u mi-coach | grep coach_api_key` o leer `settings`.
+
+> **Deuda conocida:** el token de sesión no expira server-side (la cookie sí, a 30d). Sin `exp`
+> firmado, un token robado vale indefinidamente. No urgente; anotado para endurecer.
 
 ---
 
