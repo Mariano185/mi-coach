@@ -78,6 +78,7 @@ Cascadas `ON DELETE CASCADE` week→day→exercise→set. `program_days.session_
 | Método | Ruta | Qué hace |
 |--------|------|----------|
 | GET | `/exercises` | lista la library |
+| **POST** | `/exercises` | crea ejercicio en la library (`nombre` único, `es_basico` default 0) |
 | GET/POST | `/sessions`, `/sessions/:id` | sesiones (registro manual) |
 | POST | `/sets` | agregar serie real a una sesión |
 | GET/POST | `/bodyweight` | peso corporal |
@@ -87,6 +88,7 @@ Cascadas `ON DELETE CASCADE` week→day→exercise→set. `program_days.session_
 | **GET** | `/program/weeks/:id` | semana + cards de días |
 | **GET** | `/program/days/:id` | día + cards de ejercicios |
 | **GET** | `/program/exercises/:id` | ejercicio + series (de `v_program_sets_e1rm`) |
+| **PATCH** | `/program/exercises/:id` | swap/editar ejercicio prescrito (`exercise_id`, `seccion`, `reps_text`/`carga_text`/`rpe_text`, `notas`); no toca series |
 | **PATCH** | `/program/sets/:id` | editar `real_peso/reps/rpe`; pone `hecha=1` si peso+reps presentes |
 | **POST** | `/program/days/:id/complete` | idempotente: crea/reusa `session` + inserta `sets` reales → historial |
 | **POST** | `/program/weeks` | crea semana estructurada completa desde JSON |
