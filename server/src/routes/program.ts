@@ -249,6 +249,67 @@ programRouter.get("/exercises/:id", (req, res) => {
   res.json(detail);
 });
 
+// PATCH /api/program/exercises/:id — swap/editar un ejercicio ya prescrito.
+// Permite cambiar el exercise_id (ej: Leg Curl → RDL), nombre libre, sección,
+// y los textos objetivo (reps/carga/rpe) y notas. No toca las series target/real.
+programRouter.patch("/exercises/:id", (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id)) return res.status(400).json({ error: "id inválido" });
+
+  const ex = db.prepare("SELECT * FROM program_exercises WHERE id = ?").get(id) as
+    | ProgramExercise
+    | undefined;
+  if (!ex) return res.status(404).json({ error: "ejercicio no encontrado" });
+
+  const body = (req.body ?? {}) as {
+    exercise_id?: number | null;
+    nombre_libre?: string | null;
+    seccion?: string;
+    reps_text?: string | null;
+    carga_text?: string | null;
+    rpe_text?: string | null;
+    notas?: string | null;
+  };
+
+  // Si mandan exercise_id (no null), validar que exista en la library.
+  if (body.exercise_id !== undefined && body.exercise_id !== null) {
+    const ok = db.prepare("SELECT 1 FROM exercises WHERE id = ?").get(body.exercise_id);
+    if (!ok) return res.status(400).json({ error: `exercise_id inválido: ${body.exercise_id}` });
+  }
+  if (body.seccion !== undefined && !["main", "accesorio", "core"].includes(body.seccion)) {
+    return res.status(400).json({ error: "seccion debe ser main|accesorio|core" });
+  }
+
+  // Merge: solo pisa los campos presentes en el body (undefined = no tocar).
+  const pick = <T>(v: T | undefined, cur: T): T => (v !== undefined ? v : cur);
+  const next = {
+    exercise_id: pick(body.exercise_id, ex.exercise_id),
+    nombre_libre: pick(body.nombre_libre, ex.nombre_libre),
+    seccion: pick(body.seccion, ex.seccion),
+    reps_text: pick(body.reps_text, ex.reps_text),
+    carga_text: pick(body.carga_text, ex.carga_text),
+    rpe_text: pick(body.rpe_text, ex.rpe_text),
+    notas: pick(body.notas, ex.notas),
+  };
+
+  db.prepare(
+    `UPDATE program_exercises
+       SET exercise_id=@exercise_id, nombre_libre=@nombre_libre, seccion=@seccion,
+           reps_text=@reps_text, carga_text=@carga_text, rpe_text=@rpe_text, notas=@notas
+       WHERE id=@id`
+  ).run({ id, ...next });
+
+  const updated = db
+    .prepare(
+      `SELECT pe.*, ${EX_NAME_SQL} AS nombre, COALESCE(e.es_basico,0) AS es_basico
+       FROM program_exercises pe
+       LEFT JOIN exercises e ON e.id = pe.exercise_id
+       WHERE pe.id = ?`
+    )
+    .get(id);
+  res.json(updated);
+});
+
 // ---------- SERIES ----------
 
 // PATCH /api/program/sets/:id — completar/editar valores reales de una serie.
