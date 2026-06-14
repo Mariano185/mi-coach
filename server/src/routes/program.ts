@@ -310,6 +310,98 @@ programRouter.patch("/exercises/:id", (req, res) => {
   res.json(updated);
 });
 
+// POST /api/program/days/:id/exercises — agregar un ejercicio a un día existente.
+// Body igual al objeto exercises[] de POST /program/weeks.
+programRouter.post("/days/:id/exercises", (req, res) => {
+  const dayId = Number(req.params.id);
+  if (!Number.isInteger(dayId)) return res.status(400).json({ error: "id inválido" });
+
+  const day = db.prepare("SELECT 1 FROM program_days WHERE id = ?").get(dayId);
+  if (!day) return res.status(404).json({ error: "día no encontrado" });
+
+  const body = (req.body ?? {}) as {
+    exercise_id?: number | null;
+    nombre_libre?: string | null;
+    seccion?: string;
+    reps_text?: string | null;
+    carga_text?: string | null;
+    rpe_text?: string | null;
+    notas?: string | null;
+    sets?: Array<{ n_serie: number; target_reps?: number | null; target_rpe?: number | null }>;
+  };
+
+  if (body.exercise_id != null) {
+    const ok = db.prepare("SELECT 1 FROM exercises WHERE id = ?").get(body.exercise_id);
+    if (!ok) return res.status(400).json({ error: `exercise_id inválido: ${body.exercise_id}` });
+  }
+  const seccion = body.seccion ?? "accesorio";
+  if (!["main", "accesorio", "core"].includes(seccion)) {
+    return res.status(400).json({ error: "seccion debe ser main|accesorio|core" });
+  }
+
+  const maxOrden = db
+    .prepare("SELECT COALESCE(MAX(orden),0) AS m FROM program_exercises WHERE day_id = ?")
+    .get(dayId) as { m: number };
+
+  const insEx = db.prepare(
+    `INSERT INTO program_exercises (day_id, exercise_id, nombre_libre, seccion, reps_text, carga_text, rpe_text, notas, orden)
+     VALUES (@day_id, @exercise_id, @nombre_libre, @seccion, @reps_text, @carga_text, @rpe_text, @notas, @orden)`
+  );
+  const insSet = db.prepare(
+    `INSERT INTO program_sets (program_exercise_id, n_serie, target_reps, target_rpe)
+     VALUES (@program_exercise_id, @n_serie, @target_reps, @target_rpe)`
+  );
+
+  const exId = db.transaction(() => {
+    const id = insEx.run({
+      day_id: dayId,
+      exercise_id: body.exercise_id ?? null,
+      nombre_libre: body.nombre_libre ?? null,
+      seccion,
+      reps_text: body.reps_text ?? null,
+      carga_text: body.carga_text ?? null,
+      rpe_text: body.rpe_text ?? null,
+      notas: body.notas ?? null,
+      orden: maxOrden.m + 1,
+    }).lastInsertRowid as number;
+
+    for (const s of body.sets ?? []) {
+      insSet.run({ program_exercise_id: id, n_serie: s.n_serie, target_reps: s.target_reps ?? null, target_rpe: s.target_rpe ?? null });
+    }
+    return id;
+  })();
+
+  const created = db.prepare(
+    `SELECT pe.*, ${EX_NAME_SQL} AS nombre, COALESCE(e.es_basico,0) AS es_basico
+     FROM program_exercises pe LEFT JOIN exercises e ON e.id = pe.exercise_id WHERE pe.id = ?`
+  ).get(exId);
+  res.status(201).json(created);
+});
+
+// DELETE /api/program/exercises/:id — eliminar un ejercicio prescrito (y sus series target/real).
+programRouter.delete("/exercises/:id", (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id)) return res.status(400).json({ error: "id inválido" });
+
+  const ex = db.prepare("SELECT 1 FROM program_exercises WHERE id = ?").get(id);
+  if (!ex) return res.status(404).json({ error: "ejercicio no encontrado" });
+
+  db.prepare("DELETE FROM program_exercises WHERE id = ?").run(id);
+  res.json({ ok: true });
+});
+
+// DELETE /api/program/weeks/:id — borrar semana completa (cascade days/exercises/sets).
+programRouter.delete("/weeks/:id", (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id)) return res.status(400).json({ error: "id inválido" });
+
+  const week = db.prepare("SELECT semana FROM program_weeks WHERE id = ?").get(id) as { semana: number } | undefined;
+  if (!week) return res.status(404).json({ error: "semana no encontrada" });
+
+  db.prepare("DELETE FROM program_weeks WHERE id = ?").run(id);
+  res.json({ ok: true, semana: week.semana });
+});
+
 // ---------- SERIES ----------
 
 // PATCH /api/program/sets/:id — completar/editar valores reales de una serie.
