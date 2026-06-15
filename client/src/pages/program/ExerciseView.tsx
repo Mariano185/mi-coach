@@ -287,7 +287,7 @@ function ObjetivoGrid({ data }: { data: ProgramExerciseDetail }) {
       {data.sets.map((s) => (
         <Row key={s.id}>
           <div className="serie-n">{s.n_serie}</div>
-          <div className="target-cell">{data.reps_text ?? "—"}</div>
+          <div className="target-cell">{s.target_reps ?? data.reps_text ?? "—"}</div>
           <div className="target-cell">{s.target_rpe ?? "—"}</div>
           <div className="target-cell">{data.carga_text ?? "—"}</div>
         </Row>
