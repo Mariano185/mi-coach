@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
 import type { Stats } from "../types";
-import { TrendChart } from "../components/TrendChart";
 
 export function Dashboard() {
   const [stats, setStats] = useState<Stats | null>(null);
