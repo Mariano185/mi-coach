@@ -92,6 +92,45 @@ coachRouter.get("/analisis", (req, res) => {
     .prepare("SELECT MAX(semana) AS max_semana FROM program_weeks")
     .get();
 
+  // 9) Sesiones realizadas: fecha real + horarios + duración (para analizar
+  //    frecuencia, días consecutivos y fatiga acumulada). Solo días con actividad
+  //    (al menos una serie hecha o ya registrados al historial), en la ventana.
+  //    duracion_min se calcula cuando hay hora_inicio y hora_fin (mismo día).
+  const sesiones_realizadas = db
+    .prepare(
+      `SELECT
+         pw.semana,
+         pd.dia,
+         pd.tipo,
+         COALESCE(pd.fecha_real, pd.fecha_plan) AS fecha,
+         pd.hora_inicio,
+         pd.hora_fin,
+         CASE WHEN pd.hora_inicio IS NOT NULL AND pd.hora_fin IS NOT NULL
+              THEN (
+                (CAST(substr(pd.hora_fin,1,2) AS INTEGER)*60 + CAST(substr(pd.hora_fin,4,2) AS INTEGER))
+                - (CAST(substr(pd.hora_inicio,1,2) AS INTEGER)*60 + CAST(substr(pd.hora_inicio,4,2) AS INTEGER))
+                + 1440
+              ) % 1440
+         END AS duracion_min,
+         (pd.session_id IS NOT NULL) AS registrada,
+         (SELECT COUNT(*) FROM program_sets ps
+            JOIN program_exercises pe ON pe.id = ps.program_exercise_id
+            WHERE pe.day_id = pd.id AND ps.hecha = 1) AS series_hechas
+       FROM program_days pd
+       JOIN program_weeks pw ON pw.id = pd.week_id
+       WHERE COALESCE(pd.fecha_real, pd.fecha_plan) >= date('now', ?)
+         AND (
+           pd.session_id IS NOT NULL
+           OR EXISTS (
+             SELECT 1 FROM program_sets ps
+             JOIN program_exercises pe ON pe.id = ps.program_exercise_id
+             WHERE pe.day_id = pd.id AND ps.hecha = 1
+           )
+         )
+       ORDER BY fecha, pd.hora_inicio`
+    )
+    .all(desde);
+
   res.json({
     ventana_dias: dias,
     mejor_e1rm_basicos,
@@ -103,5 +142,6 @@ coachRouter.get("/analisis", (req, res) => {
     bienestar_reciente,
     ejercicios,
     ultima_semana,
+    sesiones_realizadas,
   });
 });
