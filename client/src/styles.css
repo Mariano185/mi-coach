@@ -556,6 +556,9 @@ tbody tr:hover { background: var(--panel-2); }
 .sets-table.sets-table--no-ok {
   grid-template-columns: 44px 1fr 1fr 1fr 1fr;
 }
+.sets-table.sets-table--objetivo {
+  grid-template-columns: 44px 1fr 1fr 1fr;
+}
 /* Cada set es un .set-row (div) que en desktop se "aplana" con display:contents
    para que sus hijos participen del grid del .sets-table. En mobile se vuelve card. */
 .set-row { display: contents; }
@@ -594,7 +597,6 @@ tbody tr:hover { background: var(--panel-2); }
   font-variant-numeric: tabular-nums;
   font-weight: 600;
 }
-.sets-table input.filled { border-color: var(--lime-dim); }
 .sets-table .check {
   display: inline-flex;
   align-items: center;

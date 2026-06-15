@@ -435,13 +435,13 @@ programRouter.patch("/sets/:id", (req, res) => {
     notas: body.notas !== undefined ? body.notas : set.notas,
     hecha:
       body.hecha !== undefined
-        ? body.hecha
-          ? 1
-          : 0
-        : // auto: si tiene peso y reps reales, marcar hecha.
-          (body.real_peso ?? set.real_peso) != null && (body.real_reps ?? set.real_reps) != null
-        ? 1
-        : set.hecha,
+        ? body.hecha ? 1 : 0
+        : // auto: deriva de los valores finales (sube y baja según peso+reps).
+          (() => {
+            const peso = body.real_peso !== undefined ? num(body.real_peso) : set.real_peso;
+            const reps = body.real_reps !== undefined ? num(body.real_reps) : set.real_reps;
+            return peso != null && reps != null ? 1 : 0;
+          })(),
   };
 
   db.prepare(

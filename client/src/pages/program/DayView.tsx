@@ -29,12 +29,6 @@ export function DayView() {
   }
   useEffect(load, [dayId]);
 
-  // Recargar al volver desde ExerciseView (navegación hacia atrás en el router).
-  useEffect(() => {
-    const onPop = () => load();
-    window.addEventListener("popstate", onPop);
-    return () => window.removeEventListener("popstate", onPop);
-  }, [dayId]);
 
   // Toast efímero al registrar un día.
   useEffect(() => {

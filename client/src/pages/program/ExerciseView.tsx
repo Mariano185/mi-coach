@@ -42,7 +42,7 @@ function SetCell({
     <input
       inputMode="decimal"
       aria-label={ariaLabel}
-      className={draft !== "" ? "filled" : ""}
+      className=""
       placeholder={placeholder}
       value={draft}
       onChange={(e) => {
@@ -279,21 +279,17 @@ export function ExerciseView() {
 
 function ObjetivoGrid({ data }: { data: ProgramExerciseDetail }) {
   return (
-    <div className="sets-table" role="table" aria-label="Objetivo por serie">
+    <div className="sets-table sets-table--objetivo" role="table" aria-label="Objetivo por serie">
       <div className="sh">#</div>
       <div className="sh">Reps</div>
       <div className="sh">RPE</div>
-      <div className="sh" style={{ gridColumn: "span 2" }}>
-        Carga sugerida
-      </div>
+      <div className="sh">Carga sugerida</div>
       {data.sets.map((s) => (
         <Row key={s.id}>
           <div className="serie-n">{s.n_serie}</div>
           <div className="target-cell">{data.reps_text ?? "—"}</div>
           <div className="target-cell">{s.target_rpe ?? "—"}</div>
-          <div className="target-cell" style={{ gridColumn: "span 2" }}>
-            {data.carga_text ?? "—"}
-          </div>
+          <div className="target-cell">{data.carga_text ?? "—"}</div>
         </Row>
       ))}
     </div>
