@@ -1,27 +1,43 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { api } from "../../api";
 import type { ProgramExerciseDetail, ProgramSet } from "../../types";
-import { IconBack, IconCheck } from "../../components/icons";
+import { IconBack, IconCloudCheck, IconCloudOff, IconCloudSync } from "../../components/icons";
 
 type Tab = "objetivo" | "real";
+type SyncState = "synced" | "saving" | "error";
 
-// Campo numérico de una serie, edición optimista con guardado al salir (onBlur).
+const DEBOUNCE_MS = 2000;
+
+// Campo numérico de una serie: avisa cambios via onChange (sin guardado propio).
 function SetCell({
   value,
   placeholder,
   onCommit,
+  onDirty,
+  onBlur: onBlurExtra,
   ariaLabel,
 }: {
   value: number | null;
   placeholder: string;
   onCommit: (v: number | null) => void;
+  onDirty: () => void;
+  onBlur?: () => void;
   ariaLabel: string;
 }) {
   const [draft, setDraft] = useState(value == null ? "" : String(value));
   useEffect(() => {
     setDraft(value == null ? "" : String(value));
   }, [value]);
+
+  function handleBlur() {
+    const trimmed = draft.trim();
+    const next = trimmed === "" ? null : Number(trimmed.replace(",", "."));
+    const normalized = next != null && Number.isFinite(next) ? next : null;
+    if (normalized !== value) onCommit(normalized);
+    onBlurExtra?.();
+  }
+
   return (
     <input
       inputMode="decimal"
@@ -29,14 +45,40 @@ function SetCell({
       className={draft !== "" ? "filled" : ""}
       placeholder={placeholder}
       value={draft}
-      onChange={(e) => setDraft(e.target.value)}
-      onBlur={() => {
-        const trimmed = draft.trim();
-        const next = trimmed === "" ? null : Number(trimmed.replace(",", "."));
-        const normalized = next != null && Number.isFinite(next) ? next : null;
-        if (normalized !== value) onCommit(normalized);
+      onChange={(e) => {
+        setDraft(e.target.value);
+        onDirty();
       }}
+      onBlur={handleBlur}
     />
+  );
+}
+
+// Indicador de sync arriba a la derecha.
+function SyncStatus({ state, onFlush }: { state: SyncState; onFlush: () => void }) {
+  const canClick = state === "error";
+  if (state === "synced") {
+    return (
+      <span className="sync-status sync-ok" aria-label="Guardado">
+        <IconCloudCheck width={20} height={20} />
+      </span>
+    );
+  }
+  if (state === "saving") {
+    return (
+      <span className="sync-status sync-saving" aria-label="Guardando…">
+        <IconCloudSync width={20} height={20} />
+      </span>
+    );
+  }
+  return (
+    <button
+      className="sync-status sync-error"
+      aria-label="Error al guardar — tap para reintentar"
+      onClick={canClick ? onFlush : undefined}
+    >
+      <IconCloudOff width={20} height={20} />
+    </button>
   );
 }
 
@@ -49,6 +91,12 @@ export function ExerciseView() {
   const [data, setData] = useState<ProgramExerciseDetail | null>(null);
   const [tab, setTab] = useState<Tab>("real");
   const [err, setErr] = useState("");
+  const [syncState, setSyncState] = useState<SyncState>("synced");
+
+  // Cola de patches pendientes: setId → campos a enviar.
+  const pending = useRef<Map<number, Partial<Record<"real_peso" | "real_reps" | "real_rpe", number | null>>>>(new Map());
+  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const flushingRef = useRef(false);
 
   useEffect(() => {
     if (!Number.isInteger(exerciseId)) {
@@ -58,7 +106,88 @@ export function ExerciseView() {
     api.getProgramExercise(exerciseId).then(setData).catch((e) => setErr(e.message));
   }, [exerciseId]);
 
-  // Estadísticas derivadas en render (no en effect): mejor e1RM + tonelaje total.
+  const flush = useCallback(async () => {
+    if (flushingRef.current || pending.current.size === 0) return;
+    flushingRef.current = true;
+    setSyncState("saving");
+
+    const snapshot = new Map(pending.current);
+    pending.current.clear();
+
+    try {
+      const updates = await Promise.all(
+        [...snapshot.entries()].map(([setId, patch]) =>
+          api.updateProgramSet(setId, patch)
+        )
+      );
+      // Actualizar state con las respuestas reales del server.
+      setData((prev) =>
+        prev
+          ? {
+              ...prev,
+              sets: prev.sets.map((s) => {
+                const updated = updates.find((u) => u.id === s.id);
+                return updated ?? s;
+              }),
+            }
+          : prev
+      );
+      setSyncState("synced");
+    } catch (e) {
+      // Devolver los patches fallidos a la cola para que el usuario pueda reintentar.
+      for (const [k, v] of snapshot) {
+        if (!pending.current.has(k)) pending.current.set(k, v);
+      }
+      setErr((e as Error).message);
+      setSyncState("error");
+    } finally {
+      flushingRef.current = false;
+    }
+  }, []);
+
+  // Flush al desmontar (usuario navega fuera sin esperar el debounce).
+  useEffect(() => {
+    return () => {
+      if (debounceTimer.current) clearTimeout(debounceTimer.current);
+      if (pending.current.size > 0) void flush();
+    };
+  }, [flush]);
+
+  // Marca nube amarilla mientras el usuario está tipeando (antes de commitear).
+  function onDirty() {
+    if (syncState === "synced") setSyncState("saving");
+  }
+
+  // Registra un cambio committeado (onBlur del campo): merge en la cola y debounce.
+  function schedulePatch(
+    set: ProgramSet,
+    patch: Partial<Record<"real_peso" | "real_reps" | "real_rpe", number | null>>
+  ) {
+    if (Object.keys(patch).length === 0) return; // llamada de onDirty, ignorar
+
+    // Actualización optimista inmediata.
+    setData((prev) =>
+      prev
+        ? { ...prev, sets: prev.sets.map((s) => (s.id === set.id ? { ...s, ...patch } : s)) }
+        : prev
+    );
+
+    // Merge en pendientes.
+    const current = pending.current.get(set.id) ?? {};
+    pending.current.set(set.id, { ...current, ...patch });
+    setSyncState("saving");
+
+    // Debounce: resetear timer.
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    debounceTimer.current = setTimeout(() => void flush(), DEBOUNCE_MS);
+  }
+
+  // Cuando el usuario sale de un campo (blur): flush inmediato para no perder datos.
+  function onBlurFlush() {
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    void flush();
+  }
+
   const stats = useMemo(() => {
     if (!data) return { e1rm: 0, tonelaje: 0 };
     let e1rm = 0;
@@ -70,28 +199,7 @@ export function ExerciseView() {
     return { e1rm: Math.round(e1rm * 10) / 10, tonelaje: Math.round(tonelaje) };
   }, [data]);
 
-  function patchSet(set: ProgramSet, patch: Partial<Record<"real_peso" | "real_reps" | "real_rpe", number | null>> & { hecha?: boolean }) {
-    // Optimista: actualizo local, luego confirmo con server.
-    setData((prev) =>
-      prev
-        ? { ...prev, sets: prev.sets.map((s) => (s.id === set.id ? { ...s, ...patch, hecha: patch.hecha != null ? (patch.hecha ? 1 : 0) : s.hecha } : s)) }
-        : prev
-    );
-    api
-      .updateProgramSet(set.id, patch)
-      .then((updated) =>
-        setData((prev) =>
-          prev ? { ...prev, sets: prev.sets.map((s) => (s.id === updated.id ? updated : s)) } : prev
-        )
-      )
-      .catch((e) => setErr((e as Error).message));
-  }
-
-  function toggleDone(set: ProgramSet) {
-    patchSet(set, { hecha: set.hecha ? false : true });
-  }
-
-  if (err) return <p style={{ color: "var(--danger)" }}>{err}</p>;
+  if (err && !data) return <p style={{ color: "var(--danger)" }}>{err}</p>;
   if (!data) return <p className="muted">Cargando…</p>;
 
   return (
@@ -107,6 +215,7 @@ export function ExerciseView() {
         <span className="prog-crumb">
           Día <b>{data.dia}</b> · serie por serie
         </span>
+        <SyncStatus state={syncState} onFlush={() => void flush()} />
       </div>
 
       <h2 className="prog-title">{data.nombre}</h2>
@@ -134,7 +243,12 @@ export function ExerciseView() {
         {tab === "objetivo" ? (
           <ObjetivoGrid data={data} />
         ) : (
-          <RealGrid data={data} onPatch={patchSet} onToggle={toggleDone} />
+          <RealGrid
+            data={data}
+            onPatch={schedulePatch}
+            onDirty={onDirty}
+            onBlurFlush={onBlurFlush}
+          />
         )}
       </div>
 
@@ -163,7 +277,6 @@ export function ExerciseView() {
   );
 }
 
-// Variante: solo lectura del objetivo del coach.
 function ObjetivoGrid({ data }: { data: ProgramExerciseDetail }) {
   return (
     <div className="sets-table" role="table" aria-label="Objetivo por serie">
@@ -173,7 +286,6 @@ function ObjetivoGrid({ data }: { data: ProgramExerciseDetail }) {
       <div className="sh" style={{ gridColumn: "span 2" }}>
         Carga sugerida
       </div>
-      <div className="sh" />
       {data.sets.map((s) => (
         <Row key={s.id}>
           <div className="serie-n">{s.n_serie}</div>
@@ -182,31 +294,30 @@ function ObjetivoGrid({ data }: { data: ProgramExerciseDetail }) {
           <div className="target-cell" style={{ gridColumn: "span 2" }}>
             {data.carga_text ?? "—"}
           </div>
-          <div />
         </Row>
       ))}
     </div>
   );
 }
 
-// Variante: edición de los valores reales.
 function RealGrid({
   data,
   onPatch,
-  onToggle,
+  onDirty,
+  onBlurFlush,
 }: {
   data: ProgramExerciseDetail;
   onPatch: (s: ProgramSet, p: Partial<Record<"real_peso" | "real_reps" | "real_rpe", number | null>>) => void;
-  onToggle: (s: ProgramSet) => void;
+  onDirty: () => void;
+  onBlurFlush: () => void;
 }) {
   return (
-    <div className="sets-table" aria-label="Real por serie">
+    <div className="sets-table sets-table--no-ok" aria-label="Real por serie">
       <div className="sh">#</div>
       <div className="sh">Peso</div>
       <div className="sh">Reps</div>
       <div className="sh">RPE</div>
       <div className="sh">Obj.</div>
-      <div className="sh">OK</div>
       {data.sets.map((s) => (
         <Row key={s.id}>
           <div className="serie-n">{s.n_serie}</div>
@@ -215,31 +326,27 @@ function RealGrid({
             placeholder="kg"
             ariaLabel={`Peso serie ${s.n_serie}`}
             onCommit={(v) => onPatch(s, { real_peso: v })}
+            onDirty={onDirty}
+            onBlur={onBlurFlush}
           />
           <SetCell
             value={s.real_reps}
             placeholder="reps"
             ariaLabel={`Reps serie ${s.n_serie}`}
             onCommit={(v) => onPatch(s, { real_reps: v })}
+            onDirty={onDirty}
+            onBlur={onBlurFlush}
           />
           <SetCell
             value={s.real_rpe}
             placeholder="rpe"
             ariaLabel={`RPE serie ${s.n_serie}`}
             onCommit={(v) => onPatch(s, { real_rpe: v })}
+            onDirty={onDirty}
+            onBlur={onBlurFlush}
           />
-          <div className="obj-row">
-            <div className="target-cell" title="objetivo">
-              {data.reps_text ?? "—"}×@{data.rpe_text ?? "—"}
-            </div>
-            <button
-              className={`check ${s.hecha ? "on" : ""}`}
-              aria-pressed={s.hecha === 1}
-              aria-label={`Marcar serie ${s.n_serie} como hecha`}
-              onClick={() => onToggle(s)}
-            >
-              {s.hecha ? <IconCheck width={18} height={18} /> : null}
-            </button>
+          <div className="target-cell" title="objetivo">
+            {data.reps_text ?? "—"}×@{data.rpe_text ?? "—"}
           </div>
         </Row>
       ))}
@@ -247,9 +354,6 @@ function RealGrid({
   );
 }
 
-// Fragment helper: una fila es solo los 6 hijos directos del grid.
-// En desktop usa display:contents para que sus hijos participen del grid del .sets-table.
-// En mobile el CSS lo convierte en una card apilada.
 function Row({ children }: { children: React.ReactNode }) {
   return <div className="set-row">{children}</div>;
 }

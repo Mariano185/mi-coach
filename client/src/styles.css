@@ -351,6 +351,31 @@ tbody tr:hover { background: var(--panel-2); }
   margin-bottom: 20px;
   flex-wrap: wrap;
 }
+
+/* Indicador de estado de sincronización (nube) */
+.sync-status {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  cursor: default;
+  padding: 0;
+  flex-shrink: 0;
+}
+.sync-status.sync-ok   { color: var(--lime); }
+.sync-status.sync-saving { color: var(--faint); }
+.sync-status.sync-error {
+  color: var(--danger);
+  cursor: pointer;
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+}
+.sync-status.sync-error:hover { background: color-mix(in srgb, var(--danger) 22%, transparent); }
+.sync-status.sync-error:focus-visible { outline: 2px solid var(--danger); outline-offset: 2px; }
 .prog-back {
   display: inline-flex;
   align-items: center;
@@ -527,6 +552,9 @@ tbody tr:hover { background: var(--panel-2); }
   grid-template-columns: 44px 1fr 1fr 1fr 1fr 44px;
   gap: 8px;
   align-items: center;
+}
+.sets-table.sets-table--no-ok {
+  grid-template-columns: 44px 1fr 1fr 1fr 1fr;
 }
 /* Cada set es un .set-row (div) que en desktop se "aplana" con display:contents
    para que sus hijos participen del grid del .sets-table. En mobile se vuelve card. */

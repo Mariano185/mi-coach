@@ -1,0 +1,1 @@
+Lee siempre C:\Users\maria\OneDrive\Documentos\Gym\mi-coach\CLAUDE.md para entender el contexto de este proyecto. Aquí se describen las convenciones, el acceso a la base de datos en producción, el proceso de despliegue y las habilidades de los agentes relacionados con el proyecto "Mi Coach".

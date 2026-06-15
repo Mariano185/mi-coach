@@ -167,3 +167,18 @@ ssh root@192.168.0.100 "pct exec 110 -- bash -c \
 - Tipos compartidos espejados en `server/src/types.ts` y `client/src/types.ts` (mantener en sync).
 - Frontend: tema "Forge" (lima `#c8f54a`, Oswald display) en `client/src/styles.css`. Drill-down semana→día→ejercicio con tabs OBJETIVO/REAL.
 - Para mejorar UI usar las skills en `.agents/skills/`.
+
+
+## Agent skills
+
+  ### Issue tracker
+
+  Issues live in GitHub Issues (`Mariano185/mi-coach`). See `docs/agents/issue-tracker.md`.
+
+  ### Triage labels
+
+  Default vocabulary: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
+
+  ### Domain docs
+
+  Single-context repo — one `CONTEXT.md` + `docs/adr/` at the root. See `docs/agents/domain.md`.

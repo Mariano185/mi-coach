@@ -65,6 +65,40 @@ export function IconBack(p: SVGProps<SVGSVGElement>) {
   );
 }
 
+// === Íconos de estado de sincronización (nube) ===
+// Comparten la silueta de nube; cambia el glyph interno.
+
+const CLOUD_PATH = "M7 18a4 4 0 0 1 0-8 5.5 5.5 0 0 1 10.5-1.5A3.75 3.75 0 0 1 18 18Z";
+
+export function IconCloudCheck(p: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(p)}>
+      <path d={CLOUD_PATH} />
+      <polyline points="9.5 13.5 11.5 15.5 15 11.5" />
+    </svg>
+  );
+}
+
+export function IconCloudSync(p: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(p)}>
+      <path d={CLOUD_PATH} />
+      <path d="M14.5 13a2.5 2.5 0 1 1-.7-1.8" />
+      <polyline points="14 9.5 14 11.5 12 11.5" />
+    </svg>
+  );
+}
+
+export function IconCloudOff(p: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(p)}>
+      <path d={CLOUD_PATH} />
+      <line x1="10" y1="11.5" x2="15" y2="16.5" />
+      <line x1="15" y1="11.5" x2="10" y2="16.5" />
+    </svg>
+  );
+}
+
 // === Íconos del bottom nav (mobile) ===
 // Cada destino principal de la app, mismo lenguaje que el resto.
 
