@@ -37,18 +37,6 @@ export function Dashboard() {
       </div>
 
       <div className="panel">
-        <h2>Tendencia de peso corporal (PM 7d)</h2>
-        <TrendChart
-          labels={stats.tendencia_peso.map((p) => p.fecha.slice(5))}
-          yLabel="kg"
-          series={[
-            { label: "Peso", color: "#4f9dff", points: stats.tendencia_peso.map((p) => p.peso_kg) },
-            { label: "PM 7d", color: "#34d399", points: stats.tendencia_peso.map((p) => p.promedio_movil_7d) },
-          ]}
-        />
-      </div>
-
-      <div className="panel">
         <h2>Volumen semanal (series: básicos vs accesorios)</h2>
         <table>
           <thead>
