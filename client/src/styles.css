@@ -633,6 +633,42 @@ tbody tr:hover { background: var(--panel-2); }
 }
 .mini-stats .ms .v .u { font-size: 14px; color: var(--muted); font-weight: 500; }
 
+/* fecha/horarios de sesión */
+.session-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+.session-meta-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.session-meta-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  font-weight: 600;
+}
+.session-meta-field input[type="date"],
+.session-meta-field input[type="time"] {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 14px;
+  padding: 6px 8px;
+  width: 100%;
+  box-sizing: border-box;
+  color-scheme: dark;
+}
+.session-meta-field input[type="date"]:focus,
+.session-meta-field input[type="time"]:focus {
+  outline: none;
+  border-color: var(--lime);
+}
+
 /* notas del coach (markdown simple) */
 .coach-notes { color: var(--muted); font-size: 13px; line-height: 1.6; }
 .coach-notes strong { color: var(--text); }

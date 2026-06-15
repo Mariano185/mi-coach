@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { api } from "../../api";
 import type { ProgramDayDetail, ProgramExerciseCard, Seccion } from "../../types";
 import { IconBack, IconLayers } from "../../components/icons";
+import { CoachNotes } from "../../components/CoachNotes";
 
 const SECCION_LABEL: Record<Seccion, string> = {
   main: "Básicos",
@@ -10,6 +11,15 @@ const SECCION_LABEL: Record<Seccion, string> = {
   core: "Core / Opcional",
 };
 const SECCION_ORDER: Seccion[] = ["main", "accesorio", "core"];
+
+function today(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function nowTime(): string {
+  const d = new Date();
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
 
 export function DayView() {
   const { dayId: dayIdParam } = useParams();
@@ -20,15 +30,28 @@ export function DayView() {
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState("");
 
+  // Campos de sesión editables localmente, sincronizados al blur.
+  const [fechaReal, setFechaReal] = useState("");
+  const [horaInicio, setHoraInicio] = useState("");
+  const [horaFin, setHoraFin] = useState("");
+
+  // Evitar auto-setear hora inicio más de una vez.
+  const horaInicioAutoSet = useRef(false);
+
   function load() {
     if (!Number.isInteger(dayId)) {
       setErr("día inválido");
       return;
     }
-    api.getProgramDay(dayId).then(setData).catch((e) => setErr(e.message));
+    api.getProgramDay(dayId).then((d) => {
+      setData(d);
+      setFechaReal(d.fecha_real ?? d.fecha_plan ?? today());
+      setHoraInicio(d.hora_inicio ?? "");
+      setHoraFin(d.hora_fin ?? "");
+      if (d.hora_inicio) horaInicioAutoSet.current = true;
+    }).catch((e) => setErr(e.message));
   }
   useEffect(load, [dayId]);
-
 
   // Toast efímero al registrar un día.
   useEffect(() => {
@@ -53,6 +76,20 @@ export function DayView() {
     const hechas = exs.reduce((a, e) => a + e.n_series_hechas, 0);
     return { total, hechas };
   }, [data]);
+
+  // Auto-setear hora de inicio cuando se completa la primera serie.
+  useEffect(() => {
+    if (progreso.hechas > 0 && !horaInicioAutoSet.current) {
+      horaInicioAutoSet.current = true;
+      const t = nowTime();
+      setHoraInicio(t);
+      void api.updateProgramDay(dayId, { hora_inicio: t });
+    }
+  }, [progreso.hechas, dayId]);
+
+  function patchDay(patch: Parameters<typeof api.updateProgramDay>[1]) {
+    void api.updateProgramDay(dayId, patch).catch(() => {});
+  }
 
   async function registrarDia() {
     if (!data) return;
@@ -94,12 +131,50 @@ export function DayView() {
         {data.titulo ? <span className="sub">{data.titulo}</span> : null}
       </h2>
 
+      {/* Fecha y horarios de sesión */}
+      <div className="panel" style={{ marginBottom: 18 }}>
+        <div className="session-meta-grid">
+          <label className="session-meta-field">
+            <span className="session-meta-label">Fecha</span>
+            <input
+              type="date"
+              value={fechaReal}
+              onChange={(e) => setFechaReal(e.target.value)}
+              onBlur={() => patchDay({ fecha_real: fechaReal || null })}
+            />
+          </label>
+          <label className="session-meta-field">
+            <span className="session-meta-label">Inicio</span>
+            <input
+              type="time"
+              value={horaInicio}
+              onChange={(e) => setHoraInicio(e.target.value)}
+              onBlur={() => patchDay({ hora_inicio: horaInicio || null })}
+            />
+          </label>
+          <label className="session-meta-field">
+            <span className="session-meta-label">Fin</span>
+            <input
+              type="time"
+              value={horaFin}
+              onChange={(e) => setHoraFin(e.target.value)}
+              onBlur={() => patchDay({ hora_fin: horaFin || null })}
+            />
+          </label>
+        </div>
+      </div>
+
       {data.warmup ? (
         <div className="panel" style={{ marginBottom: 18 }}>
           <h3 style={{ marginTop: 0 }}>Warm-up</h3>
           <p className="muted" style={{ margin: 0 }}>{data.warmup}</p>
         </div>
       ) : null}
+
+      <div className="panel" style={{ marginBottom: 18 }}>
+        <h3 style={{ marginTop: 0 }}>Notas del día</h3>
+        {data.notas ? <CoachNotes text={data.notas} /> : <p className="muted" style={{ margin: 0 }}>Sin notas.</p>}
+      </div>
 
       {grouped.map(([sec, items]) => (
         <section key={sec}>

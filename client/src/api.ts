@@ -67,6 +67,21 @@ export const api = {
   getProgramWeeks: () => req<ProgramWeek[]>("/api/program/weeks"),
   getProgramWeek: (id: number) => req<ProgramWeekDetail>(`/api/program/weeks/${id}`),
   getProgramDay: (id: number) => req<ProgramDayDetail>(`/api/program/days/${id}`),
+  updateProgramDay: (
+    id: number,
+    input: {
+      titulo?: string | null;
+      warmup?: string | null;
+      notas?: string | null;
+      fecha_real?: string | null;
+      hora_inicio?: string | null;
+      hora_fin?: string | null;
+    }
+  ) =>
+    req<ProgramDayDetail>(`/api/program/days/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(input),
+    }),
   getProgramExercise: (id: number) =>
     req<ProgramExerciseDetail>(`/api/program/exercises/${id}`),
   updateProgramSet: (id: number, input: UpdateProgramSetInput) =>

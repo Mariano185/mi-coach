@@ -104,6 +104,47 @@ programRouter.get("/days/:id", (req, res) => {
   res.json(detail);
 });
 
+// PATCH /api/program/days/:id — editar metadata del día.
+// No toca ejercicios ni series. Solo pisa los campos presentes en el body.
+programRouter.patch("/days/:id", (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id)) return res.status(400).json({ error: "id inválido" });
+
+  const day = db.prepare("SELECT * FROM program_days WHERE id = ?").get(id) as
+    | ProgramDay
+    | undefined;
+  if (!day) return res.status(404).json({ error: "día no encontrado" });
+
+  const body = (req.body ?? {}) as {
+    titulo?: string | null;
+    warmup?: string | null;
+    notas?: string | null;
+    fecha_real?: string | null;
+    hora_inicio?: string | null;
+    hora_fin?: string | null;
+  };
+
+  const pick = <T>(v: T | undefined, cur: T): T => (v !== undefined ? v : cur);
+  const next = {
+    titulo: pick(body.titulo, day.titulo),
+    warmup: pick(body.warmup, day.warmup),
+    notas: pick(body.notas, day.notas),
+    fecha_real: pick(body.fecha_real, day.fecha_real),
+    hora_inicio: pick(body.hora_inicio, day.hora_inicio),
+    hora_fin: pick(body.hora_fin, day.hora_fin),
+  };
+
+  db.prepare(
+    `UPDATE program_days
+       SET titulo=@titulo, warmup=@warmup, notas=@notas,
+           fecha_real=@fecha_real, hora_inicio=@hora_inicio, hora_fin=@hora_fin
+       WHERE id=@id`
+  ).run({ id, ...next });
+
+  const updated = db.prepare("SELECT * FROM program_days WHERE id = ?").get(id);
+  res.json(updated);
+});
+
 // POST /api/program/days/:id/complete — vuelca las series REALES a sessions/sets.
 // Idempotente: si el día ya tiene session_id, reusa esa sesión (borra sus sets y reinserta).
 programRouter.post("/days/:id/complete", (req, res) => {
@@ -151,7 +192,7 @@ programRouter.post("/days/:id/complete", (req, res) => {
   const fecha =
     body.fecha && /^\d{4}-\d{2}-\d{2}$/.test(body.fecha)
       ? body.fecha
-      : day.fecha_plan ?? new Date().toISOString().slice(0, 10);
+      : day.fecha_real ?? day.fecha_plan ?? new Date().toISOString().slice(0, 10);
 
   const tx = db.transaction(() => {
     let sessionId = day.session_id;

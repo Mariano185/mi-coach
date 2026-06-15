@@ -117,7 +117,11 @@ export interface ProgramDayDetail {
   tipo: SessionType | null;
   titulo: string | null;
   warmup: string | null;
+  notas: string | null;
   fecha_plan: string | null;
+  fecha_real: string | null;
+  hora_inicio: string | null;
+  hora_fin: string | null;
   session_id: number | null;
   orden: number;
   semana: number;

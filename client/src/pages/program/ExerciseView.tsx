@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { api } from "../../api";
 import type { ProgramExerciseDetail, ProgramSet } from "../../types";
 import { IconBack, IconCloudCheck, IconCloudOff, IconCloudSync } from "../../components/icons";
+import { CoachNotes } from "../../components/CoachNotes";
 
 type Tab = "objetivo" | "real";
 type SyncState = "synced" | "saving" | "error";
@@ -219,6 +220,11 @@ export function ExerciseView() {
       </div>
 
       <h2 className="prog-title">{data.nombre}</h2>
+
+      <div className="panel" style={{ marginBottom: 18 }}>
+        <h3 style={{ marginTop: 0 }}>Notas del coach</h3>
+        {data.notas ? <CoachNotes text={data.notas} /> : <p className="muted" style={{ margin: 0 }}>Sin notas.</p>}
+      </div>
 
       <div className="panel">
         <div className="seg" role="tablist" aria-label="Objetivo o real">

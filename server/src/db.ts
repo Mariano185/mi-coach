@@ -139,6 +139,16 @@ function migrate(): void {
              THEN ROUND(ps.real_peso * ps.real_reps, 1) END AS tonelaje
       FROM program_sets ps;
   `);
+
+  // Columnas nuevas en program_days (idempotente: ignorar si ya existen).
+  for (const col of [
+    "ALTER TABLE program_days ADD COLUMN fecha_real TEXT",
+    "ALTER TABLE program_days ADD COLUMN hora_inicio TEXT",
+    "ALTER TABLE program_days ADD COLUMN hora_fin TEXT",
+    "ALTER TABLE program_days ADD COLUMN notas TEXT",
+  ]) {
+    try { db.exec(col); } catch { /* columna ya existe */ }
+  }
 }
 
 // --- Exercise Library (sección 7). Los 3 primeros son básicos. ---
