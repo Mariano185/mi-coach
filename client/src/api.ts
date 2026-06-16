@@ -29,7 +29,7 @@ function redirectToLogin(): void {
   location.href = `/login?next=${next}`;
 }
 
-async function req<T>(url: string, options?: RequestInit): Promise<T> {
+export async function req<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(url, {
     headers: { "Content-Type": "application/json" },
     credentials: "include", // enviar/recibir cookie de sesión
