@@ -1,16 +1,11 @@
-import { useEffect, useState } from "react";
-import { api } from "../api";
+import useSWR from "swr";
 import type { Stats } from "../types";
+import { swrKeys } from "../swr";
 
 export function Dashboard() {
-  const [stats, setStats] = useState<Stats | null>(null);
-  const [err, setErr] = useState("");
+  const { data: stats, error } = useSWR<Stats>(swrKeys.stats());
 
-  useEffect(() => {
-    api.getStats().then(setStats).catch((e) => setErr(e.message));
-  }, []);
-
-  if (err) return <div className="panel"><p style={{ color: "var(--danger)" }}>{err}</p></div>;
+  if (error) return <div className="panel"><p style={{ color: "var(--danger)" }}>{(error as Error).message}</p></div>;
   if (!stats) return <div className="panel"><p className="muted">Cargando…</p></div>;
 
   return (

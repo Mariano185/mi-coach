@@ -1,6 +1,8 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import useSWR from "swr";
 import { api } from "../api";
-import type { NewBodyweightInput, WeightTrendPoint } from "../types";
+import type { NewBodyweightInput, Stats } from "../types";
+import { swrKeys } from "../swr";
 import { TrendChart } from "../components/TrendChart";
 import { useToast } from "../components/Toast";
 
@@ -9,7 +11,9 @@ function today(): string {
 }
 
 export function Bodyweight() {
-  const [trend, setTrend] = useState<WeightTrendPoint[]>([]);
+  // El promedio móvil 7d lo calcula el backend en /api/stats (key compartida con Dashboard).
+  const { data: stats, error, mutate } = useSWR<Stats>(swrKeys.stats());
+  const trend = stats?.tendencia_peso ?? [];
   const [fecha, setFecha] = useState(today());
   const [peso, setPeso] = useState("");
   const [kcal, setKcal] = useState("");
@@ -18,12 +22,6 @@ export function Bodyweight() {
   const [digestion, setDigestion] = useState("");
   const [notas, setNotas] = useState("");
   const { show, node } = useToast();
-
-  function load() {
-    // El promedio móvil 7d lo calcula el backend en /api/stats.
-    api.getStats().then((s) => setTrend(s.tendencia_peso)).catch((e) => show(e.message, "err"));
-  }
-  useEffect(load, [show]);
 
   async function save() {
     const peso_kg = parseFloat(peso);
@@ -44,7 +42,7 @@ export function Bodyweight() {
       await api.createBodyweight(input);
       show("Registro guardado ✓");
       setPeso(""); setKcal(""); setProte(""); setHambre(""); setDigestion(""); setNotas("");
-      load();
+      await mutate();
     } catch (e) {
       show((e as Error).message, "err");
     }
@@ -77,6 +75,7 @@ export function Bodyweight() {
 
       <div className="panel">
         <h2>Tendencia de peso (promedio móvil 7d)</h2>
+        {error && <p style={{ color: "var(--danger)" }}>{(error as Error).message}</p>}
         <TrendChart
           labels={trend.map((r) => r.fecha.slice(5))}
           yLabel="kg"
