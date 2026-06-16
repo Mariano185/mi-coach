@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import useSWR from "swr";
 import { api } from "../../api";
 import type { ProgramDayDetail, ProgramExerciseCard, Seccion } from "../../types";
+import { swrKeys } from "../../swr";
 import { IconBack, IconLayers } from "../../components/icons";
 import { CoachNotes } from "../../components/CoachNotes";
 
@@ -25,10 +27,13 @@ export function DayView() {
   const { dayId: dayIdParam } = useParams();
   const dayId = Number(dayIdParam);
   const navigate = useNavigate();
-  const [data, setData] = useState<ProgramDayDetail | null>(null);
-  const [err, setErr] = useState("");
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState("");
+  const [actionErr, setActionErr] = useState("");
+
+  const valid = Number.isInteger(dayId);
+  const dayKey = valid ? swrKeys.programDay(dayId) : null;
+  const { data, error, mutate } = useSWR<ProgramDayDetail>(dayKey);
 
   // Campos de sesión editables localmente, sincronizados al blur.
   const [fechaReal, setFechaReal] = useState("");
@@ -38,20 +43,17 @@ export function DayView() {
   // Evitar auto-setear hora inicio más de una vez.
   const horaInicioAutoSet = useRef(false);
 
-  function load() {
-    if (!Number.isInteger(dayId)) {
-      setErr("día inválido");
-      return;
-    }
-    api.getProgramDay(dayId).then((d) => {
-      setData(d);
-      setFechaReal(d.fecha_real ?? d.fecha_plan ?? today());
-      setHoraInicio(d.hora_inicio ?? "");
-      setHoraFin(d.hora_fin ?? "");
-      if (d.hora_inicio) horaInicioAutoSet.current = true;
-    }).catch((e) => setErr(e.message));
-  }
-  useEffect(load, [dayId]);
+  // Sembrar los inputs locales desde el dato cargado (una vez por día).
+  // Al cambiar de día, re-siembra y resetea el flag de auto-hora.
+  const seededFor = useRef<number | null>(null);
+  useEffect(() => {
+    if (!data || seededFor.current === dayId) return;
+    seededFor.current = dayId;
+    setFechaReal(data.fecha_real ?? data.fecha_plan ?? today());
+    setHoraInicio(data.hora_inicio ?? "");
+    setHoraFin(data.hora_fin ?? "");
+    horaInicioAutoSet.current = Boolean(data.hora_inicio);
+  }, [data, dayId]);
 
   // Toast efímero al registrar un día.
   useEffect(() => {
@@ -88,25 +90,30 @@ export function DayView() {
   }, [progreso.hechas, dayId]);
 
   function patchDay(patch: Parameters<typeof api.updateProgramDay>[1]) {
-    void api.updateProgramDay(dayId, patch).catch(() => {});
+    void api
+      .updateProgramDay(dayId, patch)
+      .then(() => mutate())
+      .catch(() => {});
   }
 
   async function registrarDia() {
     if (!data) return;
     setSaving(true);
-    setErr("");
+    setActionErr("");
     try {
       const r = await api.completeProgramDay(dayId, {});
       setToast(`Día ${data.dia} registrado · ${r.sets} series → historial`);
-      load();
+      await mutate();
     } catch (e) {
-      setErr((e as Error).message);
+      setActionErr((e as Error).message);
     } finally {
       setSaving(false);
     }
   }
 
-  if (err) return <p style={{ color: "var(--danger)" }}>{err}</p>;
+  if (!valid) return <p style={{ color: "var(--danger)" }}>día inválido</p>;
+  if (error) return <p style={{ color: "var(--danger)" }}>{(error as Error).message}</p>;
+  if (actionErr) return <p style={{ color: "var(--danger)" }}>{actionErr}</p>;
   if (!data) return <p className="muted">Cargando…</p>;
 
   return (

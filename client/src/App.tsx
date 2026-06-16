@@ -16,8 +16,10 @@ import { ProgramIndexRedirect, Programs } from "./pages/Programs";
 import { WeekView } from "./pages/program/WeekView";
 import { DayView } from "./pages/program/DayView";
 import { ExerciseView } from "./pages/program/ExerciseView";
+import { SWRConfig } from "swr";
 import { BottomNav } from "./components/BottomNav";
 import { api } from "./api";
+import { swrConfig } from "./swr";
 
 const NAV: Array<{ to: string; label: string; end?: boolean }> = [
   { to: "/dashboard", label: "Dashboard", end: true },
@@ -112,8 +114,9 @@ function NotFound() {
 
 export function App() {
   return (
-    <BrowserRouter>
-      <Routes>
+    <SWRConfig value={swrConfig}>
+      <BrowserRouter>
+        <Routes>
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
         <Route path="/login" element={<Login />} />
@@ -177,7 +180,8 @@ export function App() {
             </RequireAuth>
           }
         />
-      </Routes>
-    </BrowserRouter>
+        </Routes>
+      </BrowserRouter>
+    </SWRConfig>
   );
 }

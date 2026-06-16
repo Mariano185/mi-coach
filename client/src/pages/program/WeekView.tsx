@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import useSWR from "swr";
 import { useNavigate, useParams } from "react-router-dom";
-import { api } from "../../api";
 import type { ProgramWeekDetail } from "../../types";
+import { swrKeys } from "../../swr";
 import { useProgramsContext } from "../Programs";
 import { CoachNotes } from "../../components/CoachNotes";
 import { IconList, IconCalendar } from "../../components/icons";
@@ -17,19 +17,14 @@ export function WeekView() {
   const weekId = Number(weekIdParam);
   const { weeks } = useProgramsContext();
   const navigate = useNavigate();
-  const [detail, setDetail] = useState<ProgramWeekDetail | null>(null);
-  const [err, setErr] = useState("");
 
-  useEffect(() => {
-    if (!Number.isInteger(weekId)) {
-      setErr("semana inválida");
-      return;
-    }
-    setDetail(null);
-    api.getProgramWeek(weekId).then(setDetail).catch((e) => setErr(e.message));
-  }, [weekId]);
+  const valid = Number.isInteger(weekId);
+  const { data: detail, error } = useSWR<ProgramWeekDetail>(
+    valid ? swrKeys.programWeek(weekId) : null
+  );
 
-  if (err) return <p style={{ color: "var(--danger)" }}>{err}</p>;
+  if (!valid) return <p style={{ color: "var(--danger)" }}>semana inválida</p>;
+  if (error) return <p style={{ color: "var(--danger)" }}>{(error as Error).message}</p>;
 
   return (
     <div>
