@@ -46,7 +46,6 @@ function RootLayout({ children }: { children: React.ReactNode }) {
         <h1>
           Powerbuilding <span className="accent">Coach</span>
         </h1>
-        <span className="sub">app local · un solo atleta</span>
         <button className="topbar-logout" onClick={logout} aria-label="Cerrar sesión">
           Salir
         </button>
