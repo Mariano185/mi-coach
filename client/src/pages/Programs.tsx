@@ -1,32 +1,24 @@
-import { useEffect, useState } from "react";
+import useSWR from "swr";
 import { Navigate, Outlet, useOutletContext } from "react-router-dom";
-import { api } from "../api";
 import type { ProgramWeek } from "../types";
+import { swrKeys } from "../swr";
 
 export type ProgramsContext = { weeks: ProgramWeek[] };
 
 // Padre del subtree /programs/*.
-// Carga la lista de semanas UNA vez y la pasa por outlet context
+// Carga la lista de semanas (cacheada por SWR) y la pasa por outlet context
 // para que WeekView no re-fetchee al cambiar de semana.
 export function Programs() {
-  const [weeks, setWeeks] = useState<ProgramWeek[] | null>(null);
-  const [err, setErr] = useState("");
+  const { data: weeks, error } = useSWR<ProgramWeek[]>(swrKeys.programWeeks());
 
-  useEffect(() => {
-    api
-      .getProgramWeeks()
-      .then(setWeeks)
-      .catch((e) => setErr(e.message));
-  }, []);
-
-  if (err) {
+  if (error) {
     return (
       <div className="panel">
-        <p style={{ color: "var(--danger)" }}>{err}</p>
+        <p style={{ color: "var(--danger)" }}>{(error as Error).message}</p>
       </div>
     );
   }
-  if (weeks === null) {
+  if (weeks === undefined) {
     return <p className="muted">Cargando…</p>;
   }
   if (weeks.length === 0) {

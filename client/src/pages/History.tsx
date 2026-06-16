@@ -1,18 +1,18 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import useSWR from "swr";
 import { api } from "../api";
 import type { Exercise, Session, SessionWithSets } from "../types";
+import { swrKeys } from "../swr";
 
 export function History() {
-  const [sessions, setSessions] = useState<Session[]>([]);
-  const [exercises, setExercises] = useState<Exercise[]>([]);
+  const { data: sessions = [], error: errSessions } = useSWR<Session[]>(swrKeys.sessions());
+  const { data: exercises = [], error: errExercises } = useSWR<Exercise[]>(swrKeys.exercises());
   const [filterEx, setFilterEx] = useState("");
   const [open, setOpen] = useState<Record<number, SessionWithSets>>({});
-  const [err, setErr] = useState("");
-
-  useEffect(() => {
-    api.getSessions().then(setSessions).catch((e) => setErr(e.message));
-    api.getExercises().then(setExercises).catch((e) => setErr(e.message));
-  }, []);
+  const [loadErr, setLoadErr] = useState("");
+  const err = errSessions ? (errSessions as Error).message
+    : errExercises ? (errExercises as Error).message
+    : loadErr;
 
   async function toggle(id: number) {
     if (open[id]) {
@@ -27,7 +27,7 @@ export function History() {
       const full = await api.getSession(id);
       setOpen((o) => ({ ...o, [id]: full }));
     } catch (e) {
-      setErr((e as Error).message);
+      setLoadErr((e as Error).message);
     }
   }
 
