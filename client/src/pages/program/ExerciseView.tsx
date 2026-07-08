@@ -295,7 +295,9 @@ function ObjetivoGrid({ data }: { data: ProgramExerciseDetail }) {
           <div className="serie-n">{s.n_serie}</div>
           <div className="target-cell">{s.target_reps ?? data.reps_text ?? "—"}</div>
           <div className="target-cell">{s.target_rpe ?? "—"}</div>
-          <div className="target-cell">{data.carga_text ?? "—"}</div>
+          <div className="target-cell">
+            {s.target_peso != null ? `${s.target_peso} kg` : data.carga_text ?? "—"}
+          </div>
         </Row>
       ))}
     </div>

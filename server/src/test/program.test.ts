@@ -269,3 +269,123 @@ describe("GET /api/program/weeks/:id", () => {
     expect(res.status).toBe(404);
   });
 });
+
+describe("target_peso por serie (carga sugerida distinta por fila)", () => {
+  let app: Awaited<ReturnType<typeof createTestApp>>;
+
+  beforeEach(async () => {
+    db.exec("DELETE FROM sets; DELETE FROM sessions; DELETE FROM program_weeks;");
+    app = await createTestApp(db);
+  });
+
+  it("POST /program/weeks con target_peso distinto por serie no lo repite entre filas", async () => {
+    const squat = (db.prepare("SELECT id FROM exercises WHERE nombre = 'Mid/High Bar Back Squat'").get() as { id: number }).id;
+
+    const res = await request(app)
+      .post("/api/program/weeks")
+      .set(AUTH)
+      .send({
+        semana: 1,
+        days: [
+          {
+            dia: 1,
+            tipo: "A",
+            exercises: [
+              {
+                exercise_id: squat,
+                seccion: "main",
+                carga_text: "90/85 kg (top set)",
+                sets: [
+                  { n_serie: 1, target_reps: 5, target_rpe: 8, target_peso: 90 },
+                  { n_serie: 2, target_reps: 5, target_rpe: 7, target_peso: 85 },
+                  { n_serie: 3, target_reps: 5, target_rpe: 7, target_peso: 85 },
+                ],
+              },
+            ],
+          },
+        ],
+      });
+
+    expect(res.status).toBe(201);
+
+    const day = db.prepare("SELECT id FROM program_days WHERE week_id = ?").get(res.body.id) as { id: number };
+    const exercise = db.prepare("SELECT id FROM program_exercises WHERE day_id = ?").get(day.id) as { id: number };
+    const exRes = await request(app).get(`/api/program/exercises/${exercise.id}`).set(AUTH);
+
+    expect(exRes.status).toBe(200);
+    const sets = exRes.body.sets as Array<{ n_serie: number; target_peso: number | null }>;
+    expect(sets.find((s) => s.n_serie === 1)?.target_peso).toBe(90);
+    expect(sets.find((s) => s.n_serie === 2)?.target_peso).toBe(85);
+    expect(sets.find((s) => s.n_serie === 3)?.target_peso).toBe(85);
+  });
+
+  it("POST /program/weeks sin target_peso guarda null (sin inventar un valor)", async () => {
+    const squat = (db.prepare("SELECT id FROM exercises WHERE nombre = 'Mid/High Bar Back Squat'").get() as { id: number }).id;
+
+    const res = await request(app)
+      .post("/api/program/weeks")
+      .set(AUTH)
+      .send({
+        semana: 1,
+        days: [
+          {
+            dia: 1,
+            tipo: "A",
+            exercises: [
+              {
+                exercise_id: squat,
+                seccion: "main",
+                carga_text: "~80 kg",
+                sets: [{ n_serie: 1, target_reps: 5, target_rpe: 7 }],
+              },
+            ],
+          },
+        ],
+      });
+
+    const day = db.prepare("SELECT id FROM program_days WHERE week_id = ?").get(res.body.id) as { id: number };
+    const exercise = db.prepare("SELECT id FROM program_exercises WHERE day_id = ?").get(day.id) as { id: number };
+    const set = db.prepare("SELECT target_peso FROM program_sets WHERE program_exercise_id = ?").get(exercise.id) as { target_peso: number | null };
+
+    expect(set.target_peso).toBeNull();
+  });
+
+  it("PATCH /program/sets/:id/target actualiza target_peso de una serie ya creada", async () => {
+    const { setIds } = seedWeekWithDay(db);
+
+    const res = await request(app)
+      .patch(`/api/program/sets/${setIds[0]}/target`)
+      .set(AUTH)
+      .send({ target_peso: 92.5 });
+
+    expect(res.status).toBe(200);
+    expect(res.body.target_peso).toBe(92.5);
+
+    const row = db.prepare("SELECT target_peso FROM program_sets WHERE id = ?").get(setIds[0]) as { target_peso: number };
+    expect(row.target_peso).toBe(92.5);
+  });
+
+  it("PATCH /program/sets/:id/target rechaza valores inválidos", async () => {
+    const { setIds } = seedWeekWithDay(db);
+
+    const res = await request(app)
+      .patch(`/api/program/sets/${setIds[0]}/target`)
+      .set(AUTH)
+      .send({ target_peso: -5 });
+
+    expect(res.status).toBe(400);
+  });
+
+  it("PATCH /program/sets/:id (valores reales del atleta) sigue funcionando sin cambios", async () => {
+    const { setIds } = seedWeekWithDay(db);
+
+    const res = await request(app)
+      .patch(`/api/program/sets/${setIds[0]}`)
+      .set(AUTH)
+      .send({ real_peso: 90, real_reps: 5, real_rpe: 8 });
+
+    expect(res.status).toBe(200);
+    expect(res.body.real_peso).toBe(90);
+    expect(res.body.hecha).toBe(1);
+  });
+});

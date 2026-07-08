@@ -17,6 +17,7 @@ import type {
   Stats,
   TracEntry,
   UpdateProgramSetInput,
+  UpdateProgramSetTargetInput,
   UpsertTracInput,
 } from "./types";
 
@@ -88,6 +89,11 @@ export const api = {
     req<ProgramExerciseDetail>(`/api/program/exercises/${id}`),
   updateProgramSet: (id: number, input: UpdateProgramSetInput) =>
     req<ProgramSet>(`/api/program/sets/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(input),
+    }),
+  updateProgramSetTarget: (id: number, input: UpdateProgramSetTargetInput) =>
+    req<ProgramSet>(`/api/program/sets/${id}/target`, {
       method: "PATCH",
       body: JSON.stringify(input),
     }),

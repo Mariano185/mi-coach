@@ -10,6 +10,7 @@ import type {
   ProgramWeek,
   ProgramWeekDetail,
   UpdateProgramSetInput,
+  UpdateProgramSetTargetInput,
 } from "../types.js";
 
 export const programRouter = Router();
@@ -368,7 +369,12 @@ programRouter.post("/days/:id/exercises", (req, res) => {
     carga_text?: string | null;
     rpe_text?: string | null;
     notas?: string | null;
-    sets?: Array<{ n_serie: number; target_reps?: number | null; target_rpe?: number | null }>;
+    sets?: Array<{
+      n_serie: number;
+      target_reps?: number | null;
+      target_rpe?: number | null;
+      target_peso?: number | null;
+    }>;
   };
 
   if (body.exercise_id != null) {
@@ -389,8 +395,8 @@ programRouter.post("/days/:id/exercises", (req, res) => {
      VALUES (@day_id, @exercise_id, @nombre_libre, @seccion, @reps_text, @carga_text, @rpe_text, @notas, @orden)`
   );
   const insSet = db.prepare(
-    `INSERT INTO program_sets (program_exercise_id, n_serie, target_reps, target_rpe)
-     VALUES (@program_exercise_id, @n_serie, @target_reps, @target_rpe)`
+    `INSERT INTO program_sets (program_exercise_id, n_serie, target_reps, target_rpe, target_peso)
+     VALUES (@program_exercise_id, @n_serie, @target_reps, @target_rpe, @target_peso)`
   );
 
   const exId = db.transaction(() => {
@@ -407,7 +413,13 @@ programRouter.post("/days/:id/exercises", (req, res) => {
     }).lastInsertRowid as number;
 
     for (const s of body.sets ?? []) {
-      insSet.run({ program_exercise_id: id, n_serie: s.n_serie, target_reps: s.target_reps ?? null, target_rpe: s.target_rpe ?? null });
+      insSet.run({
+        program_exercise_id: id,
+        n_serie: s.n_serie,
+        target_reps: s.target_reps ?? null,
+        target_rpe: s.target_rpe ?? null,
+        target_peso: s.target_peso ?? null,
+      });
     }
     return id;
   })();
@@ -497,6 +509,47 @@ programRouter.patch("/sets/:id", (req, res) => {
   res.json(updated);
 });
 
+// PATCH /api/program/sets/:id/target — el coach corrige la prescripción (target_reps/rpe/peso)
+// de una serie ya creada, sin recrear el ejercicio. No toca real_*/hecha (eso es del atleta).
+programRouter.patch("/sets/:id/target", (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id)) return res.status(400).json({ error: "id inválido" });
+
+  const set = db.prepare("SELECT * FROM program_sets WHERE id = ?").get(id) as
+    | ProgramSet
+    | undefined;
+  if (!set) return res.status(404).json({ error: "serie no encontrada" });
+
+  const body = (req.body ?? {}) as UpdateProgramSetTargetInput;
+
+  const num = (v: unknown): number | null | undefined =>
+    v === undefined ? undefined : v === null ? null : Number(v);
+  for (const [k, v] of Object.entries({
+    target_reps: num(body.target_reps),
+    target_rpe: num(body.target_rpe),
+    target_peso: num(body.target_peso),
+  })) {
+    if (v !== undefined && v !== null && (!Number.isFinite(v) || v < 0)) {
+      return res.status(400).json({ error: `${k} inválido` });
+    }
+  }
+
+  const next = {
+    target_reps: body.target_reps !== undefined ? num(body.target_reps) : set.target_reps,
+    target_rpe: body.target_rpe !== undefined ? num(body.target_rpe) : set.target_rpe,
+    target_peso: body.target_peso !== undefined ? num(body.target_peso) : set.target_peso,
+  };
+
+  db.prepare(
+    `UPDATE program_sets
+       SET target_reps=@target_reps, target_rpe=@target_rpe, target_peso=@target_peso
+       WHERE id=@id`
+  ).run({ id, ...next });
+
+  const updated = db.prepare("SELECT * FROM v_program_sets_e1rm WHERE id = ?").get(id);
+  res.json(updated);
+});
+
 // ---------- CREAR SEMANA (la usa el coach / skill nueva-semana) ----------
 
 // POST /api/program/weeks — crea una semana estructurada completa.
@@ -524,8 +577,8 @@ programRouter.post("/weeks", (req, res) => {
      VALUES (@day_id, @exercise_id, @nombre_libre, @seccion, @reps_text, @carga_text, @rpe_text, @notas, @orden)`
   );
   const insSet = db.prepare(
-    `INSERT INTO program_sets (program_exercise_id, n_serie, target_reps, target_rpe)
-     VALUES (@program_exercise_id, @n_serie, @target_reps, @target_rpe)`
+    `INSERT INTO program_sets (program_exercise_id, n_serie, target_reps, target_rpe, target_peso)
+     VALUES (@program_exercise_id, @n_serie, @target_reps, @target_rpe, @target_peso)`
   );
 
   const tx = db.transaction((input: NewProgramWeekInput) => {
@@ -567,6 +620,7 @@ programRouter.post("/weeks", (req, res) => {
             n_serie: s.n_serie,
             target_reps: s.target_reps ?? null,
             target_rpe: s.target_rpe ?? null,
+            target_peso: s.target_peso ?? null,
           });
         }
       });

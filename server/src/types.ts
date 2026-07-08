@@ -141,6 +141,7 @@ export interface ProgramSet {
   n_serie: number;
   target_reps: number | null;
   target_rpe: number | null;
+  target_peso: number | null;
   real_peso: number | null;
   real_reps: number | null;
   real_rpe: number | null;
@@ -209,9 +210,21 @@ export interface NewProgramWeekInput {
       carga_text?: string | null;
       rpe_text?: string | null;
       notas?: string | null;
-      sets: Array<{ n_serie: number; target_reps?: number | null; target_rpe?: number | null }>;
+      sets: Array<{
+        n_serie: number;
+        target_reps?: number | null;
+        target_rpe?: number | null;
+        target_peso?: number | null;
+      }>;
     }>;
   }>;
+}
+
+// PATCH /program/sets/:id/target — el coach corrige la prescripción de una serie ya creada.
+export interface UpdateProgramSetTargetInput {
+  target_reps?: number | null;
+  target_rpe?: number | null;
+  target_peso?: number | null;
 }
 
 // === Trac: tracker diario de bienestar/recuperación (independiente de sessions) ===

@@ -109,6 +109,7 @@ function migrate(): void {
       -- objetivo (lo pone el coach):
       target_reps         INTEGER,
       target_rpe          REAL,
+      target_peso         REAL,           -- carga objetivo de esta serie (kg); NULL = usar carga_text del ejercicio
       -- real (lo completa el atleta):
       real_peso           REAL,
       real_reps           INTEGER,
@@ -156,12 +157,13 @@ function migrate(): void {
       FROM program_sets ps;
   `);
 
-  // Columnas nuevas en program_days (idempotente: ignorar si ya existen).
+  // Columnas nuevas en tablas ya desplegadas (idempotente: ignorar si ya existen).
   for (const col of [
     "ALTER TABLE program_days ADD COLUMN fecha_real TEXT",
     "ALTER TABLE program_days ADD COLUMN hora_inicio TEXT",
     "ALTER TABLE program_days ADD COLUMN hora_fin TEXT",
     "ALTER TABLE program_days ADD COLUMN notas TEXT",
+    "ALTER TABLE program_sets ADD COLUMN target_peso REAL",
   ]) {
     try { db.exec(col); } catch { /* columna ya existe */ }
   }

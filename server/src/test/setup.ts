@@ -90,6 +90,7 @@ export function createTestDb() {
       n_serie INTEGER NOT NULL,
       target_reps INTEGER,
       target_rpe REAL,
+      target_peso REAL,
       real_peso REAL,
       real_reps INTEGER,
       real_rpe REAL,

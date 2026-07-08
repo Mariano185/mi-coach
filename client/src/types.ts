@@ -135,6 +135,7 @@ export interface ProgramSet {
   n_serie: number;
   target_reps: number | null;
   target_rpe: number | null;
+  target_peso: number | null;
   real_peso: number | null;
   real_reps: number | null;
   real_rpe: number | null;
@@ -142,6 +143,12 @@ export interface ProgramSet {
   notas: string | null;
   e1rm: number | null;
   tonelaje: number | null;
+}
+
+export interface UpdateProgramSetTargetInput {
+  target_reps?: number | null;
+  target_rpe?: number | null;
+  target_peso?: number | null;
 }
 
 export interface ProgramExerciseDetail {
