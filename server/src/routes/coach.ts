@@ -131,6 +131,26 @@ coachRouter.get("/analisis", (req, res) => {
     )
     .all(desde);
 
+  // 10) Trac: bienestar/recuperación de los últimos 7 días (fijo, no ligado a ?dias=).
+  //     Serie de fechas generada explícitamente + LEFT JOIN, para que los días sin
+  //     registro aparezcan con huecos en null en vez de faltar directamente.
+  const trac_reciente = db
+    .prepare(
+      `WITH RECURSIVE fechas(fecha) AS (
+         SELECT date('now', '-6 days')
+         UNION ALL
+         SELECT date(fecha, '+1 day') FROM fechas WHERE fecha < date('now')
+       )
+       SELECT
+         f.fecha,
+         t.fatiga_pierna, t.fatiga_empuje, t.fatiga_traccion,
+         t.descanso_alimentacion, t.recuperacion, t.motivacion, t.tecnica
+       FROM fechas f
+       LEFT JOIN trac t ON t.fecha = f.fecha
+       ORDER BY f.fecha ASC`
+    )
+    .all();
+
   res.json({
     ventana_dias: dias,
     mejor_e1rm_basicos,
@@ -143,5 +163,6 @@ coachRouter.get("/analisis", (req, res) => {
     ejercicios,
     ultima_semana,
     sesiones_realizadas,
+    trac_reciente,
   });
 });

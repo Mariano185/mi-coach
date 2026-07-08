@@ -15,7 +15,9 @@ import type {
   Session,
   SessionWithSets,
   Stats,
+  TracEntry,
   UpdateProgramSetInput,
+  UpsertTracInput,
 } from "./types";
 
 // Flag para evitar loops infinitos cuando /api/auth/status devuelve 401.
@@ -94,6 +96,10 @@ export const api = {
       method: "POST",
       body: JSON.stringify(input),
     }),
+
+  getTrac: (fecha: string) => req<TracEntry | null>(`/api/trac?fecha=${fecha}`),
+  upsertTrac: (input: UpsertTracInput) =>
+    req<TracEntry>("/api/trac", { method: "PUT", body: JSON.stringify(input) }),
 
   // Auth
   login: (password: string) =>

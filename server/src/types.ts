@@ -214,6 +214,32 @@ export interface NewProgramWeekInput {
   }>;
 }
 
+// === Trac: tracker diario de bienestar/recuperación (independiente de sessions) ===
+export interface TracEntry {
+  id: number;
+  fecha: string; // YYYY-MM-DD
+  fatiga_pierna: number | null;
+  fatiga_empuje: number | null;
+  fatiga_traccion: number | null;
+  descanso_alimentacion: number | null;
+  recuperacion: number | null;
+  motivacion: number | null;
+  tecnica: number | null;
+  creado_en: string;
+  actualizado_en: string;
+}
+
+export interface UpsertTracInput {
+  fecha: string;
+  fatiga_pierna?: number | null;
+  fatiga_empuje?: number | null;
+  fatiga_traccion?: number | null;
+  descanso_alimentacion?: number | null;
+  recuperacion?: number | null;
+  motivacion?: number | null;
+  tecnica?: number | null;
+}
+
 // Respuesta de /api/stats
 export interface BasicE1rm {
   exercise_id: number;

@@ -235,3 +235,29 @@ export interface NewBodyweightInput {
   digestion: string | null;
   notas: string | null;
 }
+
+// === Trac: tracker diario de bienestar/recuperación (independiente de sessions) ===
+export interface TracEntry {
+  id: number;
+  fecha: string;
+  fatiga_pierna: number | null;
+  fatiga_empuje: number | null;
+  fatiga_traccion: number | null;
+  descanso_alimentacion: number | null;
+  recuperacion: number | null;
+  motivacion: number | null;
+  tecnica: number | null;
+  creado_en: string;
+  actualizado_en: string;
+}
+
+export interface UpsertTracInput {
+  fecha: string;
+  fatiga_pierna?: number | null;
+  fatiga_empuje?: number | null;
+  fatiga_traccion?: number | null;
+  descanso_alimentacion?: number | null;
+  recuperacion?: number | null;
+  motivacion?: number | null;
+  tecnica?: number | null;
+}

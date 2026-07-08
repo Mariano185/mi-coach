@@ -122,6 +122,22 @@ function migrate(): void {
       valor TEXT NOT NULL
     );
 
+    -- Trac: tracker diario de bienestar/recuperación, independiente de sessions/program_days
+    -- (se puede cargar entrene o no el atleta). Una fila por fecha (upsert por fecha).
+    CREATE TABLE IF NOT EXISTS trac (
+      id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+      fecha                 TEXT UNIQUE NOT NULL,
+      fatiga_pierna         INTEGER CHECK (fatiga_pierna IS NULL OR fatiga_pierna BETWEEN 1 AND 5),
+      fatiga_empuje         INTEGER CHECK (fatiga_empuje IS NULL OR fatiga_empuje BETWEEN 1 AND 5),
+      fatiga_traccion       INTEGER CHECK (fatiga_traccion IS NULL OR fatiga_traccion BETWEEN 1 AND 5),
+      descanso_alimentacion INTEGER CHECK (descanso_alimentacion IS NULL OR descanso_alimentacion BETWEEN 1 AND 5),
+      recuperacion          INTEGER CHECK (recuperacion IS NULL OR recuperacion BETWEEN 1 AND 5),
+      motivacion            INTEGER CHECK (motivacion IS NULL OR motivacion BETWEEN 1 AND 5),
+      tecnica               INTEGER CHECK (tecnica IS NULL OR tecnica BETWEEN 1 AND 5),
+      creado_en             TEXT NOT NULL DEFAULT (datetime('now')),
+      actualizado_en        TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
     -- e1RM Epley calculado, nunca hardcodeado. Reusar en /api/stats.
     CREATE VIEW IF NOT EXISTS v_sets_e1rm AS
       SELECT
@@ -375,7 +391,7 @@ interface ParsedWeek {
 }
 
 // "3×5" → {series:3, reps:5}; "4×6-8" → {series:4, reps:6}; "3×12-15" → {series:3, reps:12}.
-function parseSeriesReps(text: string): { series: number; reps: number | null } {
+export function parseSeriesReps(text: string): { series: number; reps: number | null } {
   const m = text.match(/(\d+)\s*[×x]\s*(\d+)/i);
   if (!m) return { series: 3, reps: null };
   const reps = Number(m[2]); // primer número del rango
@@ -383,7 +399,7 @@ function parseSeriesReps(text: string): { series: number; reps: number | null } 
 }
 
 // "7", "7-8", "7,5" → primer número como target_rpe.
-function parseRpe(text: string): number | null {
+export function parseRpe(text: string): number | null {
   const m = text.match(/(\d+(?:[.,]\d+)?)/);
   return m ? Number(m[1].replace(",", ".")) : null;
 }

@@ -21,6 +21,7 @@ export const swrKeys = {
   stats: () => "/api/stats",
   sessions: () => "/api/sessions",
   exercises: () => "/api/exercises",
+  trac: (fecha: string) => `/api/trac?fecha=${fecha}`,
 } as const;
 
 // Config global. `keepPreviousData` evita el parpadeo al navegar: muestra el

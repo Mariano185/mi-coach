@@ -202,6 +202,23 @@ input:focus, select:focus, textarea:focus {
 .row > .field { flex: 1; min-width: 120px; }
 .field { margin-bottom: 14px; }
 
+/* Agrupación liviana de campos relacionados (ej. "Dolor muscular", "Recuperación" en Trac).
+   Deliberadamente sin el gradiente/sombra/animación de .panel: es una subdivisión visual
+   dentro de un panel, no una tarjeta propia. */
+.groupbox {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 14px 14px 2px;
+  margin-bottom: 18px;
+}
+.groupbox-title {
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0 0 10px;
+}
+
 button.btn {
   background: var(--lime);
   color: var(--on-lime);

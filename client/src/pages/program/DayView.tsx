@@ -169,6 +169,16 @@ export function DayView() {
             />
           </label>
         </div>
+        <button
+          className="btn secondary"
+          style={{ marginTop: 14 }}
+          onClick={() => {
+            const fecha = data.fecha_real ?? data.fecha_plan ?? today();
+            navigate(`/trac?fecha=${fecha}&returnTo=/programs/days/${dayId}`);
+          }}
+        >
+          Trac
+        </button>
       </div>
 
       {data.warmup ? (

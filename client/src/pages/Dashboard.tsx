@@ -1,15 +1,25 @@
 import useSWR from "swr";
+import { useNavigate } from "react-router-dom";
 import type { Stats } from "../types";
 import { swrKeys } from "../swr";
 
 export function Dashboard() {
   const { data: stats, error } = useSWR<Stats>(swrKeys.stats());
+  const navigate = useNavigate();
 
   if (error) return <div className="panel"><p style={{ color: "var(--danger)" }}>{(error as Error).message}</p></div>;
   if (!stats) return <div className="panel"><p className="muted">Cargando…</p></div>;
 
   return (
     <div>
+      <div className="panel" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+        <div>
+          <h2 style={{ margin: 0 }}>¿Cómo llegaste hoy?</h2>
+          <p className="muted" style={{ margin: "4px 0 0" }}>Cargá fatiga, descanso y motivación del día.</p>
+        </div>
+        <button className="btn" onClick={() => navigate("/trac")}>Trac</button>
+      </div>
+
       <div className="panel">
         <h2>Mejor e1RM por básico vs 1RM inicial</h2>
         <div className="stat-cards">

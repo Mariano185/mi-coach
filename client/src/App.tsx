@@ -13,6 +13,7 @@ import { History } from "./pages/History";
 import { Dashboard } from "./pages/Dashboard";
 import { Login } from "./pages/Login";
 import { ProgramIndexRedirect, Programs } from "./pages/Programs";
+import { Trac } from "./pages/Trac";
 import { WeekView } from "./pages/program/WeekView";
 import { DayView } from "./pages/program/DayView";
 import { ExerciseView } from "./pages/program/ExerciseView";
@@ -146,6 +147,16 @@ export function App() {
             <RequireAuth>
               <RootLayout>
                 <History />
+              </RootLayout>
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/trac"
+          element={
+            <RequireAuth>
+              <RootLayout>
+                <Trac />
               </RootLayout>
             </RequireAuth>
           }
