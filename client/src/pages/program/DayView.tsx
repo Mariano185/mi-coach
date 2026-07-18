@@ -134,7 +134,14 @@ export function DayView() {
 
       <h2 className="prog-title">
         Día {data.dia}
-        {data.tipo ? <span className={`pill ${data.tipo}`} style={{ marginLeft: 12, verticalAlign: "middle" }}>Opción {data.tipo}</span> : null}
+        {data.tipo ? (
+          <span
+            className={`pill ${data.tipo === "A" || data.tipo === "B" ? data.tipo : ""}`}
+            style={{ marginLeft: 12, verticalAlign: "middle" }}
+          >
+            {data.tipo === "A" || data.tipo === "B" ? `Opción ${data.tipo}` : data.tipo}
+          </span>
+        ) : null}
         {data.titulo ? <span className="sub">{data.titulo}</span> : null}
       </h2>
 

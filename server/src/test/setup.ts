@@ -20,7 +20,7 @@ export function createTestDb() {
     CREATE TABLE IF NOT EXISTS sessions (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       fecha TEXT NOT NULL,
-      tipo TEXT NOT NULL CHECK (tipo IN ('A','B')),
+      tipo TEXT,
       energia INTEGER,
       sueno_horas REAL,
       motivacion INTEGER,
@@ -61,7 +61,7 @@ export function createTestDb() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       week_id INTEGER NOT NULL REFERENCES program_weeks(id) ON DELETE CASCADE,
       dia INTEGER NOT NULL,
-      tipo TEXT CHECK (tipo IN ('A','B')),
+      tipo TEXT,
       titulo TEXT,
       warmup TEXT,
       notas TEXT,

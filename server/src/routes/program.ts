@@ -156,7 +156,6 @@ programRouter.post("/days/:id/complete", (req, res) => {
     | ProgramDay
     | undefined;
   if (!day) return res.status(404).json({ error: "día no encontrado" });
-  if (!day.tipo) return res.status(400).json({ error: "el día no tiene tipo A/B; no se puede registrar" });
 
   // Series completadas (con peso y reps reales) de ejercicios con exercise_id válido.
   const done = db
@@ -270,7 +269,7 @@ programRouter.get("/exercises/:id", (req, res) => {
        WHERE pe.id = ?`
     )
     .get(id) as
-    | (ProgramExercise & { nombre: string; es_basico: 0 | 1; dia: number; tipo: "A" | "B" | null })
+    | (ProgramExercise & { nombre: string; es_basico: 0 | 1; dia: number; tipo: string | null })
     | undefined;
   if (!ex) return res.status(404).json({ error: "ejercicio no encontrado" });
 

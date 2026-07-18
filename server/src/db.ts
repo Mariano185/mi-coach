@@ -26,7 +26,7 @@ function migrate(): void {
     CREATE TABLE IF NOT EXISTS sessions (
       id              INTEGER PRIMARY KEY AUTOINCREMENT,
       fecha           TEXT NOT NULL,
-      tipo            TEXT NOT NULL CHECK (tipo IN ('A','B')),
+      tipo            TEXT,              -- etiqueta libre y opcional (ej. "Piernas", "A", null)
       energia         INTEGER,
       sueno_horas     REAL,
       motivacion      INTEGER,
@@ -81,7 +81,7 @@ function migrate(): void {
       id          INTEGER PRIMARY KEY AUTOINCREMENT,
       week_id     INTEGER NOT NULL REFERENCES program_weeks(id) ON DELETE CASCADE,
       dia         INTEGER NOT NULL,         -- 1..N
-      tipo        TEXT CHECK (tipo IN ('A','B')),
+      tipo        TEXT,                     -- etiqueta libre y opcional (ej. "Piernas", "A", null)
       titulo      TEXT,                     -- "Squat + Bench"
       warmup      TEXT,
       fecha_plan  TEXT,                     -- YYYY-MM-DD opcional
@@ -167,6 +167,63 @@ function migrate(): void {
   ]) {
     try { db.exec(col); } catch { /* columna ya existe */ }
   }
+
+  // tipo A/B → texto libre opcional. SQLite no soporta ALTER COLUMN/DROP CONSTRAINT,
+  // así que hay que recrear la tabla para sacar el CHECK viejo. Idempotente: solo corre
+  // si el CHECK sigue presente en el DDL guardado.
+  dropTipoCheck("sessions");
+  dropTipoCheck("program_days");
+}
+
+function dropTipoCheck(table: "sessions" | "program_days"): void {
+  const row = db
+    .prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name=?")
+    .get(table) as { sql: string } | undefined;
+  if (!row || !/CHECK\s*\(\s*tipo\s+IN/i.test(row.sql)) return; // ya migrado o no existe
+
+  db.pragma("foreign_keys = OFF");
+  const tx = db.transaction(() => {
+    if (table === "sessions") {
+      db.exec(`
+        CREATE TABLE sessions_new (
+          id              INTEGER PRIMARY KEY AUTOINCREMENT,
+          fecha           TEXT NOT NULL,
+          tipo            TEXT,
+          energia         INTEGER,
+          sueno_horas     REAL,
+          motivacion      INTEGER,
+          dolor_molestias TEXT,
+          comentarios     TEXT
+        );
+        INSERT INTO sessions_new SELECT id, fecha, tipo, energia, sueno_horas, motivacion, dolor_molestias, comentarios FROM sessions;
+        DROP TABLE sessions;
+        ALTER TABLE sessions_new RENAME TO sessions;
+      `);
+    } else {
+      db.exec(`
+        CREATE TABLE program_days_new (
+          id          INTEGER PRIMARY KEY AUTOINCREMENT,
+          week_id     INTEGER NOT NULL REFERENCES program_weeks(id) ON DELETE CASCADE,
+          dia         INTEGER NOT NULL,
+          tipo        TEXT,
+          titulo      TEXT,
+          warmup      TEXT,
+          notas       TEXT,
+          fecha_plan  TEXT,
+          fecha_real  TEXT,
+          hora_inicio TEXT,
+          hora_fin    TEXT,
+          session_id  INTEGER REFERENCES sessions(id) ON DELETE SET NULL,
+          orden       INTEGER NOT NULL DEFAULT 0
+        );
+        INSERT INTO program_days_new SELECT id, week_id, dia, tipo, titulo, warmup, notas, fecha_plan, fecha_real, hora_inicio, hora_fin, session_id, orden FROM program_days;
+        DROP TABLE program_days;
+        ALTER TABLE program_days_new RENAME TO program_days;
+      `);
+    }
+  });
+  tx();
+  db.pragma("foreign_keys = ON");
 }
 
 // --- Exercise Library (sección 7). Los 3 primeros son básicos. ---

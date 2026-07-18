@@ -45,8 +45,8 @@ sessionsRouter.post("/", (req, res) => {
   if (!body || typeof body.fecha !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(body.fecha)) {
     return res.status(400).json({ error: "fecha requerida en formato YYYY-MM-DD" });
   }
-  if (body.tipo !== "A" && body.tipo !== "B") {
-    return res.status(400).json({ error: "tipo debe ser 'A' o 'B'" });
+  if (body.tipo !== undefined && body.tipo !== null && typeof body.tipo !== "string") {
+    return res.status(400).json({ error: "tipo debe ser texto" });
   }
   if (!isInt1to10(body.energia) || !isInt1to10(body.motivacion)) {
     return res.status(400).json({ error: "energia/motivacion deben estar entre 1 y 10" });
@@ -81,7 +81,7 @@ sessionsRouter.post("/", (req, res) => {
   const tx = db.transaction((input: NewSessionInput) => {
     const result = insertSession.run({
       fecha: input.fecha,
-      tipo: input.tipo,
+      tipo: input.tipo ?? null,
       energia: input.energia ?? null,
       sueno_horas: input.sueno_horas ?? null,
       motivacion: input.motivacion ?? null,

@@ -389,3 +389,107 @@ describe("target_peso por serie (carga sugerida distinta por fila)", () => {
     expect(res.body.hecha).toBe(1);
   });
 });
+
+describe("tipo de día libre y opcional (sin restricción A/B)", () => {
+  let app: Awaited<ReturnType<typeof createTestApp>>;
+
+  beforeEach(async () => {
+    db.exec("DELETE FROM sets; DELETE FROM sessions; DELETE FROM program_weeks;");
+    app = await createTestApp(db);
+  });
+
+  it("POST /program/weeks crea un día sin tipo", async () => {
+    const squat = (db.prepare("SELECT id FROM exercises WHERE nombre = 'Mid/High Bar Back Squat'").get() as { id: number }).id;
+
+    const res = await request(app)
+      .post("/api/program/weeks")
+      .set(AUTH)
+      .send({
+        semana: 1,
+        days: [{ dia: 1, exercises: [{ exercise_id: squat, sets: [{ n_serie: 1 }] }] }],
+      });
+
+    expect(res.status).toBe(201);
+    const day = db.prepare("SELECT tipo FROM program_days WHERE week_id = ?").get(res.body.id) as { tipo: string | null };
+    expect(day.tipo).toBeNull();
+  });
+
+  it("POST /program/weeks crea un día con etiqueta de texto libre", async () => {
+    const squat = (db.prepare("SELECT id FROM exercises WHERE nombre = 'Mid/High Bar Back Squat'").get() as { id: number }).id;
+
+    const res = await request(app)
+      .post("/api/program/weeks")
+      .set(AUTH)
+      .send({
+        semana: 1,
+        days: [{ dia: 1, tipo: "Piernas", exercises: [{ exercise_id: squat, sets: [{ n_serie: 1 }] }] }],
+      });
+
+    expect(res.status).toBe(201);
+    const day = db.prepare("SELECT tipo FROM program_days WHERE week_id = ?").get(res.body.id) as { tipo: string | null };
+    expect(day.tipo).toBe("Piernas");
+  });
+
+  it("completa un día sin tipo: ya no da 400 y la sesión queda con tipo null", async () => {
+    const weekId = db
+      .prepare("INSERT INTO program_weeks (semana, nombre, fecha_creada, activa) VALUES (2, 'Test', '2024-01-01', 1)")
+      .run().lastInsertRowid as number;
+    const dayId = db
+      .prepare("INSERT INTO program_days (week_id, dia, titulo, orden) VALUES (?, 1, 'Día 1', 0)")
+      .run(weekId).lastInsertRowid as number;
+    const squat = (db.prepare("SELECT id FROM exercises WHERE nombre = 'Mid/High Bar Back Squat'").get() as { id: number }).id;
+    const exId = db
+      .prepare("INSERT INTO program_exercises (day_id, exercise_id, seccion, orden) VALUES (?, ?, 'main', 0)")
+      .run(dayId, squat).lastInsertRowid as number;
+    const setId = db
+      .prepare("INSERT INTO program_sets (program_exercise_id, n_serie, real_peso, real_reps, hecha) VALUES (?, 1, 90, 5, 1)")
+      .run(exId).lastInsertRowid as number;
+    void setId;
+
+    const res = await request(app)
+      .post(`/api/program/days/${dayId}/complete`)
+      .set(AUTH)
+      .send({});
+
+    expect(res.status).toBe(201);
+    const session = db.prepare("SELECT tipo FROM sessions WHERE id = ?").get(res.body.session_id) as { tipo: string | null };
+    expect(session.tipo).toBeNull();
+  });
+
+  it("completa un día con etiqueta libre: la sesión hereda esa etiqueta", async () => {
+    const weekId = db
+      .prepare("INSERT INTO program_weeks (semana, nombre, fecha_creada, activa) VALUES (3, 'Test', '2024-01-01', 1)")
+      .run().lastInsertRowid as number;
+    const dayId = db
+      .prepare("INSERT INTO program_days (week_id, dia, tipo, titulo, orden) VALUES (?, 1, 'Piernas', 'Día 1', 0)")
+      .run(weekId).lastInsertRowid as number;
+    const squat = (db.prepare("SELECT id FROM exercises WHERE nombre = 'Mid/High Bar Back Squat'").get() as { id: number }).id;
+    const exId = db
+      .prepare("INSERT INTO program_exercises (day_id, exercise_id, seccion, orden) VALUES (?, ?, 'main', 0)")
+      .run(dayId, squat).lastInsertRowid as number;
+    db.prepare("INSERT INTO program_sets (program_exercise_id, n_serie, real_peso, real_reps, hecha) VALUES (?, 1, 90, 5, 1)").run(exId);
+
+    const res = await request(app)
+      .post(`/api/program/days/${dayId}/complete`)
+      .set(AUTH)
+      .send({});
+
+    expect(res.status).toBe(201);
+    const session = db.prepare("SELECT tipo FROM sessions WHERE id = ?").get(res.body.session_id) as { tipo: string | null };
+    expect(session.tipo).toBe("Piernas");
+  });
+
+  it("regresión: una semana con días tipo A/B se sigue creando, leyendo y completando igual", async () => {
+    const { dayId, setIds } = seedWeekWithDay(db);
+    db.prepare("UPDATE program_sets SET real_peso=100, real_reps=5, hecha=1 WHERE id=?").run(setIds[0]);
+
+    const res = await request(app)
+      .post(`/api/program/days/${dayId}/complete`)
+      .set(AUTH)
+      .send({});
+
+    expect(res.status).toBe(201);
+    const session = db.prepare("SELECT tipo FROM sessions WHERE id = ?").get(res.body.session_id) as { tipo: string | null };
+    expect(session.tipo).toBe("A");
+  });
+});

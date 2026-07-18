@@ -63,7 +63,11 @@ export function History() {
           return (
             <details key={s.id} open={!!detail} onToggle={() => { /* controlado abajo */ }}>
               <summary onClick={(e) => { e.preventDefault(); toggle(s.id); }}>
-                <span className={`pill ${s.tipo}`}>Sesión {s.tipo}</span>{" "}
+                {s.tipo ? (
+                  <>
+                    <span className={`pill ${s.tipo === "A" || s.tipo === "B" ? s.tipo : ""}`}>Sesión {s.tipo}</span>{" "}
+                  </>
+                ) : null}
                 <strong>{s.fecha}</strong>{" "}
                 {s.energia != null && <span className="muted">· energía {s.energia}</span>}
                 {s.comentarios && <span className="muted"> · {s.comentarios}</span>}

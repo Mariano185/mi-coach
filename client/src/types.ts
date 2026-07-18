@@ -1,7 +1,5 @@
 // Tipos del dominio en el cliente (espejo del server).
 
-export type SessionType = "A" | "B";
-
 export interface Exercise {
   id: number;
   nombre: string;
@@ -12,7 +10,7 @@ export interface Exercise {
 export interface Session {
   id: number;
   fecha: string;
-  tipo: SessionType;
+  tipo: string | null;
   energia: number | null;
   sueno_horas: number | null;
   motivacion: number | null;
@@ -77,7 +75,7 @@ export interface ProgramDayCard {
   id: number;
   week_id: number;
   dia: number;
-  tipo: SessionType | null;
+  tipo: string | null;
   titulo: string | null;
   warmup: string | null;
   fecha_plan: string | null;
@@ -114,7 +112,7 @@ export interface ProgramDayDetail {
   id: number;
   week_id: number;
   dia: number;
-  tipo: SessionType | null;
+  tipo: string | null;
   titulo: string | null;
   warmup: string | null;
   notas: string | null;
@@ -165,7 +163,7 @@ export interface ProgramExerciseDetail {
   nombre: string;
   es_basico: 0 | 1;
   dia: number;
-  tipo: SessionType | null;
+  tipo: string | null;
   sets: ProgramSet[];
 }
 
@@ -224,7 +222,7 @@ export interface NewSetInput {
 
 export interface NewSessionInput {
   fecha: string;
-  tipo: SessionType;
+  tipo?: string | null;
   energia: number | null;
   sueno_horas: number | null;
   motivacion: number | null;

@@ -69,7 +69,9 @@ export function WeekView() {
                   </span>
                   <div className="tile-head">
                     <div className="tile-name">Día {d.dia}</div>
-                    {d.tipo ? <span className={`pill ${d.tipo}`}>{d.tipo}</span> : null}
+                    {d.tipo ? (
+                      <span className={`pill ${d.tipo === "A" || d.tipo === "B" ? d.tipo : ""}`}>{d.tipo}</span>
+                    ) : null}
                   </div>
                   <div className="tile-meta">
                     <span className="m">

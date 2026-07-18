@@ -1,7 +1,5 @@
 // Tipos del dominio compartidos por el backend.
 
-export type SessionType = "A" | "B";
-
 export interface Exercise {
   id: number;
   nombre: string;
@@ -24,7 +22,7 @@ export interface SessionSet {
 export interface Session {
   id: number;
   fecha: string; // YYYY-MM-DD
-  tipo: SessionType;
+  tipo: string | null;
   energia: number | null;
   sueno_horas: number | null;
   motivacion: number | null;
@@ -68,7 +66,7 @@ export interface NewSetInput {
 
 export interface NewSessionInput {
   fecha: string;
-  tipo: SessionType;
+  tipo?: string | null;
   energia?: number | null;
   sueno_horas?: number | null;
   motivacion?: number | null;
@@ -110,7 +108,7 @@ export interface ProgramDay {
   id: number;
   week_id: number;
   dia: number;
-  tipo: SessionType | null;
+  tipo: string | null;
   titulo: string | null;
   warmup: string | null;
   notas: string | null;
@@ -178,7 +176,7 @@ export interface ProgramExerciseDetail extends ProgramExercise {
   nombre: string;
   es_basico: 0 | 1;
   dia: number;
-  tipo: SessionType | null;
+  tipo: string | null;
   sets: Array<ProgramSet & { e1rm: number | null; tonelaje: number | null }>;
 }
 
@@ -198,7 +196,7 @@ export interface NewProgramWeekInput {
   notas?: string | null;
   days: Array<{
     dia: number;
-    tipo?: SessionType | null;
+    tipo?: string | null;
     titulo?: string | null;
     warmup?: string | null;
     fecha_plan?: string | null;
