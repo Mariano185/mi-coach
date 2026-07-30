@@ -21,10 +21,6 @@ export function createTestDb() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       fecha TEXT NOT NULL,
       tipo TEXT,
-      energia INTEGER,
-      sueno_horas REAL,
-      motivacion INTEGER,
-      dolor_molestias TEXT,
       comentarios TEXT
     );
     CREATE TABLE IF NOT EXISTS sets (
@@ -48,14 +44,26 @@ export function createTestDb() {
       digestion TEXT,
       notas TEXT
     );
+    CREATE TABLE IF NOT EXISTS mesociclos (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      nombre TEXT NOT NULL,
+      objetivo TEXT,
+      notas TEXT,
+      fecha_inicio TEXT,
+      fecha_fin TEXT,
+      orden INTEGER NOT NULL DEFAULT 0,
+      fecha_creada TEXT NOT NULL
+    );
     CREATE TABLE IF NOT EXISTS program_weeks (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      semana INTEGER NOT NULL UNIQUE,
+      semana INTEGER NOT NULL,
       nombre TEXT,
       bloque TEXT,
       notas TEXT,
       fecha_creada TEXT NOT NULL,
-      activa INTEGER NOT NULL DEFAULT 1
+      activa INTEGER NOT NULL DEFAULT 1,
+      mesociclo_id INTEGER REFERENCES mesociclos(id) ON DELETE SET NULL,
+      UNIQUE (mesociclo_id, semana)
     );
     CREATE TABLE IF NOT EXISTS program_days (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -158,6 +166,7 @@ export async function createTestApp(db: TestDb) {
   const { settingsRouter } = await import("../routes/settings.js");
   const { exercisesRouter } = await import("../routes/exercises.js");
   const { tracRouter } = await import("../routes/trac.js");
+  const { mesociclosRouter } = await import("../routes/mesociclos.js");
 
   const app = express();
   app.use(cors({ origin: true, credentials: true }));
@@ -178,6 +187,7 @@ export async function createTestApp(db: TestDb) {
   app.use("/api/settings", settingsRouter);
   app.use("/api/exercises", exercisesRouter);
   app.use("/api/trac", tracRouter);
+  app.use("/api/mesociclos", mesociclosRouter);
 
   return app;
 }

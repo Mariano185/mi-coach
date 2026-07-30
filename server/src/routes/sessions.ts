@@ -4,10 +4,6 @@ import type { NewSessionInput, Session, SessionWithSets } from "../types.js";
 
 export const sessionsRouter = Router();
 
-function isInt1to10(v: unknown): boolean {
-  return v == null || (typeof v === "number" && v >= 1 && v <= 10);
-}
-
 // GET /api/sessions — lista, más reciente primero.
 sessionsRouter.get("/", (_req, res) => {
   const rows = db
@@ -48,9 +44,6 @@ sessionsRouter.post("/", (req, res) => {
   if (body.tipo !== undefined && body.tipo !== null && typeof body.tipo !== "string") {
     return res.status(400).json({ error: "tipo debe ser texto" });
   }
-  if (!isInt1to10(body.energia) || !isInt1to10(body.motivacion)) {
-    return res.status(400).json({ error: "energia/motivacion deben estar entre 1 y 10" });
-  }
   if (!Array.isArray(body.sets) || body.sets.length === 0) {
     return res.status(400).json({ error: "la sesión necesita al menos un set" });
   }
@@ -70,8 +63,8 @@ sessionsRouter.post("/", (req, res) => {
   }
 
   const insertSession = db.prepare(
-    `INSERT INTO sessions (fecha, tipo, energia, sueno_horas, motivacion, dolor_molestias, comentarios)
-     VALUES (@fecha, @tipo, @energia, @sueno_horas, @motivacion, @dolor_molestias, @comentarios)`
+    `INSERT INTO sessions (fecha, tipo, comentarios)
+     VALUES (@fecha, @tipo, @comentarios)`
   );
   const insertSet = db.prepare(
     `INSERT INTO sets (session_id, exercise_id, n_serie, peso_kg, reps, rpe, rir, notas)
@@ -82,10 +75,6 @@ sessionsRouter.post("/", (req, res) => {
     const result = insertSession.run({
       fecha: input.fecha,
       tipo: input.tipo ?? null,
-      energia: input.energia ?? null,
-      sueno_horas: input.sueno_horas ?? null,
-      motivacion: input.motivacion ?? null,
-      dolor_molestias: input.dolor_molestias ?? null,
       comentarios: input.comentarios ?? null,
     });
     const sessionId = result.lastInsertRowid as number;

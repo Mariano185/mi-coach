@@ -23,10 +23,6 @@ export interface Session {
   id: number;
   fecha: string; // YYYY-MM-DD
   tipo: string | null;
-  energia: number | null;
-  sueno_horas: number | null;
-  motivacion: number | null;
-  dolor_molestias: string | null;
   comentarios: string | null;
 }
 
@@ -67,10 +63,6 @@ export interface NewSetInput {
 export interface NewSessionInput {
   fecha: string;
   tipo?: string | null;
-  energia?: number | null;
-  sueno_horas?: number | null;
-  motivacion?: number | null;
-  dolor_molestias?: string | null;
   comentarios?: string | null;
   sets: NewSetInput[];
 }
@@ -91,6 +83,39 @@ export interface NewProgramInput {
   resumen?: string | null;
 }
 
+// === Mesociclos: agrupador de semanas ===
+export interface Mesociclo {
+  id: number;
+  nombre: string;
+  objetivo: string | null;
+  notas: string | null;
+  fecha_inicio: string | null;
+  fecha_fin: string | null;
+  orden: number;
+  fecha_creada: string;
+}
+
+export interface MesocicloConSemanas extends Mesociclo {
+  n_semanas: number;
+}
+
+export interface NewMesocicloInput {
+  nombre: string;
+  objetivo?: string | null;
+  notas?: string | null;
+  fecha_inicio?: string | null;
+  fecha_fin?: string | null;
+}
+
+export interface UpdateMesocicloInput {
+  nombre?: string;
+  objetivo?: string | null;
+  notas?: string | null;
+  fecha_inicio?: string | null;
+  fecha_fin?: string | null;
+  orden?: number;
+}
+
 // === Programa estructurado ===
 export type Seccion = "main" | "accesorio" | "core";
 
@@ -102,6 +127,7 @@ export interface ProgramWeek {
   notas: string | null;
   fecha_creada: string;
   activa: number;
+  mesociclo_id: number | null;
 }
 
 export interface ProgramDay {
@@ -194,6 +220,7 @@ export interface NewProgramWeekInput {
   nombre?: string | null;
   bloque?: string | null;
   notas?: string | null;
+  mesociclo_id?: number | null;
   days: Array<{
     dia: number;
     tipo?: string | null;

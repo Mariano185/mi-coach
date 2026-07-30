@@ -72,25 +72,28 @@ coachRouter.get("/analisis", (req, res) => {
     )
     .all(desde);
 
-  // 6) Bienestar reciente (energía, sueño, motivación, molestias).
-  const bienestar_reciente = db
-    .prepare(
-      `SELECT fecha, tipo, energia, sueno_horas, motivacion, dolor_molestias
-       FROM sessions
-       ORDER BY fecha DESC
-       LIMIT 8`
-    )
-    .all();
-
   // 7) Library de ejercicios (para mapear nombre → id al armar la semana).
   const ejercicios = db
     .prepare("SELECT id, nombre, categoria, es_basico FROM exercises ORDER BY id")
     .all();
 
   // 8) Última semana programada (para numerar la próxima = max + 1).
+  // Deprecado desde que existen mesociclos: la numeración ahora se reinicia por
+  // mesociclo, ver el bloque `mesociclos` más abajo (max_semana es por mesociclo).
   const ultima_semana = db
     .prepare("SELECT MAX(semana) AS max_semana FROM program_weeks")
     .get();
+
+  // 8b) Mesociclos con su semana máxima (para numerar la próxima semana de cada uno = max + 1).
+  const mesociclos = db
+    .prepare(
+      `SELECT m.id, m.nombre, m.objetivo,
+         (SELECT COUNT(*) FROM program_weeks pw WHERE pw.mesociclo_id = m.id) AS n_semanas,
+         (SELECT MAX(semana) FROM program_weeks pw WHERE pw.mesociclo_id = m.id) AS max_semana
+       FROM mesociclos m
+       ORDER BY m.orden DESC, m.id DESC`
+    )
+    .all();
 
   // 9) Sesiones realizadas: fecha real + horarios + duración (para analizar
   //    frecuencia, días consecutivos y fatiga acumulada). Solo días con actividad
@@ -159,9 +162,9 @@ coachRouter.get("/analisis", (req, res) => {
     rpe_basicos,
     peso_corporal,
     volumen_por_categoria,
-    bienestar_reciente,
     ejercicios,
     ultima_semana,
+    mesociclos,
     sesiones_realizadas,
     trac_reciente,
   });

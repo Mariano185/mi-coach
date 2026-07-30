@@ -69,7 +69,6 @@ export function History() {
                   </>
                 ) : null}
                 <strong>{s.fecha}</strong>{" "}
-                {s.energia != null && <span className="muted">· energía {s.energia}</span>}
                 {s.comentarios && <span className="muted"> · {s.comentarios}</span>}
               </summary>
               {detail && (

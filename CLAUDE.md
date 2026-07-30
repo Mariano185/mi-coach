@@ -51,7 +51,7 @@ como SPA (static + catch-all fallback). Ver `server/src/index.ts`.
 
 **Registro real (lo que pasó):**
 - `exercises` — `id, nombre, categoria, es_basico`. Seedeada (`EXERCISE_LIBRARY` en db.ts). Los 3 primeros = básicos.
-- `sessions` — `id, fecha, tipo(A/B), energia, sueno_horas, motivacion, dolor_molestias, notas`.
+- `sessions` — `id, fecha, tipo(A/B), notas`.
 - `sets` — `id, session_id, exercise_id, n_serie, peso_kg, reps, rpe`.
 - `bodyweight` — `id, fecha, peso_kg`.
 - `settings` — `clave/valor` (rm_squat, rm_bench, rm_deadlift).

@@ -15,7 +15,11 @@ export function swrFetcher<T>(url: string): Promise<T> {
 // Keys de los endpoints del programa (un solo lugar para no tipear strings sueltos).
 export const swrKeys = {
   programWeeks: () => "/api/program/weeks",
+  programWeeksByMesociclo: (id: number | null) =>
+    id == null ? "/api/program/weeks?mesociclo_id=null" : `/api/program/weeks?mesociclo_id=${id}`,
   programWeek: (id: number) => `/api/program/weeks/${id}`,
+  mesociclos: () => "/api/mesociclos",
+  mesociclo: (id: number) => `/api/mesociclos/${id}`,
   programDay: (id: number) => `/api/program/days/${id}`,
   programExercise: (id: number) => `/api/program/exercises/${id}`,
   stats: () => "/api/stats",

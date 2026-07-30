@@ -3,6 +3,8 @@ import type {
   Bodyweight,
   CompleteDayInput,
   Exercise,
+  Mesociclo,
+  MesocicloConSemanas,
   NewBodyweightInput,
   NewSessionInput,
   Program,
@@ -66,8 +68,17 @@ export const api = {
   getPrograms: () => req<ProgramSummary[]>("/api/programs"),
   getProgram: (id: number) => req<Program>(`/api/programs/${id}`),
 
+  // Mesociclos
+  getMesociclos: () => req<MesocicloConSemanas[]>("/api/mesociclos"),
+  getMesociclo: (id: number) =>
+    req<Mesociclo & { semanas: ProgramWeek[] }>(`/api/mesociclos/${id}`),
+
   // Programa estructurado
   getProgramWeeks: () => req<ProgramWeek[]>("/api/program/weeks"),
+  getProgramWeeksByMesociclo: (id: number | null) =>
+    req<ProgramWeek[]>(
+      id == null ? "/api/program/weeks?mesociclo_id=null" : `/api/program/weeks?mesociclo_id=${id}`
+    ),
   getProgramWeek: (id: number) => req<ProgramWeekDetail>(`/api/program/weeks/${id}`),
   getProgramDay: (id: number) => req<ProgramDayDetail>(`/api/program/days/${id}`),
   updateProgramDay: (

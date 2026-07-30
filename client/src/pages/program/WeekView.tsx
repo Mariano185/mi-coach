@@ -15,7 +15,7 @@ function fmtFecha(iso: string | null): string | null {
 export function WeekView() {
   const { weekId: weekIdParam } = useParams();
   const weekId = Number(weekIdParam);
-  const { weeks } = useProgramsContext();
+  const { weeks, mesociclos, mesocicloActivo, setMesocicloActivo } = useProgramsContext();
   const navigate = useNavigate();
 
   const valid = Number.isInteger(weekId);
@@ -23,12 +23,42 @@ export function WeekView() {
     valid ? swrKeys.programWeek(weekId) : null
   );
 
+  const weeksDelMesociclo =
+    mesociclos.length === 0 ? weeks : weeks.filter((w) => w.mesociclo_id === mesocicloActivo);
+  const mesocicloNombre = mesociclos.find((m) => m.id === mesocicloActivo)?.nombre ?? null;
+
+  function onCambiarMesociclo(idStr: string) {
+    const id = idStr === "" ? null : Number(idStr);
+    setMesocicloActivo(id);
+    const semanasDestino =
+      id == null ? weeks.filter((w) => w.mesociclo_id == null) : weeks.filter((w) => w.mesociclo_id === id);
+    const first = semanasDestino[0]?.id;
+    if (first != null) navigate(`/programs/weeks/${first}`);
+  }
+
   if (!valid) return <p style={{ color: "var(--danger)" }}>semana inválida</p>;
   if (error) return <p style={{ color: "var(--danger)" }}>{(error as Error).message}</p>;
 
   return (
     <div>
       <div className="prog-nav" style={{ justifyContent: "space-between" }}>
+        {mesociclos.length > 0 ? (
+          <div className="week-switch">
+            <label htmlFor="mesociclo-sel">Mesociclo</label>
+            <select
+              id="mesociclo-sel"
+              value={mesocicloActivo ?? ""}
+              onChange={(e) => onCambiarMesociclo(e.target.value)}
+            >
+              {mesociclos.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.nombre}
+                </option>
+              ))}
+              <option value="">Sin mesociclo</option>
+            </select>
+          </div>
+        ) : null}
         <div className="week-switch">
           <label htmlFor="week-sel">Semana</label>
           <select
@@ -36,7 +66,7 @@ export function WeekView() {
             value={Number.isInteger(weekId) ? weekId : ""}
             onChange={(e) => navigate(`/programs/weeks/${e.target.value}`)}
           >
-            {weeks.map((w) => (
+            {weeksDelMesociclo.map((w) => (
               <option key={w.id} value={w.id}>
                 {w.semana}
                 {w.nombre ? ` · ${w.nombre}` : ""}
@@ -50,6 +80,7 @@ export function WeekView() {
         <>
           <h2 className="prog-title">
             Semana {detail.semana}
+            {mesocicloNombre ? <span className="sub">{mesocicloNombre}</span> : null}
             {detail.nombre ? <span className="sub">{detail.nombre}</span> : null}
           </h2>
 

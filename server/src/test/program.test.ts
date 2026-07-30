@@ -70,15 +70,14 @@ describe("POST /api/program/days/:id/complete", () => {
     const res = await request(app)
       .post(`/api/program/days/${dayId}/complete`)
       .set(AUTH)
-      .send({ energia: 8, sueno_horas: 7.5 });
+      .send({});
 
     expect(res.status).toBe(201);
     expect(res.body.sets).toBe(2);
     expect(res.body.session_id).toBeTypeOf("number");
 
-    const session = db.prepare("SELECT * FROM sessions WHERE id = ?").get(res.body.session_id) as { tipo: string; energia: number } | undefined;
+    const session = db.prepare("SELECT * FROM sessions WHERE id = ?").get(res.body.session_id) as { tipo: string } | undefined;
     expect(session?.tipo).toBe("A");
-    expect(session?.energia).toBe(8);
 
     const sets = db.prepare("SELECT * FROM sets WHERE session_id = ?").all(res.body.session_id);
     expect(sets).toHaveLength(2);
@@ -491,5 +490,124 @@ describe("tipo de día libre y opcional (sin restricción A/B)", () => {
     expect(res.status).toBe(201);
     const session = db.prepare("SELECT tipo FROM sessions WHERE id = ?").get(res.body.session_id) as { tipo: string | null };
     expect(session.tipo).toBe("A");
+  });
+});
+
+describe("semanas y mesociclos", () => {
+  let app: Awaited<ReturnType<typeof createTestApp>>;
+
+  beforeEach(async () => {
+    db.exec("DELETE FROM sets; DELETE FROM sessions; DELETE FROM program_weeks; DELETE FROM mesociclos;");
+    app = await createTestApp(db);
+  });
+
+  function seedMesociclo(nombre: string): number {
+    return db
+      .prepare("INSERT INTO mesociclos (nombre, orden, fecha_creada) VALUES (?, 0, '2026-01-01')")
+      .run(nombre).lastInsertRowid as number;
+  }
+
+  it("dos mesociclos distintos pueden tener ambos una semana 1", async () => {
+    const m1 = seedMesociclo("Acumulación");
+    const m2 = seedMesociclo("Fuerza");
+    const squat = (db.prepare("SELECT id FROM exercises WHERE nombre = 'Mid/High Bar Back Squat'").get() as { id: number }).id;
+    const body = (mesociclo_id: number) => ({
+      semana: 1,
+      mesociclo_id,
+      days: [{ dia: 1, exercises: [{ exercise_id: squat, sets: [{ n_serie: 1 }] }] }],
+    });
+
+    const res1 = await request(app).post("/api/program/weeks").set(AUTH).send(body(m1));
+    const res2 = await request(app).post("/api/program/weeks").set(AUTH).send(body(m2));
+
+    expect(res1.status).toBe(201);
+    expect(res2.status).toBe(201);
+  });
+
+  it("rechaza duplicar semana dentro del mismo mesociclo", async () => {
+    const m1 = seedMesociclo("Acumulación");
+    const squat = (db.prepare("SELECT id FROM exercises WHERE nombre = 'Mid/High Bar Back Squat'").get() as { id: number }).id;
+    const body = {
+      semana: 1,
+      mesociclo_id: m1,
+      days: [{ dia: 1, exercises: [{ exercise_id: squat, sets: [{ n_serie: 1 }] }] }],
+    };
+
+    const res1 = await request(app).post("/api/program/weeks").set(AUTH).send(body);
+    const res2 = await request(app).post("/api/program/weeks").set(AUTH).send(body);
+
+    expect(res1.status).toBe(201);
+    expect(res2.status).toBe(409);
+  });
+
+  it("crear una semana sin mesociclo_id sigue funcionando (queda huérfana)", async () => {
+    const squat = (db.prepare("SELECT id FROM exercises WHERE nombre = 'Mid/High Bar Back Squat'").get() as { id: number }).id;
+    const res = await request(app)
+      .post("/api/program/weeks")
+      .set(AUTH)
+      .send({
+        semana: 1,
+        days: [{ dia: 1, exercises: [{ exercise_id: squat, sets: [{ n_serie: 1 }] }] }],
+      });
+
+    expect(res.status).toBe(201);
+    const week = db.prepare("SELECT mesociclo_id FROM program_weeks WHERE id = ?").get(res.body.id) as {
+      mesociclo_id: number | null;
+    };
+    expect(week.mesociclo_id).toBeNull();
+  });
+
+  it("GET /weeks?mesociclo_id=N filtra correctamente", async () => {
+    const m1 = seedMesociclo("Acumulación");
+    const m2 = seedMesociclo("Fuerza");
+    db.prepare("INSERT INTO program_weeks (semana, fecha_creada, mesociclo_id) VALUES (1, '2026-01-01', ?)").run(m1);
+    db.prepare("INSERT INTO program_weeks (semana, fecha_creada, mesociclo_id) VALUES (2, '2026-01-01', ?)").run(m1);
+    db.prepare("INSERT INTO program_weeks (semana, fecha_creada, mesociclo_id) VALUES (1, '2026-01-01', ?)").run(m2);
+
+    const res = await request(app).get(`/api/program/weeks?mesociclo_id=${m1}`).set(AUTH);
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveLength(2);
+    expect(res.body.every((w: { mesociclo_id: number }) => w.mesociclo_id === m1)).toBe(true);
+  });
+
+  it("GET /weeks sin filtro sigue devolviendo todas (retrocompatibilidad)", async () => {
+    const m1 = seedMesociclo("Acumulación");
+    db.prepare("INSERT INTO program_weeks (semana, fecha_creada, mesociclo_id) VALUES (1, '2026-01-01', ?)").run(m1);
+    db.prepare("INSERT INTO program_weeks (semana, fecha_creada, mesociclo_id) VALUES (1, '2026-01-01', NULL)").run();
+
+    const res = await request(app).get("/api/program/weeks").set(AUTH);
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveLength(2);
+  });
+
+  it("PATCH /weeks/:id reasigna una semana de un mesociclo a otro", async () => {
+    const m1 = seedMesociclo("Acumulación");
+    const m2 = seedMesociclo("Fuerza");
+    const weekId = db
+      .prepare("INSERT INTO program_weeks (semana, fecha_creada, mesociclo_id) VALUES (1, '2026-01-01', ?)")
+      .run(m1).lastInsertRowid as number;
+
+    const res = await request(app)
+      .patch(`/api/program/weeks/${weekId}`)
+      .set(AUTH)
+      .send({ mesociclo_id: m2, semana: 3 });
+
+    expect(res.status).toBe(200);
+    expect(res.body.mesociclo_id).toBe(m2);
+    expect(res.body.semana).toBe(3);
+  });
+
+  it("PATCH /weeks/:id rechaza mover a un mesociclo_id inexistente", async () => {
+    const m1 = seedMesociclo("Acumulación");
+    const weekId = db
+      .prepare("INSERT INTO program_weeks (semana, fecha_creada, mesociclo_id) VALUES (1, '2026-01-01', ?)")
+      .run(m1).lastInsertRowid as number;
+
+    const res = await request(app)
+      .patch(`/api/program/weeks/${weekId}`)
+      .set(AUTH)
+      .send({ mesociclo_id: 99999 });
+
+    expect(res.status).toBe(400);
   });
 });

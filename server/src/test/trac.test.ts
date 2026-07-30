@@ -183,9 +183,9 @@ describe("GET /api/coach/analisis — trac_reciente", () => {
     expect(diaSinRegistro.motivacion).toBeNull();
   });
 
-  it("no rompe bienestar_reciente existente", async () => {
+  it("no rompe el resto del payload de análisis", async () => {
     const res = await request(app).get("/api/coach/analisis").set(AUTH);
     expect(res.status).toBe(200);
-    expect(Array.isArray(res.body.bienestar_reciente)).toBe(true);
+    expect(Array.isArray(res.body.trac_reciente)).toBe(true);
   });
 });

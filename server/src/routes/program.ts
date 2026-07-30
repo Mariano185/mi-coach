@@ -21,10 +21,24 @@ const EX_NAME_SQL = "COALESCE(e.nombre, pe.nombre_libre)";
 // ---------- SEMANAS ----------
 
 // GET /api/program/weeks — lista de semanas (más reciente primero).
-programRouter.get("/weeks", (_req, res) => {
-  const rows = db
-    .prepare("SELECT * FROM program_weeks ORDER BY semana DESC")
-    .all() as ProgramWeek[];
+// ?mesociclo_id=N filtra por mesociclo; ?mesociclo_id=null filtra las huérfanas.
+// Sin el query param, devuelve todas (retrocompatible con el coach).
+programRouter.get("/weeks", (req, res) => {
+  const { mesociclo_id } = req.query;
+  let rows: ProgramWeek[];
+  if (mesociclo_id === "null") {
+    rows = db
+      .prepare("SELECT * FROM program_weeks WHERE mesociclo_id IS NULL ORDER BY semana DESC")
+      .all() as ProgramWeek[];
+  } else if (mesociclo_id !== undefined) {
+    const id = Number(mesociclo_id);
+    if (!Number.isInteger(id)) return res.status(400).json({ error: "mesociclo_id inválido" });
+    rows = db
+      .prepare("SELECT * FROM program_weeks WHERE mesociclo_id = ? ORDER BY semana DESC")
+      .all(id) as ProgramWeek[];
+  } else {
+    rows = db.prepare("SELECT * FROM program_weeks ORDER BY semana DESC").all() as ProgramWeek[];
+  }
   res.json(rows);
 });
 
@@ -63,6 +77,61 @@ programRouter.get("/weeks/:id", (req, res) => {
     days: days as ProgramWeekDetail["days"],
   };
   res.json(detail);
+});
+
+// PATCH /api/program/weeks/:id — reasignar una semana a otro mesociclo y/o renumerarla.
+// Es la vía para acomodar semanas huérfanas (creadas antes de que existieran los mesociclos).
+programRouter.patch("/weeks/:id", (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id)) return res.status(400).json({ error: "id inválido" });
+
+  const week = db.prepare("SELECT * FROM program_weeks WHERE id = ?").get(id) as
+    | ProgramWeek
+    | undefined;
+  if (!week) return res.status(404).json({ error: "semana no encontrada" });
+
+  const body = (req.body ?? {}) as {
+    semana?: number;
+    mesociclo_id?: number | null;
+    nombre?: string | null;
+    bloque?: string | null;
+    notas?: string | null;
+  };
+
+  if (body.semana !== undefined && !Number.isInteger(body.semana)) {
+    return res.status(400).json({ error: "semana debe ser un entero" });
+  }
+  if (body.mesociclo_id !== undefined && body.mesociclo_id !== null) {
+    const ok = db.prepare("SELECT 1 FROM mesociclos WHERE id = ?").get(body.mesociclo_id);
+    if (!ok) return res.status(400).json({ error: `mesociclo_id inválido: ${body.mesociclo_id}` });
+  }
+
+  const pick = <T>(v: T | undefined, cur: T): T => (v !== undefined ? v : cur);
+  const next = {
+    semana: pick(body.semana, week.semana),
+    mesociclo_id: pick(body.mesociclo_id, week.mesociclo_id),
+    nombre: pick(body.nombre, week.nombre),
+    bloque: pick(body.bloque, week.bloque),
+    notas: pick(body.notas, week.notas),
+  };
+
+  const dup = db
+    .prepare("SELECT 1 FROM program_weeks WHERE semana = ? AND mesociclo_id IS ? AND id != ?")
+    .get(next.semana, next.mesociclo_id, id);
+  if (dup) {
+    return res
+      .status(409)
+      .json({ error: `ya existe la semana ${next.semana} en ese mesociclo` });
+  }
+
+  db.prepare(
+    `UPDATE program_weeks
+       SET semana=@semana, mesociclo_id=@mesociclo_id, nombre=@nombre, bloque=@bloque, notas=@notas
+       WHERE id=@id`
+  ).run({ id, ...next });
+
+  const updated = db.prepare("SELECT * FROM program_weeks WHERE id = ?").get(id);
+  res.json(updated);
 });
 
 // ---------- DÍAS ----------
@@ -183,10 +252,6 @@ programRouter.post("/days/:id/complete", (req, res) => {
 
   const body = (req.body ?? {}) as {
     fecha?: string;
-    energia?: number | null;
-    sueno_horas?: number | null;
-    motivacion?: number | null;
-    dolor_molestias?: string | null;
     comentarios?: string | null;
   };
   const fecha =
@@ -199,31 +264,22 @@ programRouter.post("/days/:id/complete", (req, res) => {
     if (sessionId) {
       db.prepare("DELETE FROM sets WHERE session_id = ?").run(sessionId);
       db.prepare(
-        `UPDATE sessions SET fecha=@fecha, tipo=@tipo, energia=@energia, sueno_horas=@sueno_horas,
-           motivacion=@motivacion, dolor_molestias=@dolor_molestias, comentarios=@comentarios WHERE id=@id`
+        `UPDATE sessions SET fecha=@fecha, tipo=@tipo, comentarios=@comentarios WHERE id=@id`
       ).run({
         id: sessionId,
         fecha,
         tipo: day.tipo,
-        energia: body.energia ?? null,
-        sueno_horas: body.sueno_horas ?? null,
-        motivacion: body.motivacion ?? null,
-        dolor_molestias: body.dolor_molestias ?? null,
         comentarios: body.comentarios ?? `Día ${day.dia} del programa.`,
       });
     } else {
       sessionId = db
         .prepare(
-          `INSERT INTO sessions (fecha, tipo, energia, sueno_horas, motivacion, dolor_molestias, comentarios)
-           VALUES (@fecha, @tipo, @energia, @sueno_horas, @motivacion, @dolor_molestias, @comentarios)`
+          `INSERT INTO sessions (fecha, tipo, comentarios)
+           VALUES (@fecha, @tipo, @comentarios)`
         )
         .run({
           fecha,
           tipo: day.tipo,
-          energia: body.energia ?? null,
-          sueno_horas: body.sueno_horas ?? null,
-          motivacion: body.motivacion ?? null,
-          dolor_molestias: body.dolor_molestias ?? null,
           comentarios: body.comentarios ?? `Día ${day.dia} del programa.`,
         }).lastInsertRowid as number;
       db.prepare("UPDATE program_days SET session_id = ? WHERE id = ?").run(sessionId, id);
@@ -560,12 +616,18 @@ programRouter.post("/weeks", (req, res) => {
   if (!Array.isArray(body.days) || body.days.length === 0) {
     return res.status(400).json({ error: "la semana necesita al menos un día" });
   }
-  const dup = db.prepare("SELECT 1 FROM program_weeks WHERE semana = ?").get(body.semana);
-  if (dup) return res.status(409).json({ error: `la semana ${body.semana} ya existe` });
+  if (body.mesociclo_id != null) {
+    const ok = db.prepare("SELECT 1 FROM mesociclos WHERE id = ?").get(body.mesociclo_id);
+    if (!ok) return res.status(400).json({ error: `mesociclo_id inválido: ${body.mesociclo_id}` });
+  }
+  const dup = db
+    .prepare("SELECT 1 FROM program_weeks WHERE semana = ? AND mesociclo_id IS ?")
+    .get(body.semana, body.mesociclo_id ?? null);
+  if (dup) return res.status(409).json({ error: `la semana ${body.semana} ya existe en ese mesociclo` });
 
   const insWeek = db.prepare(
-    `INSERT INTO program_weeks (semana, nombre, bloque, notas, fecha_creada, activa)
-     VALUES (@semana, @nombre, @bloque, @notas, @fecha_creada, 1)`
+    `INSERT INTO program_weeks (semana, nombre, bloque, notas, fecha_creada, activa, mesociclo_id)
+     VALUES (@semana, @nombre, @bloque, @notas, @fecha_creada, 1, @mesociclo_id)`
   );
   const insDay = db.prepare(
     `INSERT INTO program_days (week_id, dia, tipo, titulo, warmup, fecha_plan, orden)
@@ -587,6 +649,7 @@ programRouter.post("/weeks", (req, res) => {
       bloque: input.bloque ?? null,
       notas: input.notas ?? null,
       fecha_creada: new Date().toISOString().slice(0, 10),
+      mesociclo_id: input.mesociclo_id ?? null,
     }).lastInsertRowid as number;
 
     input.days.forEach((d, di) => {

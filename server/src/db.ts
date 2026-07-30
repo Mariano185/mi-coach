@@ -27,10 +27,6 @@ function migrate(): void {
       id              INTEGER PRIMARY KEY AUTOINCREMENT,
       fecha           TEXT NOT NULL,
       tipo            TEXT,              -- etiqueta libre y opcional (ej. "Piernas", "A", null)
-      energia         INTEGER,
-      sueno_horas     REAL,
-      motivacion      INTEGER,
-      dolor_molestias TEXT,
       comentarios     TEXT
     );
 
@@ -63,6 +59,20 @@ function migrate(): void {
       fecha_creada TEXT NOT NULL,
       contenido_md TEXT NOT NULL,
       resumen      TEXT
+    );
+
+    -- Mesociclo: agrupador de semanas (ej. "Acumulación octubre", "Fuerza pre-test").
+    -- Cada semana pertenece a un mesociclo (o ninguno); el número de semana se reinicia
+    -- por mesociclo, ver UNIQUE(mesociclo_id, semana) en program_weeks.
+    CREATE TABLE IF NOT EXISTS mesociclos (
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      nombre       TEXT NOT NULL,
+      objetivo     TEXT,
+      notas        TEXT,
+      fecha_inicio TEXT,
+      fecha_fin    TEXT,
+      orden        INTEGER NOT NULL DEFAULT 0,
+      fecha_creada TEXT NOT NULL
     );
 
     -- === Programa estructurado (semana → día → ejercicio → serie) ===
@@ -164,6 +174,7 @@ function migrate(): void {
     "ALTER TABLE program_days ADD COLUMN hora_fin TEXT",
     "ALTER TABLE program_days ADD COLUMN notas TEXT",
     "ALTER TABLE program_sets ADD COLUMN target_peso REAL",
+    "ALTER TABLE program_weeks ADD COLUMN mesociclo_id INTEGER REFERENCES mesociclos(id) ON DELETE SET NULL",
   ]) {
     try { db.exec(col); } catch { /* columna ya existe */ }
   }
@@ -173,6 +184,24 @@ function migrate(): void {
   // si el CHECK sigue presente en el DDL guardado.
   dropTipoCheck("sessions");
   dropTipoCheck("program_days");
+
+  // semana única global → única por mesociclo (mesociclo_id, semana). Requiere recrear
+  // la tabla porque el UNIQUE viejo está en la definición de columna. Idempotente: solo
+  // corre si el UNIQUE global sigue presente en el DDL guardado.
+  migrateSemanaUnique();
+
+  // Bienestar en sessions (energia/sueno_horas/motivacion/dolor_molestias) nunca tuvo
+  // formulario en la UI — trac lo reemplazó de hecho. Sacar las columnas muertas.
+  dropSessionsBienestarColumns();
+}
+
+function dropSessionsBienestarColumns(): void {
+  const cols = db.prepare("PRAGMA table_info(sessions)").all() as Array<{ name: string }>;
+  for (const col of ["energia", "sueno_horas", "motivacion", "dolor_molestias"]) {
+    if (cols.some((c) => c.name === col)) {
+      db.exec(`ALTER TABLE sessions DROP COLUMN ${col}`);
+    }
+  }
 }
 
 function dropTipoCheck(table: "sessions" | "program_days"): void {
@@ -184,18 +213,17 @@ function dropTipoCheck(table: "sessions" | "program_days"): void {
   db.pragma("foreign_keys = OFF");
   const tx = db.transaction(() => {
     if (table === "sessions") {
+      const cols = db.prepare("PRAGMA table_info(sessions)").all() as Array<{ name: string }>;
+      const hasBienestar = cols.some((c) => c.name === "energia");
       db.exec(`
         CREATE TABLE sessions_new (
           id              INTEGER PRIMARY KEY AUTOINCREMENT,
           fecha           TEXT NOT NULL,
           tipo            TEXT,
-          energia         INTEGER,
-          sueno_horas     REAL,
-          motivacion      INTEGER,
-          dolor_molestias TEXT,
+          ${hasBienestar ? "energia INTEGER, sueno_horas REAL, motivacion INTEGER, dolor_molestias TEXT," : ""}
           comentarios     TEXT
         );
-        INSERT INTO sessions_new SELECT id, fecha, tipo, energia, sueno_horas, motivacion, dolor_molestias, comentarios FROM sessions;
+        INSERT INTO sessions_new SELECT id, fecha, tipo, ${hasBienestar ? "energia, sueno_horas, motivacion, dolor_molestias," : ""} comentarios FROM sessions;
         DROP TABLE sessions;
         ALTER TABLE sessions_new RENAME TO sessions;
       `);
@@ -221,6 +249,37 @@ function dropTipoCheck(table: "sessions" | "program_days"): void {
         ALTER TABLE program_days_new RENAME TO program_days;
       `);
     }
+  });
+  tx();
+  db.pragma("foreign_keys = ON");
+}
+
+function migrateSemanaUnique(): void {
+  const row = db
+    .prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='program_weeks'")
+    .get() as { sql: string } | undefined;
+  // Guard de idempotencia: si ya no tiene UNIQUE en la columna semana, salir.
+  if (!row || !/semana\s+INTEGER\s+NOT\s+NULL\s+UNIQUE/i.test(row.sql)) return;
+
+  db.pragma("foreign_keys = OFF");
+  const tx = db.transaction(() => {
+    db.exec(`
+      CREATE TABLE program_weeks_new (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        semana       INTEGER NOT NULL,
+        nombre       TEXT,
+        bloque       TEXT,
+        notas        TEXT,
+        fecha_creada TEXT NOT NULL,
+        activa       INTEGER NOT NULL DEFAULT 1,
+        mesociclo_id INTEGER REFERENCES mesociclos(id) ON DELETE SET NULL,
+        UNIQUE (mesociclo_id, semana)
+      );
+      INSERT INTO program_weeks_new (id, semana, nombre, bloque, notas, fecha_creada, activa, mesociclo_id)
+        SELECT id, semana, nombre, bloque, notas, fecha_creada, activa, mesociclo_id FROM program_weeks;
+      DROP TABLE program_weeks;
+      ALTER TABLE program_weeks_new RENAME TO program_weeks;
+    `);
   });
   tx();
   db.pragma("foreign_keys = ON");
@@ -308,8 +367,8 @@ function seedSampleData(): void {
   if (count > 0) return;
 
   const insertSession = db.prepare(
-    `INSERT INTO sessions (fecha, tipo, energia, sueno_horas, motivacion, dolor_molestias, comentarios)
-     VALUES (@fecha, @tipo, @energia, @sueno_horas, @motivacion, @dolor_molestias, @comentarios)`
+    `INSERT INTO sessions (fecha, tipo, comentarios)
+     VALUES (@fecha, @tipo, @comentarios)`
   );
   const insertSet = db.prepare(
     `INSERT INTO sets (session_id, exercise_id, n_serie, peso_kg, reps, rpe, rir, notas)
@@ -360,15 +419,12 @@ function seedSampleData(): void {
   const sessions: Array<{
     fecha: string;
     tipo: "A" | "B";
-    energia: number;
-    sueno: number;
-    motiv: number;
     sets: SetSeed[];
   }> = [
-    { fecha: daysAgo(13), tipo: "A", energia: 7, sueno: 7.5, motiv: 8, sets: makeSetsA(80, 67.5) },
-    { fecha: daysAgo(11), tipo: "B", energia: 7, sueno: 7, motiv: 7, sets: makeSetsB(130, 70) },
-    { fecha: daysAgo(6), tipo: "A", energia: 8, sueno: 8, motiv: 8, sets: makeSetsA(82.5, 70) },
-    { fecha: daysAgo(4), tipo: "B", energia: 6, sueno: 6.5, motiv: 6, sets: makeSetsB(132.5, 70) },
+    { fecha: daysAgo(13), tipo: "A", sets: makeSetsA(80, 67.5) },
+    { fecha: daysAgo(11), tipo: "B", sets: makeSetsB(130, 70) },
+    { fecha: daysAgo(6), tipo: "A", sets: makeSetsA(82.5, 70) },
+    { fecha: daysAgo(4), tipo: "B", sets: makeSetsB(132.5, 70) },
   ];
 
   const tx = db.transaction(() => {
@@ -376,10 +432,6 @@ function seedSampleData(): void {
       const res = insertSession.run({
         fecha: s.fecha,
         tipo: s.tipo,
-        energia: s.energia,
-        sueno_horas: s.sueno,
-        motivacion: s.motiv,
-        dolor_molestias: null,
         comentarios: "Sesión de ejemplo (seed).",
       });
       const sessionId = res.lastInsertRowid as number;
