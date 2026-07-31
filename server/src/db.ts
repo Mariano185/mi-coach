@@ -166,6 +166,10 @@ function migrate(): void {
   // Debe correr DESPUÉS de backfillFechaRealDesdeSessions() y migrateFechaRealAFecha().
   dropSessionsYSets();
 
+  // v_sets_e1rm leía de sets (eliminada arriba); quedaba huérfana en DBs ya desplegadas porque
+  // el CREATE VIEW viejo salió del DDL sin un DROP explícito que la limpiara.
+  db.exec("DROP VIEW IF EXISTS v_sets_e1rm");
+
   // v_program_sets_e1rm ganó la columna rir; CREATE VIEW IF NOT EXISTS no actualiza una vista
   // ya existente, así que hay que dropearla antes de que el CREATE de arriba la recree.
   db.exec("DROP VIEW IF EXISTS v_program_sets_e1rm");
