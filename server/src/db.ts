@@ -185,6 +185,26 @@ function migrate(): void {
   // Bienestar en sessions (energia/sueno_horas/motivacion/dolor_molestias) nunca tuvo
   // formulario en la UI — trac lo reemplazó de hecho. Sacar las columnas muertas.
   dropSessionsBienestarColumns();
+
+  // Días registrados (session_id no nulo) cuya fecha_real/fecha_plan quedaron NULL porque el
+  // volcado (POST /days/:id/complete) resolvía la fecha con new Date() sin escribirla nunca en
+  // program_days. Esa fecha solo existe en sessions.fecha — rescatarla antes de perderla.
+  // Idempotente (WHERE fecha_real IS NULL) y no pisa fecha_real si ya tiene un valor propio.
+  backfillFechaRealDesdeSessions();
+}
+
+function backfillFechaRealDesdeSessions(): void {
+  const tableExists = db
+    .prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='sessions'")
+    .get();
+  if (!tableExists) return; // ya migrado a la nueva forma sin sessions
+
+  db.exec(`
+    UPDATE program_days
+       SET fecha_real = (SELECT s.fecha FROM sessions s WHERE s.id = program_days.session_id)
+     WHERE fecha_real IS NULL
+       AND session_id IS NOT NULL;
+  `);
 }
 
 function dropSessionsBienestarColumns(): void {
