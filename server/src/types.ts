@@ -41,32 +41,6 @@ export interface Bodyweight {
   notas: string | null;
 }
 
-export interface Program {
-  id: number;
-  semana: number;
-  fecha_creada: string;
-  contenido_md: string;
-  resumen: string | null;
-}
-
-// Payload del form de LogSession: una sesión + sus sets en un solo POST.
-export interface NewSetInput {
-  exercise_id: number;
-  n_serie: number;
-  peso_kg: number;
-  reps: number;
-  rpe?: number | null;
-  rir?: number | null;
-  notas?: string | null;
-}
-
-export interface NewSessionInput {
-  fecha: string;
-  tipo?: string | null;
-  comentarios?: string | null;
-  sets: NewSetInput[];
-}
-
 export interface NewBodyweightInput {
   fecha: string;
   peso_kg: number;
@@ -75,12 +49,6 @@ export interface NewBodyweightInput {
   hambre?: number | null;
   digestion?: string | null;
   notas?: string | null;
-}
-
-export interface NewProgramInput {
-  semana: number;
-  contenido_md: string;
-  resumen?: string | null;
 }
 
 // === Mesociclos: agrupador de semanas ===

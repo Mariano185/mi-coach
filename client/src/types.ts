@@ -43,17 +43,6 @@ export interface Bodyweight {
   notas: string | null;
 }
 
-export interface ProgramSummary {
-  id: number;
-  semana: number;
-  fecha_creada: string;
-  resumen: string | null;
-}
-
-export interface Program extends ProgramSummary {
-  contenido_md: string;
-}
-
 // === Mesociclos: agrupador de semanas ===
 export interface Mesociclo {
   id: number;
@@ -236,23 +225,6 @@ export interface Stats {
 }
 
 // Inputs de formularios
-export interface NewSetInput {
-  exercise_id: number;
-  n_serie: number;
-  peso_kg: number;
-  reps: number;
-  rpe: number | null;
-  rir: number | null;
-  notas: string | null;
-}
-
-export interface NewSessionInput {
-  fecha: string;
-  tipo?: string | null;
-  comentarios: string | null;
-  sets: NewSetInput[];
-}
-
 export interface NewBodyweightInput {
   fecha: string;
   peso_kg: number;

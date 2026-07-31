@@ -1,17 +1,13 @@
 // Cliente fetch tipado. Una función por endpoint. Rutas relativas (proxy de Vite → :3001).
 import type {
-  Bodyweight,
   CompleteDayInput,
   Exercise,
   Mesociclo,
   MesocicloConSemanas,
   NewBodyweightInput,
-  NewSessionInput,
-  Program,
   ProgramDayDetail,
   ProgramExerciseDetail,
   ProgramSet,
-  ProgramSummary,
   ProgramWeek,
   ProgramWeekDetail,
   Session,
@@ -56,17 +52,11 @@ export const api = {
 
   getSessions: () => req<Session[]>("/api/sessions"),
   getSession: (id: number) => req<SessionWithSets>(`/api/sessions/${id}`),
-  createSession: (input: NewSessionInput) =>
-    req<{ id: number }>("/api/sessions", { method: "POST", body: JSON.stringify(input) }),
 
-  getBodyweight: () => req<Bodyweight[]>("/api/bodyweight"),
   createBodyweight: (input: NewBodyweightInput) =>
     req<{ id: number }>("/api/bodyweight", { method: "POST", body: JSON.stringify(input) }),
 
   getStats: () => req<Stats>("/api/stats"),
-
-  getPrograms: () => req<ProgramSummary[]>("/api/programs"),
-  getProgram: (id: number) => req<Program>(`/api/programs/${id}`),
 
   // Mesociclos
   getMesociclos: () => req<MesocicloConSemanas[]>("/api/mesociclos"),

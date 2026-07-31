@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "../db.js";
-import type { NewSessionInput, Session, SessionWithSets } from "../types.js";
+import type { Session, SessionWithSets } from "../types.js";
 
 export const sessionsRouter = Router();
 
@@ -32,67 +32,4 @@ sessionsRouter.get("/:id", (req, res) => {
 
   const result: SessionWithSets = { ...session, sets: sets as SessionWithSets["sets"] };
   res.json(result);
-});
-
-// POST /api/sessions — crea sesión + sus sets en una transacción.
-sessionsRouter.post("/", (req, res) => {
-  const body = req.body as NewSessionInput;
-
-  if (!body || typeof body.fecha !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(body.fecha)) {
-    return res.status(400).json({ error: "fecha requerida en formato YYYY-MM-DD" });
-  }
-  if (body.tipo !== undefined && body.tipo !== null && typeof body.tipo !== "string") {
-    return res.status(400).json({ error: "tipo debe ser texto" });
-  }
-  if (!Array.isArray(body.sets) || body.sets.length === 0) {
-    return res.status(400).json({ error: "la sesión necesita al menos un set" });
-  }
-
-  // Validar cada set y que el ejercicio exista.
-  const exExists = db.prepare("SELECT 1 FROM exercises WHERE id = ?");
-  for (const s of body.sets) {
-    if (!Number.isInteger(s.exercise_id) || !exExists.get(s.exercise_id)) {
-      return res.status(400).json({ error: `exercise_id inválido: ${s.exercise_id}` });
-    }
-    if (typeof s.peso_kg !== "number" || s.peso_kg < 0) {
-      return res.status(400).json({ error: "peso_kg inválido" });
-    }
-    if (!Number.isInteger(s.reps) || s.reps <= 0) {
-      return res.status(400).json({ error: "reps inválido" });
-    }
-  }
-
-  const insertSession = db.prepare(
-    `INSERT INTO sessions (fecha, tipo, comentarios)
-     VALUES (@fecha, @tipo, @comentarios)`
-  );
-  const insertSet = db.prepare(
-    `INSERT INTO sets (session_id, exercise_id, n_serie, peso_kg, reps, rpe, rir, notas)
-     VALUES (@session_id, @exercise_id, @n_serie, @peso_kg, @reps, @rpe, @rir, @notas)`
-  );
-
-  const tx = db.transaction((input: NewSessionInput) => {
-    const result = insertSession.run({
-      fecha: input.fecha,
-      tipo: input.tipo ?? null,
-      comentarios: input.comentarios ?? null,
-    });
-    const sessionId = result.lastInsertRowid as number;
-    for (const s of input.sets) {
-      insertSet.run({
-        session_id: sessionId,
-        exercise_id: s.exercise_id,
-        n_serie: s.n_serie,
-        peso_kg: s.peso_kg,
-        reps: s.reps,
-        rpe: s.rpe ?? null,
-        rir: s.rir ?? null,
-        notas: s.notas ?? null,
-      });
-    }
-    return sessionId;
-  });
-
-  const newId = tx(body);
-  res.status(201).json({ id: newId });
 });
