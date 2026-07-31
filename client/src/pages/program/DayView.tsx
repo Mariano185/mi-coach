@@ -147,7 +147,7 @@ export function DayView() {
       {data.warmup ? (
         <div className="panel" style={{ marginBottom: 18 }}>
           <h3 style={{ marginTop: 0 }}>Warm-up</h3>
-          <p className="muted" style={{ margin: 0 }}>{data.warmup}</p>
+          <CoachNotes text={data.warmup} />
         </div>
       ) : null}
 
