@@ -9,3 +9,4 @@ db-snapshots/
 *.log
 .DS_Store
 .env
+CLAUDE.local.md
