@@ -145,7 +145,6 @@ export async function createTestApp(db: TestDb) {
   const { historyRouter } = await import("../routes/history.js");
   const { statsRouter } = await import("../routes/stats.js");
   const { coachRouter } = await import("../routes/coach.js");
-  const { settingsRouter } = await import("../routes/settings.js");
   const { exercisesRouter } = await import("../routes/exercises.js");
   const { tracRouter } = await import("../routes/trac.js");
   const { mesociclosRouter } = await import("../routes/mesociclos.js");
@@ -167,7 +166,6 @@ export async function createTestApp(db: TestDb) {
   app.use("/api/history", historyRouter);
   app.use("/api/stats", statsRouter);
   app.use("/api/coach", coachRouter);
-  app.use("/api/settings", settingsRouter);
   app.use("/api/exercises", exercisesRouter);
   app.use("/api/trac", tracRouter);
   app.use("/api/mesociclos", mesociclosRouter);

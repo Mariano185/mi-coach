@@ -312,6 +312,9 @@ tbody tr:hover { background: var(--panel-2); }
 .stat-card .delta { font-size: 12px; font-weight: 600; }
 .delta.up { color: var(--lime); }
 .delta.down { color: var(--danger); }
+.delta.muted { color: var(--muted); font-weight: 500; }
+.stat-card.empty::after { background: var(--border); }
+.stat-card.empty .big { color: var(--muted); }
 
 .muted { color: var(--muted); }
 .faint { color: var(--faint); }

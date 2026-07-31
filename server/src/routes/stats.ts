@@ -4,40 +4,47 @@ import type { BasicE1rm, Stats, WeeklyVolume, WeightTrendPoint } from "../types.
 
 export const statsRouter = Router();
 
-const SETTING_KEY: Record<string, string> = {
-  "Mid/High Bar Back Squat": "rm_squat",
-  "Flat Bench Press (barra)": "rm_bench",
-  "Conventional Deadlift": "rm_deadlift",
-};
+// Ventana del e1RM "actual": mejor de las últimas N sesiones DE ESE básico (no días de
+// calendario — con frecuencias bajas por básico, una ventana fija se vacía por rotación
+// normal). N=3 cubre un ciclo pesado/técnico/volumen sin que el día de volumen arrastre
+// el valor hacia abajo (siempre pierde contra el día pesado dentro de esas 3 sesiones).
+const SESIONES_ACTUAL = 3;
 
-// GET /api/stats — e1RM por básico, tendencia de peso (PM 7d), volumen semanal.
+// GET /api/stats — e1RM por básico (histórico + actual), tendencia de peso (PM 7d), volumen semanal.
 statsRouter.get("/", (_req, res) => {
-  // 1) Mejor e1RM por básico vs 1RM inicial (settings).
-  // LEFT JOIN para incluir básicos sin series completadas aún (mejor_e1rm = null → fallback
-  // a rm_inicial). Lee program_sets (única fuente de verdad), no sessions/sets.
-  const basicosRaw = db
+  // 1) e1RM por básico: PR histórico (MAX de siempre) + actual (MAX de las últimas
+  // SESIONES_ACTUAL sesiones entrenadas). Se agrupa por día primero para que el mejor set
+  // de cada sesión compita entero contra el de otras sesiones — así el día pesado siempre
+  // gana sobre el de volumen dentro de la ventana. FROM exercises sin más joins garantiza
+  // que los 3 básicos aparezcan aunque no tengan series (null → "Sin datos" en el cliente).
+  const basicos = db
     .prepare(
-      `SELECT e.id AS exercise_id, e.nombre, MAX(v.e1rm) AS mejor_e1rm
+      `WITH dias AS (
+         SELECT e.id AS exercise_id, pd.fecha, MAX(v.e1rm) AS e1rm_dia
+         FROM exercises e
+         JOIN program_exercises pe ON pe.exercise_id = e.id
+         JOIN program_days      pd ON pd.id = pe.day_id
+         JOIN v_program_sets_e1rm v ON v.program_exercise_id = pe.id
+         WHERE e.es_basico = 1 AND v.e1rm IS NOT NULL AND pd.fecha IS NOT NULL
+         GROUP BY e.id, pd.fecha
+       ),
+       rankeado AS (
+         SELECT *, ROW_NUMBER() OVER (PARTITION BY exercise_id ORDER BY fecha DESC) AS rn
+         FROM dias
+       )
+       SELECT e.id AS exercise_id, e.nombre,
+         (SELECT MAX(e1rm_dia) FROM dias d WHERE d.exercise_id = e.id) AS mejor_e1rm,
+         -- en empate de PR gana la fecha más reciente (el PR "vigente")
+         (SELECT d.fecha FROM dias d WHERE d.exercise_id = e.id
+            ORDER BY d.e1rm_dia DESC, d.fecha DESC LIMIT 1)            AS mejor_fecha,
+         (SELECT MAX(e1rm_dia) FROM rankeado r
+            WHERE r.exercise_id = e.id AND r.rn <= ?)                  AS actual_e1rm,
+         (SELECT MAX(fecha) FROM dias d WHERE d.exercise_id = e.id)    AS ultima_fecha
        FROM exercises e
-       LEFT JOIN program_exercises pe ON pe.exercise_id = e.id
-       LEFT JOIN v_program_sets_e1rm v ON v.program_exercise_id = pe.id AND v.e1rm IS NOT NULL
        WHERE e.es_basico = 1
-       GROUP BY e.id, e.nombre`
+       ORDER BY e.id`
     )
-    .all() as Array<{ exercise_id: number; nombre: string; mejor_e1rm: number | null }>;
-
-  const getSetting = db.prepare("SELECT valor FROM settings WHERE clave = ?");
-  const basicos: BasicE1rm[] = basicosRaw.map((b) => {
-    const key = SETTING_KEY[b.nombre];
-    const row = key ? (getSetting.get(key) as { valor: string } | undefined) : undefined;
-    const rm_inicial = row ? Number(row.valor) : null;
-    return {
-      exercise_id: b.exercise_id,
-      nombre: b.nombre,
-      mejor_e1rm: b.mejor_e1rm ?? rm_inicial ?? 0,
-      rm_inicial,
-    };
-  });
+    .all(SESIONES_ACTUAL) as BasicE1rm[];
 
   // 2) Tendencia de peso con promedio móvil de 7 días (window function en SQL).
   const tendencia_peso = db

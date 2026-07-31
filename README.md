@@ -122,7 +122,7 @@ mi-coach/
 │   ├── index.ts            arranque Express, guard de auth, static SPA
 │   ├── auth.ts             login por password + X-Coach-Key
 │   ├── routes/             exercises · bodyweight · program · history
-│   │                       mesociclos · stats · coach · settings · trac
+│   │                       mesociclos · stats · coach · trac
 │   └── test/               tests de API (vitest + supertest)
 ├── client/src/
 │   ├── App.tsx             router + SWRConfig + guard de login
@@ -170,4 +170,3 @@ Todas las rutas (salvo las públicas) requieren cookie de sesión o header `X-Co
 | PATCH | `/api/program/sets/:id` | completar serie real (autosetea fecha/hora del día) |
 | PATCH | `/api/program/sets/:id/target` | corregir la prescripción de una serie |
 | GET | `/api/coach/analisis?dias=42` | análisis agregado para el coach |
-| GET/PATCH | `/api/settings` | 1RM iniciales y configuración |

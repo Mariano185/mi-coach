@@ -3,6 +3,16 @@ import { useNavigate } from "react-router-dom";
 import type { Stats } from "../types";
 import { swrKeys } from "../swr";
 
+// Recencia legible desde una fecha YYYY-MM-DD. Date.UTC evita que la comparación se corra
+// un día según la zona horaria del navegador (las fechas del server son solo la parte de fecha).
+function hace(fecha: string): string {
+  const [y, m, d] = fecha.split("-").map(Number);
+  const dias = Math.round((Date.now() - Date.UTC(y, m - 1, d)) / 86_400_000);
+  if (dias <= 0) return "hoy";
+  if (dias === 1) return "ayer";
+  return `hace ${dias} días`;
+}
+
 export function Dashboard() {
   const { data: stats, error } = useSWR<Stats>(swrKeys.stats());
   const navigate = useNavigate();
@@ -21,23 +31,33 @@ export function Dashboard() {
       </div>
 
       <div className="panel">
-        <h2>Mejor e1RM por básico vs 1RM inicial</h2>
-        <div className="stat-cards">
-          {stats.basicos.map((b) => {
-            const delta = b.rm_inicial != null ? b.mejor_e1rm - b.rm_inicial : null;
-            return (
-              <div className="stat-card" key={b.exercise_id}>
+        <h2>e1RM por básico</h2>
+        {stats.basicos.length === 0 ? (
+          <p className="muted">Sin datos</p>
+        ) : (
+          <div className="stat-cards">
+            {stats.basicos.map((b) => (
+              <div className={`stat-card${b.mejor_e1rm == null ? " empty" : ""}`} key={b.exercise_id}>
                 <div className="name">{b.nombre}</div>
-                <div className="big">{b.mejor_e1rm} kg</div>
-                {b.rm_inicial != null && (
-                  <div className={`delta ${delta! >= 0 ? "up" : "down"}`}>
-                    {delta! >= 0 ? "▲" : "▼"} {Math.abs(delta!).toFixed(1)} kg vs {b.rm_inicial} inicial
-                  </div>
+                {b.mejor_e1rm == null ? (
+                  <>
+                    <div className="big">Sin datos</div>
+                    <div className="delta muted">Cargá una serie para ver tu e1RM</div>
+                  </>
+                ) : (
+                  <>
+                    <div className="big">{b.actual_e1rm} kg</div>
+                    <div className="delta muted">
+                      {b.actual_e1rm === b.mejor_e1rm
+                        ? `PR actual · ${hace(b.ultima_fecha!)}`
+                        : `PR ${b.mejor_e1rm} kg · ${hace(b.mejor_fecha!)}`}
+                    </div>
+                  </>
                 )}
               </div>
-            );
-          })}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="panel">

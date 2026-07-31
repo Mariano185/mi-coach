@@ -13,7 +13,6 @@ import { historyRouter } from "./routes/history.js";
 import { mesociclosRouter } from "./routes/mesociclos.js";
 import { statsRouter } from "./routes/stats.js";
 import { coachRouter } from "./routes/coach.js";
-import { settingsRouter } from "./routes/settings.js";
 import { tracRouter } from "./routes/trac.js";
 
 const PORT = Number(process.env.PORT) || 3001;
@@ -42,7 +41,6 @@ app.use("/api/history", historyRouter);
 app.use("/api/mesociclos", mesociclosRouter);
 app.use("/api/stats", statsRouter);
 app.use("/api/coach", coachRouter);
-app.use("/api/settings", settingsRouter);
 app.use("/api/trac", tracRouter);
 
 // En producción, servir el frontend buildeado (client/dist) desde el mismo proceso.

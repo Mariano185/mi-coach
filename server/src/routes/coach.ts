@@ -10,7 +10,7 @@ coachRouter.get("/analisis", (req, res) => {
   const dias = Number(req.query.dias) || 42;
   const desde = `-${dias} days`;
 
-  // 1) Mejor e1RM por básico vs 1RM inicial (settings).
+  // 1) Mejor e1RM histórico por básico.
   const mejor_e1rm_basicos = db
     .prepare(
       `SELECT e.nombre, MAX(v.e1rm) AS mejor_e1rm
@@ -21,8 +21,6 @@ coachRouter.get("/analisis", (req, res) => {
        GROUP BY e.id, e.nombre`
     )
     .all();
-
-  const settings = db.prepare("SELECT clave, valor FROM settings").all();
 
   // 2) Progresión e1RM por básico en la ventana (serie temporal por día entrenado).
   const progresion_basicos = db
@@ -157,7 +155,6 @@ coachRouter.get("/analisis", (req, res) => {
   res.json({
     ventana_dias: dias,
     mejor_e1rm_basicos,
-    settings,
     progresion_basicos,
     rpe_basicos,
     peso_corporal,

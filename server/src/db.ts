@@ -170,6 +170,11 @@ function migrate(): void {
   // el CREATE VIEW viejo salió del DDL sin un DROP explícito que la limpiara.
   db.exec("DROP VIEW IF EXISTS v_sets_e1rm");
 
+  // rm_squat/rm_bench/rm_deadlift eran los "1RM iniciales" del bootstrap. Ya no se usan: el
+  // e1RM sale siempre de v_program_sets_e1rm (histórico + actual). Idempotente (un DELETE sin
+  // match es no-op). No toca las claves de auth (coach_api_key, auth_*).
+  db.exec("DELETE FROM settings WHERE clave IN ('rm_squat','rm_bench','rm_deadlift')");
+
   // v_program_sets_e1rm ganó la columna rir; CREATE VIEW IF NOT EXISTS no actualiza una vista
   // ya existente, así que hay que dropearla antes de que el CREATE de arriba la recree.
   db.exec("DROP VIEW IF EXISTS v_program_sets_e1rm");
@@ -348,16 +353,6 @@ function seedExercises(): void {
   tx();
 }
 
-function seedSettings(): void {
-  const insert = db.prepare(
-    "INSERT OR IGNORE INTO settings (clave, valor) VALUES (?, ?)"
-  );
-  // 1RM de partida del atleta (sección 8). Editables.
-  insert.run("rm_squat", "97");
-  insert.run("rm_bench", "82.5");
-  insert.run("rm_deadlift", "160");
-}
-
 // === Settings (clave/valor, reusado por auth) ===
 export function getSetting(clave: string): string | null {
   const row = db
@@ -372,6 +367,5 @@ export function setSetting(clave: string, valor: string): void {
 export function initDb(): void {
   migrate();
   seedExercises();
-  seedSettings();
   console.log(`[db] listo en ${DB_PATH}`);
 }

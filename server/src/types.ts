@@ -225,8 +225,10 @@ export interface UpsertTracInput {
 export interface BasicE1rm {
   exercise_id: number;
   nombre: string;
-  mejor_e1rm: number;
-  rm_inicial: number | null;
+  mejor_e1rm: number | null;   // PR histórico. null = nunca tuvo una serie con peso+reps
+  mejor_fecha: string | null;  // YYYY-MM-DD del día del PR
+  actual_e1rm: number | null;  // mejor de las últimas sesiones de ESE básico
+  ultima_fecha: string | null; // último día entrenado
 }
 
 export interface WeightTrendPoint {
