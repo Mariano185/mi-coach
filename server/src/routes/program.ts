@@ -176,6 +176,8 @@ programRouter.get("/days/:id", (req, res) => {
 
 // PATCH /api/program/days/:id — editar metadata del día.
 // No toca ejercicios ni series. Solo pisa los campos presentes en el body.
+// fecha normalmente se autosetea sola (ver PATCH /sets/:id) pero queda editable a mano
+// para corregir cargas en diferido.
 programRouter.patch("/days/:id", (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id)) return res.status(400).json({ error: "id inválido" });
@@ -189,7 +191,7 @@ programRouter.patch("/days/:id", (req, res) => {
     titulo?: string | null;
     warmup?: string | null;
     notas?: string | null;
-    fecha_real?: string | null;
+    fecha?: string | null;
     hora_inicio?: string | null;
     hora_fin?: string | null;
   };
@@ -199,7 +201,7 @@ programRouter.patch("/days/:id", (req, res) => {
     titulo: pick(body.titulo, day.titulo),
     warmup: pick(body.warmup, day.warmup),
     notas: pick(body.notas, day.notas),
-    fecha_real: pick(body.fecha_real, day.fecha_real),
+    fecha: pick(body.fecha, day.fecha),
     hora_inicio: pick(body.hora_inicio, day.hora_inicio),
     hora_fin: pick(body.hora_fin, day.hora_fin),
   };
@@ -207,105 +209,12 @@ programRouter.patch("/days/:id", (req, res) => {
   db.prepare(
     `UPDATE program_days
        SET titulo=@titulo, warmup=@warmup, notas=@notas,
-           fecha_real=@fecha_real, hora_inicio=@hora_inicio, hora_fin=@hora_fin
+           fecha=@fecha, hora_inicio=@hora_inicio, hora_fin=@hora_fin
        WHERE id=@id`
   ).run({ id, ...next });
 
   const updated = db.prepare("SELECT * FROM program_days WHERE id = ?").get(id);
   res.json(updated);
-});
-
-// POST /api/program/days/:id/complete — vuelca las series REALES a sessions/sets.
-// Idempotente: si el día ya tiene session_id, reusa esa sesión (borra sus sets y reinserta).
-programRouter.post("/days/:id/complete", (req, res) => {
-  const id = Number(req.params.id);
-  if (!Number.isInteger(id)) return res.status(400).json({ error: "id inválido" });
-
-  const day = db.prepare("SELECT * FROM program_days WHERE id = ?").get(id) as
-    | ProgramDay
-    | undefined;
-  if (!day) return res.status(404).json({ error: "día no encontrado" });
-
-  // Series completadas (con peso y reps reales) de ejercicios con exercise_id válido.
-  const done = db
-    .prepare(
-      `SELECT pe.exercise_id, ps.real_peso, ps.real_reps, ps.real_rpe, ps.n_serie, ps.notas
-       FROM program_sets ps
-       JOIN program_exercises pe ON pe.id = ps.program_exercise_id
-       WHERE pe.day_id = ? AND ps.hecha = 1
-         AND ps.real_peso IS NOT NULL AND ps.real_reps IS NOT NULL
-         AND pe.exercise_id IS NOT NULL
-       ORDER BY pe.orden, ps.n_serie`
-    )
-    .all(id) as Array<{
-    exercise_id: number;
-    real_peso: number;
-    real_reps: number;
-    real_rpe: number | null;
-    n_serie: number;
-    notas: string | null;
-  }>;
-
-  if (done.length === 0) {
-    return res.status(400).json({ error: "no hay series completadas con peso y reps reales" });
-  }
-
-  const body = (req.body ?? {}) as {
-    fecha?: string;
-    comentarios?: string | null;
-  };
-  const fecha =
-    body.fecha && /^\d{4}-\d{2}-\d{2}$/.test(body.fecha)
-      ? body.fecha
-      : day.fecha_real ?? day.fecha_plan ?? new Date().toISOString().slice(0, 10);
-
-  const tx = db.transaction(() => {
-    let sessionId = day.session_id;
-    if (sessionId) {
-      db.prepare("DELETE FROM sets WHERE session_id = ?").run(sessionId);
-      db.prepare(
-        `UPDATE sessions SET fecha=@fecha, tipo=@tipo, comentarios=@comentarios WHERE id=@id`
-      ).run({
-        id: sessionId,
-        fecha,
-        tipo: day.tipo,
-        comentarios: body.comentarios ?? `Día ${day.dia} del programa.`,
-      });
-    } else {
-      sessionId = db
-        .prepare(
-          `INSERT INTO sessions (fecha, tipo, comentarios)
-           VALUES (@fecha, @tipo, @comentarios)`
-        )
-        .run({
-          fecha,
-          tipo: day.tipo,
-          comentarios: body.comentarios ?? `Día ${day.dia} del programa.`,
-        }).lastInsertRowid as number;
-      db.prepare("UPDATE program_days SET session_id = ? WHERE id = ?").run(sessionId, id);
-    }
-
-    const insSet = db.prepare(
-      `INSERT INTO sets (session_id, exercise_id, n_serie, peso_kg, reps, rpe, rir, notas)
-       VALUES (@session_id, @exercise_id, @n_serie, @peso_kg, @reps, @rpe, @rir, @notas)`
-    );
-    for (const d of done) {
-      insSet.run({
-        session_id: sessionId,
-        exercise_id: d.exercise_id,
-        n_serie: d.n_serie,
-        peso_kg: d.real_peso,
-        reps: d.real_reps,
-        rpe: d.real_rpe,
-        rir: d.real_rpe != null ? Math.max(0, Math.round(10 - d.real_rpe)) : null,
-        notas: d.notas,
-      });
-    }
-    return sessionId;
-  });
-
-  const sessionId = tx();
-  res.status(201).json({ session_id: sessionId, sets: done.length });
 });
 
 // ---------- EJERCICIOS ----------
@@ -552,11 +461,26 @@ programRouter.patch("/sets/:id", (req, res) => {
           })(),
   };
 
-  db.prepare(
-    `UPDATE program_sets
-       SET real_peso=@real_peso, real_reps=@real_reps, real_rpe=@real_rpe, notas=@notas, hecha=@hecha
-       WHERE id=@id`
-  ).run({ id, ...next });
+  const tx = db.transaction(() => {
+    db.prepare(
+      `UPDATE program_sets
+         SET real_peso=@real_peso, real_reps=@real_reps, real_rpe=@real_rpe, notas=@notas, hecha=@hecha
+         WHERE id=@id`
+    ).run({ id, ...next });
+
+    // La fecha/hora del entrenamiento es la del primer dato cargado, no la de un registro
+    // manual posterior (que podía llegar días después). COALESCE = solo escribe si está NULL,
+    // así que respeta cualquier edición manual previa y es idempotente entre series del mismo día.
+    if (next.hecha === 1) {
+      db.prepare(
+        `UPDATE program_days
+            SET fecha = COALESCE(fecha, date('now', 'localtime')),
+                hora_inicio = COALESCE(hora_inicio, time('now', 'localtime'))
+          WHERE id = (SELECT pe.day_id FROM program_exercises pe WHERE pe.id = ?)`
+      ).run(set.program_exercise_id);
+    }
+  });
+  tx();
 
   const updated = db
     .prepare("SELECT * FROM v_program_sets_e1rm WHERE id = ?")
@@ -630,8 +554,8 @@ programRouter.post("/weeks", (req, res) => {
      VALUES (@semana, @nombre, @bloque, @notas, @fecha_creada, 1, @mesociclo_id)`
   );
   const insDay = db.prepare(
-    `INSERT INTO program_days (week_id, dia, tipo, titulo, warmup, fecha_plan, orden)
-     VALUES (@week_id, @dia, @tipo, @titulo, @warmup, @fecha_plan, @orden)`
+    `INSERT INTO program_days (week_id, dia, tipo, titulo, warmup, orden)
+     VALUES (@week_id, @dia, @tipo, @titulo, @warmup, @orden)`
   );
   const insEx = db.prepare(
     `INSERT INTO program_exercises (day_id, exercise_id, nombre_libre, seccion, reps_text, carga_text, rpe_text, notas, orden)
@@ -659,7 +583,6 @@ programRouter.post("/weeks", (req, res) => {
         tipo: d.tipo ?? null,
         titulo: d.titulo ?? null,
         warmup: d.warmup ?? null,
-        fecha_plan: d.fecha_plan ?? null,
         orden: di,
       }).lastInsertRowid as number;
 

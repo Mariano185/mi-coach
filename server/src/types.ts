@@ -7,29 +7,6 @@ export interface Exercise {
   es_basico: 0 | 1;
 }
 
-export interface SessionSet {
-  id: number;
-  session_id: number;
-  exercise_id: number;
-  n_serie: number;
-  peso_kg: number;
-  reps: number;
-  rpe: number | null;
-  rir: number | null;
-  notas: string | null;
-}
-
-export interface Session {
-  id: number;
-  fecha: string; // YYYY-MM-DD
-  tipo: string | null;
-  comentarios: string | null;
-}
-
-export interface SessionWithSets extends Session {
-  sets: Array<SessionSet & { exercise_nombre: string; e1rm: number }>;
-}
-
 export interface Bodyweight {
   id: number;
   fecha: string;
@@ -106,11 +83,9 @@ export interface ProgramDay {
   titulo: string | null;
   warmup: string | null;
   notas: string | null;
-  fecha_plan: string | null;
-  fecha_real: string | null;
+  fecha: string | null; // se autosetea al completar la primera serie; editable a mano
   hora_inicio: string | null;
   hora_fin: string | null;
-  session_id: number | null;
   orden: number;
 }
 
@@ -139,6 +114,7 @@ export interface ProgramSet {
   real_rpe: number | null;
   hecha: number;
   notas: string | null;
+  rir: number | null; // derivado en v_program_sets_e1rm: MAX(0, ROUND(10 - real_rpe))
 }
 
 // Vistas agregadas devueltas por la API:
@@ -194,7 +170,6 @@ export interface NewProgramWeekInput {
     tipo?: string | null;
     titulo?: string | null;
     warmup?: string | null;
-    fecha_plan?: string | null;
     exercises: Array<{
       exercise_id?: number | null;
       nombre_libre?: string | null;
@@ -270,4 +245,30 @@ export interface Stats {
   basicos: BasicE1rm[];
   tendencia_peso: WeightTrendPoint[];
   volumen_semanal: WeeklyVolume[];
+}
+
+// === Historial (reemplaza sessions/sets — lee directo de program_sets) ===
+export interface HistoryDay {
+  day_id: number;
+  fecha: string;
+  semana: number;
+  dia: number;
+  tipo: string | null;
+  titulo: string | null;
+  hora_inicio: string | null;
+  hora_fin: string | null;
+  n_series: number;
+}
+
+export interface HistoryDayDetail extends HistoryDay {
+  sets: Array<{
+    exercise_id: number | null;
+    exercise_nombre: string;
+    n_serie: number;
+    real_peso: number;
+    real_reps: number;
+    real_rpe: number | null;
+    rir: number | null;
+    e1rm: number | null;
+  }>;
 }

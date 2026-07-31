@@ -88,7 +88,7 @@ export function WeekView() {
             {detail.days.map((d) => {
               const pct = d.n_series ? d.n_series_hechas / d.n_series : 0;
               const complete = d.n_series > 0 && d.n_series_hechas === d.n_series;
-              const fecha = fmtFecha(d.fecha_plan);
+              const fecha = fmtFecha(d.fecha);
               return (
                 <button
                   key={d.id}

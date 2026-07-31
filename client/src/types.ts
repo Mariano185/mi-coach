@@ -7,31 +7,6 @@ export interface Exercise {
   es_basico: 0 | 1;
 }
 
-export interface Session {
-  id: number;
-  fecha: string;
-  tipo: string | null;
-  comentarios: string | null;
-}
-
-export interface SetWithExercise {
-  id: number;
-  session_id: number;
-  exercise_id: number;
-  n_serie: number;
-  peso_kg: number;
-  reps: number;
-  rpe: number | null;
-  rir: number | null;
-  notas: string | null;
-  exercise_nombre: string;
-  e1rm: number;
-}
-
-export interface SessionWithSets extends Session {
-  sets: SetWithExercise[];
-}
-
 export interface Bodyweight {
   id: number;
   fecha: string;
@@ -97,8 +72,7 @@ export interface ProgramDayCard {
   tipo: string | null;
   titulo: string | null;
   warmup: string | null;
-  fecha_plan: string | null;
-  session_id: number | null;
+  fecha: string | null;
   orden: number;
   nombre_ejercicios: string | null;
   n_ejercicios: number;
@@ -135,11 +109,9 @@ export interface ProgramDayDetail {
   titulo: string | null;
   warmup: string | null;
   notas: string | null;
-  fecha_plan: string | null;
-  fecha_real: string | null;
+  fecha: string | null; // se autosetea al completar la primera serie; editable a mano
   hora_inicio: string | null;
   hora_fin: string | null;
-  session_id: number | null;
   orden: number;
   semana: number;
   nombre_semana: string | null;
@@ -160,6 +132,7 @@ export interface ProgramSet {
   notas: string | null;
   e1rm: number | null;
   tonelaje: number | null;
+  rir: number | null;
 }
 
 export interface UpdateProgramSetTargetInput {
@@ -192,11 +165,6 @@ export interface UpdateProgramSetInput {
   real_rpe?: number | null;
   hecha?: boolean;
   notas?: string | null;
-}
-
-export interface CompleteDayInput {
-  fecha?: string;
-  comentarios?: string | null;
 }
 
 export interface BasicE1rm {
@@ -259,4 +227,30 @@ export interface UpsertTracInput {
   recuperacion?: number | null;
   motivacion?: number | null;
   tecnica?: number | null;
+}
+
+// === Historial (reemplaza sessions/sets — lee directo de program_sets) ===
+export interface HistoryDay {
+  day_id: number;
+  fecha: string;
+  semana: number;
+  dia: number;
+  tipo: string | null;
+  titulo: string | null;
+  hora_inicio: string | null;
+  hora_fin: string | null;
+  n_series: number;
+}
+
+export interface HistoryDayDetail extends HistoryDay {
+  sets: Array<{
+    exercise_id: number | null;
+    exercise_nombre: string;
+    n_serie: number;
+    real_peso: number;
+    real_reps: number;
+    real_rpe: number | null;
+    rir: number | null;
+    e1rm: number | null;
+  }>;
 }

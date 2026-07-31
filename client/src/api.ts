@@ -1,7 +1,8 @@
 // Cliente fetch tipado. Una función por endpoint. Rutas relativas (proxy de Vite → :3001).
 import type {
-  CompleteDayInput,
   Exercise,
+  HistoryDay,
+  HistoryDayDetail,
   Mesociclo,
   MesocicloConSemanas,
   NewBodyweightInput,
@@ -10,8 +11,6 @@ import type {
   ProgramSet,
   ProgramWeek,
   ProgramWeekDetail,
-  Session,
-  SessionWithSets,
   Stats,
   TracEntry,
   UpdateProgramSetInput,
@@ -50,8 +49,8 @@ export async function req<T>(url: string, options?: RequestInit): Promise<T> {
 export const api = {
   getExercises: () => req<Exercise[]>("/api/exercises"),
 
-  getSessions: () => req<Session[]>("/api/sessions"),
-  getSession: (id: number) => req<SessionWithSets>(`/api/sessions/${id}`),
+  getHistory: () => req<HistoryDay[]>("/api/history"),
+  getHistoryDay: (dayId: number) => req<HistoryDayDetail>(`/api/history/${dayId}`),
 
   createBodyweight: (input: NewBodyweightInput) =>
     req<{ id: number }>("/api/bodyweight", { method: "POST", body: JSON.stringify(input) }),
@@ -77,7 +76,7 @@ export const api = {
       titulo?: string | null;
       warmup?: string | null;
       notas?: string | null;
-      fecha_real?: string | null;
+      fecha?: string | null;
       hora_inicio?: string | null;
       hora_fin?: string | null;
     }
@@ -96,11 +95,6 @@ export const api = {
   updateProgramSetTarget: (id: number, input: UpdateProgramSetTargetInput) =>
     req<ProgramSet>(`/api/program/sets/${id}/target`, {
       method: "PATCH",
-      body: JSON.stringify(input),
-    }),
-  completeProgramDay: (id: number, input: CompleteDayInput = {}) =>
-    req<{ session_id: number; sets: number }>(`/api/program/days/${id}/complete`, {
-      method: "POST",
       body: JSON.stringify(input),
     }),
 

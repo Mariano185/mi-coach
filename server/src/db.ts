@@ -23,25 +23,6 @@ function migrate(): void {
       es_basico INTEGER NOT NULL DEFAULT 0
     );
 
-    CREATE TABLE IF NOT EXISTS sessions (
-      id              INTEGER PRIMARY KEY AUTOINCREMENT,
-      fecha           TEXT NOT NULL,
-      tipo            TEXT,              -- etiqueta libre y opcional (ej. "Piernas", "A", null)
-      comentarios     TEXT
-    );
-
-    CREATE TABLE IF NOT EXISTS sets (
-      id          INTEGER PRIMARY KEY AUTOINCREMENT,
-      session_id  INTEGER NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
-      exercise_id INTEGER NOT NULL REFERENCES exercises(id),
-      n_serie     INTEGER NOT NULL,
-      peso_kg     REAL NOT NULL,
-      reps        INTEGER NOT NULL,
-      rpe         REAL,
-      rir         REAL,
-      notas       TEXT
-    );
-
     CREATE TABLE IF NOT EXISTS bodyweight (
       id            INTEGER PRIMARY KEY AUTOINCREMENT,
       fecha         TEXT NOT NULL,
@@ -86,8 +67,7 @@ function migrate(): void {
       tipo        TEXT,                     -- etiqueta libre y opcional (ej. "Piernas", "A", null)
       titulo      TEXT,                     -- "Squat + Bench"
       warmup      TEXT,
-      fecha_plan  TEXT,                     -- YYYY-MM-DD opcional
-      session_id  INTEGER REFERENCES sessions(id) ON DELETE SET NULL,
+      fecha       TEXT,                     -- YYYY-MM-DD; se autosetea al completar la primera serie
       orden       INTEGER NOT NULL DEFAULT 0
     );
 
@@ -141,27 +121,14 @@ function migrate(): void {
       actualizado_en        TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
-    -- e1RM Epley calculado, nunca hardcodeado. Reusar en /api/stats.
-    CREATE VIEW IF NOT EXISTS v_sets_e1rm AS
-      SELECT
-        s.*,
-        ROUND(s.peso_kg * (1 + s.reps / 30.0), 1) AS e1rm
-      FROM sets s;
-
-    -- e1RM/tonelaje de las series REALES del programa (solo las completadas).
-    CREATE VIEW IF NOT EXISTS v_program_sets_e1rm AS
-      SELECT
-        ps.*,
-        CASE WHEN ps.real_peso IS NOT NULL AND ps.real_reps IS NOT NULL
-             THEN ROUND(ps.real_peso * (1 + ps.real_reps / 30.0), 1) END AS e1rm,
-        CASE WHEN ps.real_peso IS NOT NULL AND ps.real_reps IS NOT NULL
-             THEN ROUND(ps.real_peso * ps.real_reps, 1) END AS tonelaje
-      FROM program_sets ps;
   `);
 
   // Columnas nuevas en tablas ya desplegadas (idempotente: ignorar si ya existen).
+  // No incluye fecha_real/fecha_plan/session_id: esas solo existieron en la forma vieja de
+  // program_days (pre-rename a "fecha"); las DBs que las tenían ya las agregaron en su día,
+  // y una DB nueva nace directo con "fecha" vía el CREATE TABLE de arriba — no hay que
+  // reintroducirlas nunca.
   for (const col of [
-    "ALTER TABLE program_days ADD COLUMN fecha_real TEXT",
     "ALTER TABLE program_days ADD COLUMN hora_inicio TEXT",
     "ALTER TABLE program_days ADD COLUMN hora_fin TEXT",
     "ALTER TABLE program_days ADD COLUMN notas TEXT",
@@ -171,26 +138,49 @@ function migrate(): void {
     try { db.exec(col); } catch { /* columna ya existe */ }
   }
 
-  // tipo A/B → texto libre opcional. SQLite no soporta ALTER COLUMN/DROP CONSTRAINT,
-  // así que hay que recrear la tabla para sacar el CHECK viejo. Idempotente: solo corre
-  // si el CHECK sigue presente en el DDL guardado.
-  dropTipoCheck("sessions");
-  dropTipoCheck("program_days");
+  // tipo A/B → texto libre opcional en program_days. SQLite no soporta ALTER COLUMN/DROP
+  // CONSTRAINT, así que hay que recrear la tabla para sacar el CHECK viejo. Idempotente: solo
+  // corre si el CHECK sigue presente en el DDL guardado.
+  dropTipoCheckProgramDays();
 
   // semana única global → única por mesociclo (mesociclo_id, semana). Requiere recrear
   // la tabla porque el UNIQUE viejo está en la definición de columna. Idempotente: solo
   // corre si el UNIQUE global sigue presente en el DDL guardado.
   migrateSemanaUnique();
 
-  // Bienestar en sessions (energia/sueno_horas/motivacion/dolor_molestias) nunca tuvo
-  // formulario en la UI — trac lo reemplazó de hecho. Sacar las columnas muertas.
-  dropSessionsBienestarColumns();
-
   // Días registrados (session_id no nulo) cuya fecha_real/fecha_plan quedaron NULL porque el
   // volcado (POST /days/:id/complete) resolvía la fecha con new Date() sin escribirla nunca en
   // program_days. Esa fecha solo existe en sessions.fecha — rescatarla antes de perderla.
   // Idempotente (WHERE fecha_real IS NULL) y no pisa fecha_real si ya tiene un valor propio.
+  // Debe correr ANTES de dropSessionsYSets(), que borra sessions.
   backfillFechaRealDesdeSessions();
+
+  // fecha_real/fecha_plan/session_id → fecha (renombrado, fecha_plan eliminado por no usarse
+  // nunca, session_id eliminado junto con sessions). El atleta ya no "registra" el día: la
+  // fecha se autosetea sola al completar la primera serie (PATCH /program/sets/:id).
+  // Idempotente: solo corre si program_days todavía tiene la columna vieja fecha_real.
+  migrateFechaRealAFecha();
+
+  // sessions/sets eran una copia derivada de program_sets, poblada solo al apretar el botón
+  // "Registrar día" (eliminado). Cero datos únicos tras el backfill de arriba — ver CLAUDE.md.
+  // Debe correr DESPUÉS de backfillFechaRealDesdeSessions() y migrateFechaRealAFecha().
+  dropSessionsYSets();
+
+  // v_program_sets_e1rm ganó la columna rir; CREATE VIEW IF NOT EXISTS no actualiza una vista
+  // ya existente, así que hay que dropearla antes de que el CREATE de arriba la recree.
+  db.exec("DROP VIEW IF EXISTS v_program_sets_e1rm");
+  db.exec(`
+    CREATE VIEW v_program_sets_e1rm AS
+      SELECT
+        ps.*,
+        CASE WHEN ps.real_peso IS NOT NULL AND ps.real_reps IS NOT NULL
+             THEN ROUND(ps.real_peso * (1 + ps.real_reps / 30.0), 1) END AS e1rm,
+        CASE WHEN ps.real_peso IS NOT NULL AND ps.real_reps IS NOT NULL
+             THEN ROUND(ps.real_peso * ps.real_reps, 1) END AS tonelaje,
+        CASE WHEN ps.real_rpe IS NOT NULL
+             THEN MAX(0, ROUND(10 - ps.real_rpe)) END AS rir
+      FROM program_sets ps;
+  `);
 }
 
 function backfillFechaRealDesdeSessions(): void {
@@ -198,6 +188,9 @@ function backfillFechaRealDesdeSessions(): void {
     .prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='sessions'")
     .get();
   if (!tableExists) return; // ya migrado a la nueva forma sin sessions
+
+  const cols = db.prepare("PRAGMA table_info(program_days)").all() as Array<{ name: string }>;
+  if (!cols.some((c) => c.name === "fecha_real")) return; // ya renombrada a fecha
 
   db.exec(`
     UPDATE program_days
@@ -207,60 +200,70 @@ function backfillFechaRealDesdeSessions(): void {
   `);
 }
 
-function dropSessionsBienestarColumns(): void {
-  const cols = db.prepare("PRAGMA table_info(sessions)").all() as Array<{ name: string }>;
-  for (const col of ["energia", "sueno_horas", "motivacion", "dolor_molestias"]) {
-    if (cols.some((c) => c.name === col)) {
-      db.exec(`ALTER TABLE sessions DROP COLUMN ${col}`);
-    }
-  }
+function migrateFechaRealAFecha(): void {
+  const cols = db.prepare("PRAGMA table_info(program_days)").all() as Array<{ name: string }>;
+  if (!cols.some((c) => c.name === "fecha_real")) return; // ya migrado
+
+  db.pragma("foreign_keys = OFF");
+  const tx = db.transaction(() => {
+    db.exec(`
+      CREATE TABLE program_days_new (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        week_id     INTEGER NOT NULL REFERENCES program_weeks(id) ON DELETE CASCADE,
+        dia         INTEGER NOT NULL,
+        tipo        TEXT,
+        titulo      TEXT,
+        warmup      TEXT,
+        notas       TEXT,
+        fecha       TEXT,
+        hora_inicio TEXT,
+        hora_fin    TEXT,
+        orden       INTEGER NOT NULL DEFAULT 0
+      );
+      INSERT INTO program_days_new (id, week_id, dia, tipo, titulo, warmup, notas, fecha, hora_inicio, hora_fin, orden)
+        SELECT id, week_id, dia, tipo, titulo, warmup, notas, COALESCE(fecha_real, fecha_plan), hora_inicio, hora_fin, orden
+        FROM program_days;
+      DROP TABLE program_days;
+      ALTER TABLE program_days_new RENAME TO program_days;
+    `);
+  });
+  tx();
+  db.pragma("foreign_keys = ON");
 }
 
-function dropTipoCheck(table: "sessions" | "program_days"): void {
+function dropSessionsYSets(): void {
+  db.exec("DROP TABLE IF EXISTS sets");
+  db.exec("DROP TABLE IF EXISTS sessions");
+}
+
+function dropTipoCheckProgramDays(): void {
   const row = db
-    .prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name=?")
-    .get(table) as { sql: string } | undefined;
+    .prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='program_days'")
+    .get() as { sql: string } | undefined;
   if (!row || !/CHECK\s*\(\s*tipo\s+IN/i.test(row.sql)) return; // ya migrado o no existe
 
   db.pragma("foreign_keys = OFF");
   const tx = db.transaction(() => {
-    if (table === "sessions") {
-      const cols = db.prepare("PRAGMA table_info(sessions)").all() as Array<{ name: string }>;
-      const hasBienestar = cols.some((c) => c.name === "energia");
-      db.exec(`
-        CREATE TABLE sessions_new (
-          id              INTEGER PRIMARY KEY AUTOINCREMENT,
-          fecha           TEXT NOT NULL,
-          tipo            TEXT,
-          ${hasBienestar ? "energia INTEGER, sueno_horas REAL, motivacion INTEGER, dolor_molestias TEXT," : ""}
-          comentarios     TEXT
-        );
-        INSERT INTO sessions_new SELECT id, fecha, tipo, ${hasBienestar ? "energia, sueno_horas, motivacion, dolor_molestias," : ""} comentarios FROM sessions;
-        DROP TABLE sessions;
-        ALTER TABLE sessions_new RENAME TO sessions;
-      `);
-    } else {
-      db.exec(`
-        CREATE TABLE program_days_new (
-          id          INTEGER PRIMARY KEY AUTOINCREMENT,
-          week_id     INTEGER NOT NULL REFERENCES program_weeks(id) ON DELETE CASCADE,
-          dia         INTEGER NOT NULL,
-          tipo        TEXT,
-          titulo      TEXT,
-          warmup      TEXT,
-          notas       TEXT,
-          fecha_plan  TEXT,
-          fecha_real  TEXT,
-          hora_inicio TEXT,
-          hora_fin    TEXT,
-          session_id  INTEGER REFERENCES sessions(id) ON DELETE SET NULL,
-          orden       INTEGER NOT NULL DEFAULT 0
-        );
-        INSERT INTO program_days_new SELECT id, week_id, dia, tipo, titulo, warmup, notas, fecha_plan, fecha_real, hora_inicio, hora_fin, session_id, orden FROM program_days;
-        DROP TABLE program_days;
-        ALTER TABLE program_days_new RENAME TO program_days;
-      `);
-    }
+    db.exec(`
+      CREATE TABLE program_days_new (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        week_id     INTEGER NOT NULL REFERENCES program_weeks(id) ON DELETE CASCADE,
+        dia         INTEGER NOT NULL,
+        tipo        TEXT,
+        titulo      TEXT,
+        warmup      TEXT,
+        notas       TEXT,
+        fecha_plan  TEXT,
+        fecha_real  TEXT,
+        hora_inicio TEXT,
+        hora_fin    TEXT,
+        session_id  INTEGER REFERENCES sessions(id) ON DELETE SET NULL,
+        orden       INTEGER NOT NULL DEFAULT 0
+      );
+      INSERT INTO program_days_new SELECT id, week_id, dia, tipo, titulo, warmup, notas, fecha_plan, fecha_real, hora_inicio, hora_fin, session_id, orden FROM program_days;
+      DROP TABLE program_days;
+      ALTER TABLE program_days_new RENAME TO program_days;
+    `);
   });
   tx();
   db.pragma("foreign_keys = ON");
@@ -351,17 +354,6 @@ function seedSettings(): void {
   insert.run("rm_deadlift", "160");
 }
 
-// Helper: fecha YYYY-MM-DD a N días atrás de hoy.
-function daysAgo(n: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() - n);
-  return d.toISOString().slice(0, 10);
-}
-
-function exId(nombre: string): number {
-  return (db.prepare("SELECT id FROM exercises WHERE nombre = ?").get(nombre) as { id: number }).id;
-}
-
 // === Settings (clave/valor, reusado por auth) ===
 export function getSetting(clave: string): string | null {
   const row = db
@@ -371,114 +363,6 @@ export function getSetting(clave: string): string | null {
 }
 export function setSetting(clave: string, valor: string): void {
   db.prepare("INSERT OR REPLACE INTO settings (clave, valor) VALUES (?, ?)").run(clave, valor);
-}
-
-// --- Seed mínimo: ~2 semanas de sesiones A/B + bodyweight, para que el dashboard no esté vacío. ---
-function seedSampleData(): void {
-  const count = (db.prepare("SELECT COUNT(*) AS n FROM sessions").get() as { n: number }).n;
-  if (count > 0) return;
-
-  const insertSession = db.prepare(
-    `INSERT INTO sessions (fecha, tipo, comentarios)
-     VALUES (@fecha, @tipo, @comentarios)`
-  );
-  const insertSet = db.prepare(
-    `INSERT INTO sets (session_id, exercise_id, n_serie, peso_kg, reps, rpe, rir, notas)
-     VALUES (@session_id, @exercise_id, @n_serie, @peso_kg, @reps, @rpe, @rir, @notas)`
-  );
-  const insertBw = db.prepare(
-    `INSERT INTO bodyweight (fecha, peso_kg, kcal_objetivo, proteina_g, hambre, digestion, notas)
-     VALUES (@fecha, @peso_kg, @kcal_objetivo, @proteina_g, @hambre, @digestion, @notas)`
-  );
-
-  const squat = exId("Mid/High Bar Back Squat");
-  const dead = exId("Conventional Deadlift");
-  const bench = exId("Flat Bench Press (barra)");
-  const incline = exId("Incline Bench Press (barra)");
-  const lateral = exId("Vuelos laterales con mancuernas");
-  const row = exId("Remo en máquina T");
-  const legext = exId("Sillón de cuádriceps (Leg Extension)");
-  const triceps = exId("Tríceps en polea");
-
-  interface SetSeed {
-    ex: number;
-    peso: number;
-    reps: number;
-    rpe: number;
-    series: number;
-  }
-  // Sesión A: Squat + Bench pesados + accesorios. Sesión B: Deadlift + Bench + accesorios.
-  function makeSetsA(squatKg: number, benchKg: number): SetSeed[] {
-    return [
-      { ex: squat, peso: squatKg, reps: 5, rpe: 7, series: 3 },
-      { ex: bench, peso: benchKg, reps: 5, rpe: 7, series: 3 },
-      { ex: incline, peso: benchKg - 25, reps: 10, rpe: 8, series: 3 },
-      { ex: legext, peso: 55, reps: 12, rpe: 9, series: 3 },
-      { ex: lateral, peso: 10, reps: 15, rpe: 9, series: 3 },
-    ];
-  }
-  function makeSetsB(deadKg: number, benchKg: number): SetSeed[] {
-    return [
-      { ex: dead, peso: deadKg, reps: 4, rpe: 7.5, series: 2 },
-      { ex: bench, peso: benchKg, reps: 6, rpe: 7, series: 3 },
-      { ex: row, peso: 60, reps: 10, rpe: 8, series: 3 },
-      { ex: triceps, peso: 30, reps: 12, rpe: 9, series: 3 },
-      { ex: lateral, peso: 10, reps: 15, rpe: 9, series: 3 },
-    ];
-  }
-
-  // 4 sesiones repartidas en ~2 semanas con leve progresión.
-  const sessions: Array<{
-    fecha: string;
-    tipo: "A" | "B";
-    sets: SetSeed[];
-  }> = [
-    { fecha: daysAgo(13), tipo: "A", sets: makeSetsA(80, 67.5) },
-    { fecha: daysAgo(11), tipo: "B", sets: makeSetsB(130, 70) },
-    { fecha: daysAgo(6), tipo: "A", sets: makeSetsA(82.5, 70) },
-    { fecha: daysAgo(4), tipo: "B", sets: makeSetsB(132.5, 70) },
-  ];
-
-  const tx = db.transaction(() => {
-    for (const s of sessions) {
-      const res = insertSession.run({
-        fecha: s.fecha,
-        tipo: s.tipo,
-        comentarios: "Sesión de ejemplo (seed).",
-      });
-      const sessionId = res.lastInsertRowid as number;
-      for (const st of s.sets) {
-        for (let i = 1; i <= st.series; i++) {
-          insertSet.run({
-            session_id: sessionId,
-            exercise_id: st.ex,
-            n_serie: i,
-            peso_kg: st.peso,
-            reps: st.reps,
-            rpe: st.rpe,
-            rir: Math.max(0, Math.round(10 - st.rpe)),
-            notas: null,
-          });
-        }
-      }
-    }
-
-    // Bodyweight: leve tendencia bajista (~72.8 → 72.3) sobre 2 semanas.
-    const bwDays = [13, 11, 9, 7, 5, 3, 1];
-    const bwVals = [72.8, 72.9, 72.6, 72.5, 72.6, 72.4, 72.3];
-    for (let i = 0; i < bwDays.length; i++) {
-      insertBw.run({
-        fecha: daysAgo(bwDays[i]),
-        peso_kg: bwVals[i],
-        kcal_objetivo: 2600,
-        proteina_g: 160,
-        hambre: 5,
-        digestion: "ok",
-        notas: null,
-      });
-    }
-  });
-  tx();
 }
 
 export function initDb(): void {

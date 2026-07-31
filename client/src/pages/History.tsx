@@ -1,46 +1,42 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import useSWR from "swr";
 import { api } from "../api";
-import type { Exercise, Session, SessionWithSets } from "../types";
+import type { Exercise, HistoryDay, HistoryDayDetail } from "../types";
 import { swrKeys } from "../swr";
 
 export function History() {
-  const { data: sessions = [], error: errSessions } = useSWR<Session[]>(swrKeys.sessions());
+  const { data: days = [], error: errDays } = useSWR<HistoryDay[]>(swrKeys.history());
   const { data: exercises = [], error: errExercises } = useSWR<Exercise[]>(swrKeys.exercises());
   const [filterEx, setFilterEx] = useState("");
-  const [open, setOpen] = useState<Record<number, SessionWithSets>>({});
+  const [open, setOpen] = useState<Record<number, HistoryDayDetail>>({});
   const [loadErr, setLoadErr] = useState("");
-  const err = errSessions ? (errSessions as Error).message
+  const err = errDays ? (errDays as Error).message
     : errExercises ? (errExercises as Error).message
     : loadErr;
 
-  async function toggle(id: number) {
-    if (open[id]) {
+  async function toggle(dayId: number) {
+    if (open[dayId]) {
       setOpen((o) => {
         const next = { ...o };
-        delete next[id];
+        delete next[dayId];
         return next;
       });
       return;
     }
     try {
-      const full = await api.getSession(id);
-      setOpen((o) => ({ ...o, [id]: full }));
+      const full = await api.getHistoryDay(dayId);
+      setOpen((o) => ({ ...o, [dayId]: full }));
     } catch (e) {
       setLoadErr((e as Error).message);
     }
   }
 
-  // Filtro por ejercicio: muestra solo sesiones que incluyen ese ejercicio.
-  // Como la lista base no trae sets, expandimos perezosamente; el filtro aplica
-  // sobre las que ya estén abiertas + las que matcheen al cargar detalle.
-  const filtered = useMemo(() => sessions, [sessions]);
   const filterId = filterEx ? Number(filterEx) : null;
 
   return (
     <div>
       <div className="panel">
-        <h2>Historial de sesiones</h2>
+        <h2>Historial de entrenamientos</h2>
         {err && <p style={{ color: "var(--danger)" }}>{err}</p>}
         <div className="field" style={{ maxWidth: 320 }}>
           <label>Filtrar por ejercicio</label>
@@ -52,24 +48,20 @@ export function History() {
           </select>
         </div>
 
-        {filtered.length === 0 && <p className="muted">No hay sesiones registradas.</p>}
+        {days.length === 0 && <p className="muted">No hay entrenamientos registrados.</p>}
 
-        {filtered.map((s) => {
-          const detail = open[s.id];
-          // Si hay filtro y la sesión está expandida, ocultar las que no contienen el ejercicio.
+        {days.map((d) => {
+          const detail = open[d.day_id];
+          // Si hay filtro y el día está expandido, ocultar los que no contienen el ejercicio.
           if (filterId && detail && !detail.sets.some((x) => x.exercise_id === filterId)) {
             return null;
           }
           return (
-            <details key={s.id} open={!!detail} onToggle={() => { /* controlado abajo */ }}>
-              <summary onClick={(e) => { e.preventDefault(); toggle(s.id); }}>
-                {s.tipo ? (
-                  <>
-                    <span className={`pill ${s.tipo === "A" || s.tipo === "B" ? s.tipo : ""}`}>Sesión {s.tipo}</span>{" "}
-                  </>
-                ) : null}
-                <strong>{s.fecha}</strong>{" "}
-                {s.comentarios && <span className="muted"> · {s.comentarios}</span>}
+            <details key={d.day_id} open={!!detail} onToggle={() => { /* controlado abajo */ }}>
+              <summary onClick={(e) => { e.preventDefault(); toggle(d.day_id); }}>
+                {d.tipo ? <><span className="pill">{d.tipo}</span>{" "}</> : null}
+                <strong>{d.fecha}</strong>{" "}
+                {d.titulo && <span className="muted"> · {d.titulo}</span>}
               </summary>
               {detail && (
                 <table>
@@ -79,15 +71,15 @@ export function History() {
                   <tbody>
                     {detail.sets
                       .filter((x) => !filterId || x.exercise_id === filterId)
-                      .map((x) => (
-                        <tr key={x.id}>
+                      .map((x, i) => (
+                        <tr key={i}>
                           <td>{x.exercise_nombre}</td>
                           <td>{x.n_serie}</td>
-                          <td>{x.peso_kg}</td>
-                          <td>{x.reps}</td>
-                          <td>{x.rpe ?? "—"}</td>
+                          <td>{x.real_peso}</td>
+                          <td>{x.real_reps}</td>
+                          <td>{x.real_rpe ?? "—"}</td>
                           <td>{x.rir ?? "—"}</td>
-                          <td>{x.e1rm}</td>
+                          <td>{x.e1rm ?? "—"}</td>
                         </tr>
                       ))}
                   </tbody>

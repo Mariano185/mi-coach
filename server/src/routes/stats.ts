@@ -13,12 +13,14 @@ const SETTING_KEY: Record<string, string> = {
 // GET /api/stats — e1RM por básico, tendencia de peso (PM 7d), volumen semanal.
 statsRouter.get("/", (_req, res) => {
   // 1) Mejor e1RM por básico vs 1RM inicial (settings).
-  // LEFT JOIN para incluir básicos sin sets aún (mejor_e1rm = null → fallback a rm_inicial).
+  // LEFT JOIN para incluir básicos sin series completadas aún (mejor_e1rm = null → fallback
+  // a rm_inicial). Lee program_sets (única fuente de verdad), no sessions/sets.
   const basicosRaw = db
     .prepare(
       `SELECT e.id AS exercise_id, e.nombre, MAX(v.e1rm) AS mejor_e1rm
        FROM exercises e
-       LEFT JOIN v_sets_e1rm v ON v.exercise_id = e.id
+       LEFT JOIN program_exercises pe ON pe.exercise_id = e.id
+       LEFT JOIN v_program_sets_e1rm v ON v.program_exercise_id = pe.id AND v.e1rm IS NOT NULL
        WHERE e.es_basico = 1
        GROUP BY e.id, e.nombre`
     )
@@ -56,12 +58,15 @@ statsRouter.get("/", (_req, res) => {
   const volumen_semanal = db
     .prepare(
       `SELECT
-         strftime('%Y-%W', s.fecha) AS semana,
+         strftime('%Y-%W', pd.fecha) AS semana,
          SUM(CASE WHEN e.es_basico = 1 THEN 1 ELSE 0 END) AS series_basicos,
          SUM(CASE WHEN e.es_basico = 0 THEN 1 ELSE 0 END) AS series_accesorios
-       FROM sets st
-       JOIN sessions s ON s.id = st.session_id
-       JOIN exercises e ON e.id = st.exercise_id
+       FROM program_sets ps
+       JOIN program_exercises pe ON pe.id = ps.program_exercise_id
+       JOIN program_days pd ON pd.id = pe.day_id
+       JOIN exercises e ON e.id = pe.exercise_id
+       WHERE ps.hecha = 1 AND ps.real_peso IS NOT NULL AND ps.real_reps IS NOT NULL
+         AND pd.fecha IS NOT NULL
        GROUP BY semana
        ORDER BY semana ASC`
     )

@@ -144,7 +144,7 @@ describe("GET /api/coach/analisis — trac_reciente", () => {
   let app: Awaited<ReturnType<typeof createTestApp>>;
 
   beforeEach(async () => {
-    db.exec("DELETE FROM trac; DELETE FROM sessions;");
+    db.exec("DELETE FROM trac;");
     app = await createTestApp(db);
   });
 

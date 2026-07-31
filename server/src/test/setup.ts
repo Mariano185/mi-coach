@@ -17,23 +17,6 @@ export function createTestDb() {
       categoria TEXT NOT NULL,
       es_basico INTEGER NOT NULL DEFAULT 0
     );
-    CREATE TABLE IF NOT EXISTS sessions (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      fecha TEXT NOT NULL,
-      tipo TEXT,
-      comentarios TEXT
-    );
-    CREATE TABLE IF NOT EXISTS sets (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      session_id INTEGER NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
-      exercise_id INTEGER NOT NULL REFERENCES exercises(id),
-      n_serie INTEGER NOT NULL,
-      peso_kg REAL NOT NULL,
-      reps INTEGER NOT NULL,
-      rpe REAL,
-      rir REAL,
-      notas TEXT
-    );
     CREATE TABLE IF NOT EXISTS bodyweight (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       fecha TEXT NOT NULL,
@@ -73,11 +56,9 @@ export function createTestDb() {
       titulo TEXT,
       warmup TEXT,
       notas TEXT,
-      fecha_plan TEXT,
-      fecha_real TEXT,
+      fecha TEXT,
       hora_inicio TEXT,
       hora_fin TEXT,
-      session_id INTEGER REFERENCES sessions(id) ON DELETE SET NULL,
       orden INTEGER NOT NULL DEFAULT 0
     );
     CREATE TABLE IF NOT EXISTS program_exercises (
@@ -122,14 +103,14 @@ export function createTestDb() {
       creado_en TEXT NOT NULL DEFAULT (datetime('now')),
       actualizado_en TEXT NOT NULL DEFAULT (datetime('now'))
     );
-    CREATE VIEW IF NOT EXISTS v_sets_e1rm AS
-      SELECT s.*, ROUND(s.peso_kg * (1 + s.reps / 30.0), 1) AS e1rm FROM sets s;
     CREATE VIEW IF NOT EXISTS v_program_sets_e1rm AS
       SELECT ps.*,
         CASE WHEN ps.real_peso IS NOT NULL AND ps.real_reps IS NOT NULL
              THEN ROUND(ps.real_peso * (1 + ps.real_reps / 30.0), 1) END AS e1rm,
         CASE WHEN ps.real_peso IS NOT NULL AND ps.real_reps IS NOT NULL
-             THEN ROUND(ps.real_peso * ps.real_reps, 1) END AS tonelaje
+             THEN ROUND(ps.real_peso * ps.real_reps, 1) END AS tonelaje,
+        CASE WHEN ps.real_rpe IS NOT NULL
+             THEN MAX(0, ROUND(10 - ps.real_rpe)) END AS rir
       FROM program_sets ps;
   `);
 
@@ -161,6 +142,7 @@ export type TestDb = ReturnType<typeof createTestDb>;
 export async function createTestApp(db: TestDb) {
   // Importar los routers después de que vi.mock haya reemplazado db.
   const { programRouter } = await import("../routes/program.js");
+  const { historyRouter } = await import("../routes/history.js");
   const { statsRouter } = await import("../routes/stats.js");
   const { coachRouter } = await import("../routes/coach.js");
   const { settingsRouter } = await import("../routes/settings.js");
@@ -182,6 +164,7 @@ export async function createTestApp(db: TestDb) {
   });
 
   app.use("/api/program", programRouter);
+  app.use("/api/history", historyRouter);
   app.use("/api/stats", statsRouter);
   app.use("/api/coach", coachRouter);
   app.use("/api/settings", settingsRouter);

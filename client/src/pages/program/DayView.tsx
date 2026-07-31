@@ -18,49 +18,31 @@ function today(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-function nowTime(): string {
-  const d = new Date();
-  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-}
-
 export function DayView() {
   const { dayId: dayIdParam } = useParams();
   const dayId = Number(dayIdParam);
   const navigate = useNavigate();
-  const [saving, setSaving] = useState(false);
-  const [toast, setToast] = useState("");
-  const [actionErr, setActionErr] = useState("");
 
   const valid = Number.isInteger(dayId);
   const dayKey = valid ? swrKeys.programDay(dayId) : null;
   const { data, error, mutate } = useSWR<ProgramDayDetail>(dayKey);
 
   // Campos de sesión editables localmente, sincronizados al blur.
-  const [fechaReal, setFechaReal] = useState("");
+  // fecha/hora_inicio se autosetean solas en el server al completar la primera serie
+  // (PATCH /program/sets/:id); este input queda para corregir cargas en diferido.
+  const [fecha, setFecha] = useState("");
   const [horaInicio, setHoraInicio] = useState("");
   const [horaFin, setHoraFin] = useState("");
 
-  // Evitar auto-setear hora inicio más de una vez.
-  const horaInicioAutoSet = useRef(false);
-
   // Sembrar los inputs locales desde el dato cargado (una vez por día).
-  // Al cambiar de día, re-siembra y resetea el flag de auto-hora.
   const seededFor = useRef<number | null>(null);
   useEffect(() => {
     if (!data || seededFor.current === dayId) return;
     seededFor.current = dayId;
-    setFechaReal(data.fecha_real ?? data.fecha_plan ?? today());
+    setFecha(data.fecha ?? today());
     setHoraInicio(data.hora_inicio ?? "");
     setHoraFin(data.hora_fin ?? "");
-    horaInicioAutoSet.current = Boolean(data.hora_inicio);
   }, [data, dayId]);
-
-  // Toast efímero al registrar un día.
-  useEffect(() => {
-    if (!toast) return;
-    const t = setTimeout(() => setToast(""), 2600);
-    return () => clearTimeout(t);
-  }, [toast]);
 
   const grouped = useMemo(() => {
     const map = new Map<Seccion, ProgramExerciseCard[]>();
@@ -79,16 +61,6 @@ export function DayView() {
     return { total, hechas };
   }, [data]);
 
-  // Auto-setear hora de inicio cuando se completa la primera serie.
-  useEffect(() => {
-    if (progreso.hechas > 0 && !horaInicioAutoSet.current) {
-      horaInicioAutoSet.current = true;
-      const t = nowTime();
-      setHoraInicio(t);
-      void api.updateProgramDay(dayId, { hora_inicio: t });
-    }
-  }, [progreso.hechas, dayId]);
-
   function patchDay(patch: Parameters<typeof api.updateProgramDay>[1]) {
     void api
       .updateProgramDay(dayId, patch)
@@ -96,24 +68,8 @@ export function DayView() {
       .catch(() => {});
   }
 
-  async function registrarDia() {
-    if (!data) return;
-    setSaving(true);
-    setActionErr("");
-    try {
-      const r = await api.completeProgramDay(dayId, {});
-      setToast(`Día ${data.dia} registrado · ${r.sets} series → historial`);
-      await mutate();
-    } catch (e) {
-      setActionErr((e as Error).message);
-    } finally {
-      setSaving(false);
-    }
-  }
-
   if (!valid) return <p style={{ color: "var(--danger)" }}>día inválido</p>;
   if (error) return <p style={{ color: "var(--danger)" }}>{(error as Error).message}</p>;
-  if (actionErr) return <p style={{ color: "var(--danger)" }}>{actionErr}</p>;
   if (!data) return <p className="muted">Cargando…</p>;
 
   return (
@@ -152,9 +108,9 @@ export function DayView() {
             <span className="session-meta-label">Fecha</span>
             <input
               type="date"
-              value={fechaReal}
-              onChange={(e) => setFechaReal(e.target.value)}
-              onBlur={() => patchDay({ fecha_real: fechaReal || null })}
+              value={fecha}
+              onChange={(e) => setFecha(e.target.value)}
+              onBlur={() => patchDay({ fecha: fecha || null })}
             />
           </label>
           <label className="session-meta-field">
@@ -180,8 +136,8 @@ export function DayView() {
           className="btn secondary"
           style={{ marginTop: 14 }}
           onClick={() => {
-            const fecha = data.fecha_real ?? data.fecha_plan ?? today();
-            navigate(`/trac?fecha=${fecha}&returnTo=/programs/days/${dayId}`);
+            const fechaTrac = data.fecha ?? today();
+            navigate(`/trac?fecha=${fechaTrac}&returnTo=/programs/days/${dayId}`);
           }}
         >
           Trac
@@ -246,20 +202,10 @@ export function DayView() {
           </div>
           <div style={{ fontFamily: "var(--font-display)", fontSize: 22, fontWeight: 700 }}>
             {progreso.hechas} / {progreso.total} series
-            {data.session_id ? <span className="done-chip" style={{ marginLeft: 12 }}>✓ en historial</span> : null}
+            {progreso.hechas > 0 ? <span className="done-chip" style={{ marginLeft: 12 }}>✓ en historial</span> : null}
           </div>
         </div>
-        <button
-          className="btn"
-          onClick={registrarDia}
-          disabled={saving || progreso.hechas === 0}
-          title={progreso.hechas === 0 ? "Completá al menos una serie real" : "Volcar al historial"}
-        >
-          {saving ? "Guardando…" : data.session_id ? "Actualizar historial" : "Registrar día"}
-        </button>
       </div>
-
-      {toast ? <div className="toast">{toast}</div> : null}
     </div>
   );
 }

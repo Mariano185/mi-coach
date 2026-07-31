@@ -43,74 +43,11 @@ function seedWeekWithDay(testDb: TestDb) {
   return { weekId, dayId, exId, squat, setIds: [s1, s2, s3] };
 }
 
-describe("POST /api/program/days/:id/complete", () => {
-  let app: Awaited<ReturnType<typeof createTestApp>>;
-
-  beforeEach(async () => {
-    db.exec("DELETE FROM sets; DELETE FROM sessions; DELETE FROM program_weeks;");
-    app = await createTestApp(db);
-  });
-
-  it("falla con 400 si no hay series completadas", async () => {
-    const { dayId } = seedWeekWithDay(db);
-    const res = await request(app)
-      .post(`/api/program/days/${dayId}/complete`)
-      .set(AUTH)
-      .send({});
-    expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/no hay series/i);
-  });
-
-  it("crea una sesión real con los sets completados", async () => {
-    const { dayId, setIds } = seedWeekWithDay(db);
-
-    db.prepare("UPDATE program_sets SET real_peso=100, real_reps=5, real_rpe=7, hecha=1 WHERE id=?").run(setIds[0]);
-    db.prepare("UPDATE program_sets SET real_peso=100, real_reps=5, real_rpe=7.5, hecha=1 WHERE id=?").run(setIds[1]);
-
-    const res = await request(app)
-      .post(`/api/program/days/${dayId}/complete`)
-      .set(AUTH)
-      .send({});
-
-    expect(res.status).toBe(201);
-    expect(res.body.sets).toBe(2);
-    expect(res.body.session_id).toBeTypeOf("number");
-
-    const session = db.prepare("SELECT * FROM sessions WHERE id = ?").get(res.body.session_id) as { tipo: string } | undefined;
-    expect(session?.tipo).toBe("A");
-
-    const sets = db.prepare("SELECT * FROM sets WHERE session_id = ?").all(res.body.session_id);
-    expect(sets).toHaveLength(2);
-
-    const day = db.prepare("SELECT session_id FROM program_days WHERE id = ?").get(dayId) as { session_id: number };
-    expect(day.session_id).toBe(res.body.session_id);
-  });
-
-  it("es idempotente: re-llamar reusa la sesión y actualiza los sets", async () => {
-    const { dayId, setIds } = seedWeekWithDay(db);
-
-    db.prepare("UPDATE program_sets SET real_peso=100, real_reps=5, hecha=1 WHERE id=?").run(setIds[0]);
-
-    const res1 = await request(app).post(`/api/program/days/${dayId}/complete`).set(AUTH).send({});
-    expect(res1.status).toBe(201);
-    const sessionId = res1.body.session_id;
-
-    db.prepare("UPDATE program_sets SET real_peso=102.5, real_reps=5, hecha=1 WHERE id=?").run(setIds[1]);
-    const res2 = await request(app).post(`/api/program/days/${dayId}/complete`).set(AUTH).send({});
-    expect(res2.status).toBe(201);
-    expect(res2.body.session_id).toBe(sessionId);
-    expect(res2.body.sets).toBe(2);
-
-    const count = (db.prepare("SELECT COUNT(*) AS n FROM sessions").get() as { n: number }).n;
-    expect(count).toBe(1);
-  });
-});
-
 describe("PATCH /api/program/sets/:id", () => {
   let app: Awaited<ReturnType<typeof createTestApp>>;
 
   beforeEach(async () => {
-    db.exec("DELETE FROM sets; DELETE FROM sessions; DELETE FROM program_weeks;");
+    db.exec("DELETE FROM program_weeks;");
     app = await createTestApp(db);
   });
 
@@ -142,6 +79,65 @@ describe("PATCH /api/program/sets/:id", () => {
     expect(res.body.hecha).toBe(0);
   });
 
+  it("autosetea fecha y hora_inicio del día al completar la primera serie", async () => {
+    const { dayId, setIds } = seedWeekWithDay(db);
+
+    const before = db.prepare("SELECT fecha, hora_inicio FROM program_days WHERE id = ?").get(dayId) as {
+      fecha: string | null;
+      hora_inicio: string | null;
+    };
+    expect(before.fecha).toBeNull();
+    expect(before.hora_inicio).toBeNull();
+
+    const res = await request(app)
+      .patch(`/api/program/sets/${setIds[0]}`)
+      .set(AUTH)
+      .send({ real_peso: 95, real_reps: 5 });
+
+    expect(res.status).toBe(200);
+    const after = db.prepare("SELECT fecha, hora_inicio FROM program_days WHERE id = ?").get(dayId) as {
+      fecha: string | null;
+      hora_inicio: string | null;
+    };
+    expect(after.fecha).not.toBeNull();
+    expect(after.hora_inicio).not.toBeNull();
+  });
+
+  it("no pisa una fecha ya existente (COALESCE es idempotente)", async () => {
+    const { dayId, setIds } = seedWeekWithDay(db);
+    db.prepare("UPDATE program_days SET fecha = '2020-01-01' WHERE id = ?").run(dayId);
+
+    await request(app)
+      .patch(`/api/program/sets/${setIds[0]}`)
+      .set(AUTH)
+      .send({ real_peso: 95, real_reps: 5 });
+
+    const day = db.prepare("SELECT fecha FROM program_days WHERE id = ?").get(dayId) as { fecha: string };
+    expect(day.fecha).toBe("2020-01-01");
+  });
+
+  it("borrar el peso no borra la fecha ya autoseteada", async () => {
+    const { dayId, setIds } = seedWeekWithDay(db);
+
+    await request(app)
+      .patch(`/api/program/sets/${setIds[0]}`)
+      .set(AUTH)
+      .send({ real_peso: 95, real_reps: 5 });
+    const fechaSeteada = (
+      db.prepare("SELECT fecha FROM program_days WHERE id = ?").get(dayId) as { fecha: string }
+    ).fecha;
+
+    const res = await request(app)
+      .patch(`/api/program/sets/${setIds[0]}`)
+      .set(AUTH)
+      .send({ real_peso: null });
+
+    expect(res.status).toBe(200);
+    expect(res.body.hecha).toBe(0);
+    const day = db.prepare("SELECT fecha FROM program_days WHERE id = ?").get(dayId) as { fecha: string };
+    expect(day.fecha).toBe(fechaSeteada);
+  });
+
   it("rechaza valores negativos", async () => {
     const { setIds } = seedWeekWithDay(db);
     const res = await request(app)
@@ -165,7 +161,7 @@ describe("POST /api/program/weeks", () => {
   let app: Awaited<ReturnType<typeof createTestApp>>;
 
   beforeEach(async () => {
-    db.exec("DELETE FROM sets; DELETE FROM sessions; DELETE FROM program_weeks;");
+    db.exec("DELETE FROM program_weeks;");
     app = await createTestApp(db);
   });
 
@@ -245,7 +241,7 @@ describe("GET /api/program/weeks/:id", () => {
   let app: Awaited<ReturnType<typeof createTestApp>>;
 
   beforeEach(async () => {
-    db.exec("DELETE FROM sets; DELETE FROM sessions; DELETE FROM program_weeks;");
+    db.exec("DELETE FROM program_weeks;");
     app = await createTestApp(db);
   });
 
@@ -273,7 +269,7 @@ describe("target_peso por serie (carga sugerida distinta por fila)", () => {
   let app: Awaited<ReturnType<typeof createTestApp>>;
 
   beforeEach(async () => {
-    db.exec("DELETE FROM sets; DELETE FROM sessions; DELETE FROM program_weeks;");
+    db.exec("DELETE FROM program_weeks;");
     app = await createTestApp(db);
   });
 
@@ -393,7 +389,7 @@ describe("tipo de día libre y opcional (sin restricción A/B)", () => {
   let app: Awaited<ReturnType<typeof createTestApp>>;
 
   beforeEach(async () => {
-    db.exec("DELETE FROM sets; DELETE FROM sessions; DELETE FROM program_weeks;");
+    db.exec("DELETE FROM program_weeks;");
     app = await createTestApp(db);
   });
 
@@ -429,67 +425,38 @@ describe("tipo de día libre y opcional (sin restricción A/B)", () => {
     expect(day.tipo).toBe("Piernas");
   });
 
-  it("completa un día sin tipo: ya no da 400 y la sesión queda con tipo null", async () => {
+  it("día sin tipo: se crea y se lee con tipo null, sin restricción A/B", async () => {
     const weekId = db
       .prepare("INSERT INTO program_weeks (semana, nombre, fecha_creada, activa) VALUES (2, 'Test', '2024-01-01', 1)")
       .run().lastInsertRowid as number;
     const dayId = db
       .prepare("INSERT INTO program_days (week_id, dia, titulo, orden) VALUES (?, 1, 'Día 1', 0)")
       .run(weekId).lastInsertRowid as number;
-    const squat = (db.prepare("SELECT id FROM exercises WHERE nombre = 'Mid/High Bar Back Squat'").get() as { id: number }).id;
-    const exId = db
-      .prepare("INSERT INTO program_exercises (day_id, exercise_id, seccion, orden) VALUES (?, ?, 'main', 0)")
-      .run(dayId, squat).lastInsertRowid as number;
-    const setId = db
-      .prepare("INSERT INTO program_sets (program_exercise_id, n_serie, real_peso, real_reps, hecha) VALUES (?, 1, 90, 5, 1)")
-      .run(exId).lastInsertRowid as number;
-    void setId;
 
-    const res = await request(app)
-      .post(`/api/program/days/${dayId}/complete`)
-      .set(AUTH)
-      .send({});
-
-    expect(res.status).toBe(201);
-    const session = db.prepare("SELECT tipo FROM sessions WHERE id = ?").get(res.body.session_id) as { tipo: string | null };
-    expect(session.tipo).toBeNull();
+    const res = await request(app).get(`/api/program/days/${dayId}`).set(AUTH);
+    expect(res.status).toBe(200);
+    expect(res.body.tipo).toBeNull();
   });
 
-  it("completa un día con etiqueta libre: la sesión hereda esa etiqueta", async () => {
+  it("día con etiqueta libre: se lee tal cual, sin normalizar a A/B", async () => {
     const weekId = db
       .prepare("INSERT INTO program_weeks (semana, nombre, fecha_creada, activa) VALUES (3, 'Test', '2024-01-01', 1)")
       .run().lastInsertRowid as number;
     const dayId = db
       .prepare("INSERT INTO program_days (week_id, dia, tipo, titulo, orden) VALUES (?, 1, 'Piernas', 'Día 1', 0)")
       .run(weekId).lastInsertRowid as number;
-    const squat = (db.prepare("SELECT id FROM exercises WHERE nombre = 'Mid/High Bar Back Squat'").get() as { id: number }).id;
-    const exId = db
-      .prepare("INSERT INTO program_exercises (day_id, exercise_id, seccion, orden) VALUES (?, ?, 'main', 0)")
-      .run(dayId, squat).lastInsertRowid as number;
-    db.prepare("INSERT INTO program_sets (program_exercise_id, n_serie, real_peso, real_reps, hecha) VALUES (?, 1, 90, 5, 1)").run(exId);
 
-    const res = await request(app)
-      .post(`/api/program/days/${dayId}/complete`)
-      .set(AUTH)
-      .send({});
-
-    expect(res.status).toBe(201);
-    const session = db.prepare("SELECT tipo FROM sessions WHERE id = ?").get(res.body.session_id) as { tipo: string | null };
-    expect(session.tipo).toBe("Piernas");
+    const res = await request(app).get(`/api/program/days/${dayId}`).set(AUTH);
+    expect(res.status).toBe(200);
+    expect(res.body.tipo).toBe("Piernas");
   });
 
-  it("regresión: una semana con días tipo A/B se sigue creando, leyendo y completando igual", async () => {
-    const { dayId, setIds } = seedWeekWithDay(db);
-    db.prepare("UPDATE program_sets SET real_peso=100, real_reps=5, hecha=1 WHERE id=?").run(setIds[0]);
+  it("regresión: una semana con días tipo A/B se sigue creando y leyendo igual", async () => {
+    const { dayId } = seedWeekWithDay(db); // seedea con tipo 'A'
 
-    const res = await request(app)
-      .post(`/api/program/days/${dayId}/complete`)
-      .set(AUTH)
-      .send({});
-
-    expect(res.status).toBe(201);
-    const session = db.prepare("SELECT tipo FROM sessions WHERE id = ?").get(res.body.session_id) as { tipo: string | null };
-    expect(session.tipo).toBe("A");
+    const res = await request(app).get(`/api/program/days/${dayId}`).set(AUTH);
+    expect(res.status).toBe(200);
+    expect(res.body.tipo).toBe("A");
   });
 });
 
@@ -497,7 +464,7 @@ describe("semanas y mesociclos", () => {
   let app: Awaited<ReturnType<typeof createTestApp>>;
 
   beforeEach(async () => {
-    db.exec("DELETE FROM sets; DELETE FROM sessions; DELETE FROM program_weeks; DELETE FROM mesociclos;");
+    db.exec("DELETE FROM program_weeks; DELETE FROM mesociclos;");
     app = await createTestApp(db);
   });
 
