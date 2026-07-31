@@ -5,6 +5,7 @@ coach.db-journal
 coach.db-wal
 coach.db-shm
 coach.db.bak-*
+db-snapshots/
 *.log
 .DS_Store
 .env
