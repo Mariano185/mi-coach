@@ -61,6 +61,32 @@ export function Dashboard() {
       </div>
 
       <div className="panel">
+        <h2>e1RM por básico — histórico</h2>
+        {stats.basicos.length === 0 ? (
+          <p className="muted">Sin datos</p>
+        ) : (
+          <div className="stat-cards">
+            {stats.basicos.map((b) => (
+              <div className={`stat-card${b.mejor_e1rm == null ? " empty" : ""}`} key={b.exercise_id}>
+                <div className="name">{b.nombre}</div>
+                {b.mejor_e1rm == null ? (
+                  <>
+                    <div className="big">Sin datos</div>
+                    <div className="delta muted">Cargá una serie para ver tu e1RM</div>
+                  </>
+                ) : (
+                  <>
+                    <div className="big">{b.mejor_e1rm} kg</div>
+                    <div className="delta muted">PR · {hace(b.mejor_fecha!)}</div>
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="panel">
         <h2>Volumen semanal (series: básicos vs accesorios)</h2>
         <table>
           <thead>
