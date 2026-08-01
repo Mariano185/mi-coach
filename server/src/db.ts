@@ -1,6 +1,7 @@
 import Database from "better-sqlite3";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
+import { seedEnciclopedia } from "./seed/index.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // coach.db: por defecto en la raíz de mi-coach/ (dos niveles arriba de server/src).
@@ -275,6 +276,9 @@ function migrate(): void {
       JOIN ejercicio_musculos em ON em.exercise_id = pe.exercise_id
       JOIN musculos m ON m.id = em.musculo_id
       WHERE ps.hecha = 1 AND pd.fecha IS NOT NULL
+        -- Los estabilizadores tienen fraccion_volumen = 0: sin este filtro
+        -- aparecerían como filas en 0 inflando el payload del coach sin aportar.
+        AND em.fraccion_volumen > 0
       GROUP BY semana, m.id
       ORDER BY semana, m.grupo, m.nombre;
   `);
@@ -397,49 +401,10 @@ function migrateSemanaUnique(): void {
   db.pragma("foreign_keys = ON");
 }
 
-// --- Exercise Library (sección 7). Los 3 primeros son básicos. ---
-const EXERCISE_LIBRARY: Array<[string, string, 0 | 1]> = [
-  ["Mid/High Bar Back Squat", "Básico", 1],
-  ["Conventional Deadlift", "Básico", 1],
-  ["Flat Bench Press (barra)", "Básico", 1],
-  ["Incline Bench Press (Smith)", "Smith/Multipower", 0],
-  ["Shoulder Press (Smith)", "Smith/Multipower", 0],
-  ["Squat (Smith)", "Smith/Multipower", 0],
-  ["Incline Bench Press (barra)", "Smith/Multipower", 0],
-  ["Flat Dumbbell Bench Press", "Press mancuernas", 0],
-  ["Incline Dumbbell Bench Press", "Press mancuernas", 0],
-  ["Jalón agarre neutro", "Espalda/Deltoides post.", 0],
-  ["Remo en máquina T", "Espalda/Deltoides post.", 0],
-  ["Remo con mancuernas", "Espalda/Deltoides post.", 0],
-  ["Face Pulls", "Espalda/Deltoides post.", 0],
-  ["Peck Deck Invertido", "Espalda/Deltoides post.", 0],
-  ["Dominadas", "Espalda/Deltoides post.", 0],
-  ["Vuelos laterales con mancuernas", "Hombros", 0],
-  ["Press de hombro en Smith", "Hombros", 0],
-  ["Peck Deck (Mariposa)", "Pecho accesorio", 0],
-  ["Prensa inclinada 45°", "Piernas", 0],
-  ["Sillón de cuádriceps (Leg Extension)", "Piernas", 0],
-  ["Sillón de isquios (Leg Curl)", "Piernas", 0],
-  ["Romanian Deadlift", "Piernas", 0],
-  ["Tríceps en polea", "Brazos", 0],
-  ["Curl inclinado con mancuernas", "Brazos", 0],
-  ["Curl en banco Scott (Preacher)", "Brazos", 0],
-  ["Curl alternado con mancuernas", "Brazos", 0],
-];
-
-function seedExercises(): void {
-  const count = (db.prepare("SELECT COUNT(*) AS n FROM exercises").get() as { n: number }).n;
-  if (count > 0) return;
-  const insert = db.prepare(
-    "INSERT INTO exercises (nombre, categoria, es_basico) VALUES (?, ?, ?)"
-  );
-  const tx = db.transaction(() => {
-    for (const [nombre, categoria, es_basico] of EXERCISE_LIBRARY) {
-      insert.run(nombre, categoria, es_basico);
-    }
-  });
-  tx();
-}
+// El seed del catálogo de ejercicios (biomecánica + músculos) vive en
+// server/src/seed/. Reemplaza al viejo EXERCISE_LIBRARY, que solo insertaba
+// nombre/categoria si la tabla estaba vacía: el seed nuevo hace upsert por
+// nombre, así que también completa DBs ya desplegadas sin tocar sus ids.
 
 // === Settings (clave/valor, reusado por auth) ===
 export function getSetting(clave: string): string | null {
@@ -454,6 +419,6 @@ export function setSetting(clave: string, valor: string): void {
 
 export function initDb(): void {
   migrate();
-  seedExercises();
+  seedEnciclopedia(db);
   console.log(`[db] listo en ${DB_PATH}`);
 }

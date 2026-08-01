@@ -172,6 +172,7 @@ export function createTestDb() {
       JOIN ejercicio_musculos em ON em.exercise_id = pe.exercise_id
       JOIN musculos m ON m.id = em.musculo_id
       WHERE ps.hecha = 1 AND pd.fecha IS NOT NULL
+        AND em.fraccion_volumen > 0
       GROUP BY semana, m.id
       ORDER BY semana, m.grupo, m.nombre;
   `);
