@@ -1,7 +1,70 @@
-import useSWR from "swr";
+import { useEffect } from "react";
+import useSWR, { preload } from "swr";
 import { useNavigate } from "react-router-dom";
+import type { MesocicloConSemanas, ProgramWeek, ProgramWeekDetail, ProgramDayDetail } from "../types";
 import type { Stats } from "../types";
-import { swrKeys } from "../swr";
+import { swrKeys, swrFetcher } from "../swr";
+import { useConnectivity } from "../connectivity";
+
+const MESOCICLO_STORAGE_KEY = "mi-coach:mesociclo-activo";
+
+// Precalienta el cache del service worker con la semana activa completa
+// (días + ejercicios), para que esté disponible offline sin que el usuario
+// tenga que acordarse de abrir manualmente cada pantalla antes de ir al gym.
+// Solo corre con conexión. Usa preload() (no mutate()): mutate() sin ningún
+// useSWR(key) montado en pantalla es un no-op — no dispara el fetch. preload()
+// sí lo hace y deja el resultado en el cache global para cuando el componente
+// real monte esa key. El fetch real es lo que Workbox intercepta y guarda.
+function usePrecalentarCache(): void {
+  const { status } = useConnectivity();
+
+  useEffect(() => {
+    if (status !== "online") return;
+    let cancelled = false;
+
+    async function run() {
+      try {
+        const mesociclos = await preload<MesocicloConSemanas[]>(swrKeys.mesociclos(), swrFetcher);
+        if (cancelled) return;
+
+        const stored = Number(localStorage.getItem(MESOCICLO_STORAGE_KEY));
+        const mesocicloId =
+          mesociclos.some((m) => m.id === stored) ? stored : mesociclos[0]?.id ?? null;
+
+        const weeks = await preload<ProgramWeek[]>(swrKeys.programWeeks(), swrFetcher);
+        if (cancelled) return;
+
+        const weeksActivas =
+          mesocicloId == null ? weeks : weeks.filter((w) => w.mesociclo_id === mesocicloId);
+
+        for (const week of weeksActivas) {
+          if (cancelled) return;
+          const detail = await preload<ProgramWeekDetail>(swrKeys.programWeek(week.id), swrFetcher);
+          if (cancelled) continue;
+
+          for (const day of detail.days) {
+            if (cancelled) return;
+            const dayDetail = await preload<ProgramDayDetail>(swrKeys.programDay(day.id), swrFetcher);
+            if (cancelled) continue;
+
+            for (const ex of dayDetail.exercises) {
+              if (cancelled) return;
+              await preload(swrKeys.programExercise(ex.id), swrFetcher);
+            }
+          }
+        }
+      } catch {
+        // Si falla a mitad de camino (red se cayó justo ahora), no pasa
+        // nada: lo que ya se alcanzó a cachear queda disponible igual.
+      }
+    }
+
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [status]);
+}
 
 // Recencia legible desde una fecha YYYY-MM-DD. Date.UTC evita que la comparación se corra
 // un día según la zona horaria del navegador (las fechas del server son solo la parte de fecha).
@@ -16,6 +79,7 @@ function hace(fecha: string): string {
 export function Dashboard() {
   const { data: stats, error } = useSWR<Stats>(swrKeys.stats());
   const navigate = useNavigate();
+  usePrecalentarCache();
 
   if (error) return <div className="panel"><p style={{ color: "var(--danger)" }}>{(error as Error).message}</p></div>;
   if (!stats) return <div className="panel"><p className="muted">Cargando…</p></div>;

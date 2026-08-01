@@ -17,6 +17,8 @@ import type {
   UpdateProgramSetTargetInput,
   UpsertTracInput,
 } from "./types";
+import { setAuthedFlag } from "./authState";
+import { reportConnectivity } from "./connectivity";
 
 // Flag para evitar loops infinitos cuando /api/auth/status devuelve 401.
 let redirectingToLogin = false;
@@ -29,16 +31,44 @@ function redirectToLogin(): void {
   location.href = `/login?next=${next}`;
 }
 
+// Error de red: el fetch ni siquiera llegó al server (offline, DNS, server
+// caído, túnel roto). NO implica falta de auth — a diferencia de un 401, acá
+// el server nunca respondió, así que no sabemos nada sobre la sesión.
+export class NetworkError extends Error {
+  readonly isNetworkError = true;
+  readonly sourceError?: unknown;
+  constructor(sourceError?: unknown) {
+    super("sin conexión con el servidor");
+    this.name = "NetworkError";
+    this.sourceError = sourceError;
+  }
+}
+
+export function isNetworkError(e: unknown): e is NetworkError {
+  return e instanceof NetworkError;
+}
+
 export async function req<T>(url: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(url, {
-    headers: { "Content-Type": "application/json" },
-    credentials: "include", // enviar/recibir cookie de sesión
-    ...options,
-  });
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      headers: { "Content-Type": "application/json" },
+      credentials: "include", // enviar/recibir cookie de sesión
+      ...options,
+    });
+  } catch (e) {
+    // No redirigir a login acá: un fallo de red no dice nada sobre la sesión.
+    reportConnectivity(false);
+    throw new NetworkError(e);
+  }
+
   if (res.status === 401) {
+    // El server sí respondió: la sesión venció o no existe. Acá sí es un 401 real.
+    setAuthedFlag(false);
     redirectToLogin();
     throw new Error("no autenticado");
   }
+
   if (!res.ok) {
     const body = (await res.json().catch(() => ({}))) as { error?: string };
     throw new Error(body.error ?? `Error ${res.status}`);
