@@ -15,7 +15,54 @@ export function createTestDb() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       nombre TEXT NOT NULL UNIQUE,
       categoria TEXT NOT NULL,
-      es_basico INTEGER NOT NULL DEFAULT 0
+      es_basico INTEGER NOT NULL DEFAULT 0,
+      patron_id INTEGER REFERENCES patrones(id),
+      ejercicio_padre_id INTEGER REFERENCES exercises(id),
+      tipo_variante TEXT,
+      transferencia REAL,
+      proposito TEXT,
+      implemento TEXT,
+      angulo_grados INTEGER,
+      agarre TEXT,
+      postura TEXT,
+      unilateral INTEGER,
+      mecanica TEXT,
+      fuerza TEXT,
+      sesgo_longitud TEXT,
+      perfil_resistencia TEXT,
+      cadena TEXT,
+      carga_axial INTEGER,
+      costo_fatiga INTEGER,
+      demanda_estabilidad INTEGER,
+      demanda_tecnica INTEGER,
+      rastrea_e1rm INTEGER,
+      es_competitivo INTEGER,
+      notas_tecnicas TEXT,
+      contraindicaciones TEXT,
+      cues TEXT
+    );
+    CREATE TABLE IF NOT EXISTS musculos (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      nombre TEXT NOT NULL UNIQUE,
+      nombre_en TEXT,
+      grupo TEXT NOT NULL,
+      region TEXT,
+      biarticular INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE TABLE IF NOT EXISTS patrones (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      nombre TEXT NOT NULL UNIQUE,
+      plano TEXT,
+      descripcion TEXT
+    );
+    CREATE TABLE IF NOT EXISTS ejercicio_musculos (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      exercise_id INTEGER NOT NULL REFERENCES exercises(id) ON DELETE CASCADE,
+      musculo_id INTEGER NOT NULL REFERENCES musculos(id) ON DELETE CASCADE,
+      rol TEXT NOT NULL,
+      orden INTEGER NOT NULL,
+      fraccion_volumen REAL NOT NULL DEFAULT 1.0,
+      UNIQUE (exercise_id, musculo_id)
     );
     CREATE TABLE IF NOT EXISTS bodyweight (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -112,6 +159,21 @@ export function createTestDb() {
         CASE WHEN ps.real_rpe IS NOT NULL
              THEN MAX(0, ROUND(10 - ps.real_rpe)) END AS rir
       FROM program_sets ps;
+    CREATE VIEW IF NOT EXISTS v_volumen_por_musculo AS
+      SELECT
+        strftime('%Y-%W', pd.fecha) AS semana,
+        m.id AS musculo_id,
+        m.nombre AS musculo,
+        m.grupo,
+        ROUND(SUM(em.fraccion_volumen), 2) AS series
+      FROM program_sets ps
+      JOIN program_exercises pe ON pe.id = ps.program_exercise_id
+      JOIN program_days pd ON pd.id = pe.day_id
+      JOIN ejercicio_musculos em ON em.exercise_id = pe.exercise_id
+      JOIN musculos m ON m.id = em.musculo_id
+      WHERE ps.hecha = 1 AND pd.fecha IS NOT NULL
+      GROUP BY semana, m.id
+      ORDER BY semana, m.grupo, m.nombre;
   `);
 
   // Ejercicios básicos mínimos para los tests

@@ -23,6 +23,42 @@ function migrate(): void {
       es_basico INTEGER NOT NULL DEFAULT 0
     );
 
+    -- Catálogo canónico de músculos (sección "enciclopedia de ejercicios", ver
+    -- docs/adr/0001). region permite hipertrofia regional (ej. "porción larga" del
+    -- tríceps); biarticular marca los músculos cuya longitud depende de dos
+    -- articulaciones, necesario para razonar sobre exercises.sesgo_longitud.
+    CREATE TABLE IF NOT EXISTS musculos (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      nombre      TEXT NOT NULL UNIQUE,
+      nombre_en   TEXT,
+      grupo       TEXT NOT NULL,          -- pecho | espalda | hombro | brazo | pierna | core
+      region      TEXT,                   -- subdivisión anatómica opcional
+      biarticular INTEGER NOT NULL DEFAULT 0
+    );
+
+    -- Catálogo de patrones de movimiento (sentadilla, bisagra de cadera, empuje
+    -- horizontal...). Habilita sustituciones ("dame otro empuje horizontal") y
+    -- balance empuje/tracción, que con categoria en texto libre eran imposibles.
+    CREATE TABLE IF NOT EXISTS patrones (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      nombre      TEXT NOT NULL UNIQUE,
+      plano       TEXT,                   -- sagital | frontal | transversal
+      descripcion TEXT
+    );
+
+    -- Tabla puente ejercicio↔músculo: "todos los músculos de mayor a menor grado"
+    -- (ver ADR). Cada VARIANTE lleva su propia grilla, no la hereda del padre: el
+    -- press inclinado a 30° y a 60° pueden tener distinto músculo en orden=1.
+    CREATE TABLE IF NOT EXISTS ejercicio_musculos (
+      id               INTEGER PRIMARY KEY AUTOINCREMENT,
+      exercise_id      INTEGER NOT NULL REFERENCES exercises(id) ON DELETE CASCADE,
+      musculo_id       INTEGER NOT NULL REFERENCES musculos(id) ON DELETE CASCADE,
+      rol              TEXT NOT NULL,      -- agonista | sinergista | estabilizador
+      orden            INTEGER NOT NULL,   -- 1 = mayor contribución (ordinal, no % EMG)
+      fraccion_volumen REAL NOT NULL DEFAULT 1.0,  -- 1.0 | 0.5 | 0.25 | 0 — series fraccionadas
+      UNIQUE (exercise_id, musculo_id)
+    );
+
     CREATE TABLE IF NOT EXISTS bodyweight (
       id            INTEGER PRIMARY KEY AUTOINCREMENT,
       fecha         TEXT NOT NULL,
@@ -134,6 +170,35 @@ function migrate(): void {
     "ALTER TABLE program_days ADD COLUMN notas TEXT",
     "ALTER TABLE program_sets ADD COLUMN target_peso REAL",
     "ALTER TABLE program_weeks ADD COLUMN mesociclo_id INTEGER REFERENCES mesociclos(id) ON DELETE SET NULL",
+    // Enciclopedia de ejercicios (ver docs/adr/0001). Todas nullable: se pueblan en
+    // la fase 2 (curación de datos), no acá. Identidad de la variante:
+    "ALTER TABLE exercises ADD COLUMN patron_id INTEGER REFERENCES patrones(id)",
+    "ALTER TABLE exercises ADD COLUMN ejercicio_padre_id INTEGER REFERENCES exercises(id)",
+    "ALTER TABLE exercises ADD COLUMN tipo_variante TEXT",
+    "ALTER TABLE exercises ADD COLUMN transferencia REAL",
+    "ALTER TABLE exercises ADD COLUMN proposito TEXT",
+    "ALTER TABLE exercises ADD COLUMN implemento TEXT",
+    "ALTER TABLE exercises ADD COLUMN angulo_grados INTEGER",
+    "ALTER TABLE exercises ADD COLUMN agarre TEXT",
+    "ALTER TABLE exercises ADD COLUMN postura TEXT",
+    "ALTER TABLE exercises ADD COLUMN unilateral INTEGER",
+    // Biomecánica:
+    "ALTER TABLE exercises ADD COLUMN mecanica TEXT",
+    "ALTER TABLE exercises ADD COLUMN fuerza TEXT",
+    "ALTER TABLE exercises ADD COLUMN sesgo_longitud TEXT",
+    "ALTER TABLE exercises ADD COLUMN perfil_resistencia TEXT",
+    "ALTER TABLE exercises ADD COLUMN cadena TEXT",
+    "ALTER TABLE exercises ADD COLUMN carga_axial INTEGER",
+    // Costo — heurístico declarado, no medición (ver ADR):
+    "ALTER TABLE exercises ADD COLUMN costo_fatiga INTEGER",
+    "ALTER TABLE exercises ADD COLUMN demanda_estabilidad INTEGER",
+    "ALTER TABLE exercises ADD COLUMN demanda_tecnica INTEGER",
+    // Tracking y texto:
+    "ALTER TABLE exercises ADD COLUMN rastrea_e1rm INTEGER",
+    "ALTER TABLE exercises ADD COLUMN es_competitivo INTEGER",
+    "ALTER TABLE exercises ADD COLUMN notas_tecnicas TEXT",
+    "ALTER TABLE exercises ADD COLUMN contraindicaciones TEXT",
+    "ALTER TABLE exercises ADD COLUMN cues TEXT",
   ]) {
     try { db.exec(col); } catch { /* columna ya existe */ }
   }
@@ -189,6 +254,29 @@ function migrate(): void {
         CASE WHEN ps.real_rpe IS NOT NULL
              THEN MAX(0, ROUND(10 - ps.real_rpe)) END AS rir
       FROM program_sets ps;
+  `);
+
+  // Volumen semanal fraccionado por músculo (reemplaza a volumen_por_categoria del
+  // coach.ts, que agrupaba por implemento/región mezclados — ver ADR). Una serie de
+  // remo no es "una serie de espalda": aporta 1.0 a dorsal ancho y 0.5 a bíceps.
+  // Devuelve 0 filas hasta que ejercicio_musculos esté poblada (fase 2).
+  db.exec("DROP VIEW IF EXISTS v_volumen_por_musculo");
+  db.exec(`
+    CREATE VIEW v_volumen_por_musculo AS
+      SELECT
+        strftime('%Y-%W', pd.fecha) AS semana,
+        m.id AS musculo_id,
+        m.nombre AS musculo,
+        m.grupo,
+        ROUND(SUM(em.fraccion_volumen), 2) AS series
+      FROM program_sets ps
+      JOIN program_exercises pe ON pe.id = ps.program_exercise_id
+      JOIN program_days pd ON pd.id = pe.day_id
+      JOIN ejercicio_musculos em ON em.exercise_id = pe.exercise_id
+      JOIN musculos m ON m.id = em.musculo_id
+      WHERE ps.hecha = 1 AND pd.fecha IS NOT NULL
+      GROUP BY semana, m.id
+      ORDER BY semana, m.grupo, m.nombre;
   `);
 }
 
