@@ -692,6 +692,25 @@ tbody tr:hover { background: var(--panel-2); }
 /* notas del coach (markdown simple) */
 .coach-notes { color: var(--muted); font-size: 13px; line-height: 1.6; }
 .coach-notes strong { color: var(--text); }
+
+/* notas del día (editable por el atleta) */
+.notas-dia {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+  padding: 8px 10px;
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+}
+.notas-dia:focus {
+  outline: none;
+  border-color: var(--lime);
+}
 .coach-notes ul { margin: 0; padding-left: 18px; }
 .coach-notes li { margin-bottom: 4px; }
 

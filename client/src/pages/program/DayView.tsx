@@ -33,6 +33,7 @@ export function DayView() {
   const [fecha, setFecha] = useState("");
   const [horaInicio, setHoraInicio] = useState("");
   const [horaFin, setHoraFin] = useState("");
+  const [notas, setNotas] = useState("");
 
   // Sembrar los inputs locales desde el dato cargado (una vez por día).
   const seededFor = useRef<number | null>(null);
@@ -42,6 +43,7 @@ export function DayView() {
     setFecha(data.fecha ?? today());
     setHoraInicio(data.hora_inicio ?? "");
     setHoraFin(data.hora_fin ?? "");
+    setNotas(data.notas ?? "");
   }, [data, dayId]);
 
   const grouped = useMemo(() => {
@@ -153,7 +155,14 @@ export function DayView() {
 
       <div className="panel" style={{ marginBottom: 18 }}>
         <h3 style={{ marginTop: 0 }}>Notas del día</h3>
-        {data.notas ? <CoachNotes text={data.notas} /> : <p className="muted" style={{ margin: 0 }}>Sin notas.</p>}
+        <textarea
+          className="notas-dia"
+          value={notas}
+          placeholder="Escribí algo sobre este día…"
+          onChange={(e) => setNotas(e.target.value)}
+          onBlur={() => patchDay({ notas: notas || null })}
+          rows={4}
+        />
       </div>
 
       {grouped.map(([sec, items]) => (

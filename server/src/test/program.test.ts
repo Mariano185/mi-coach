@@ -458,6 +458,36 @@ describe("tipo de día libre y opcional (sin restricción A/B)", () => {
     expect(res.status).toBe(200);
     expect(res.body.tipo).toBe("A");
   });
+
+  it("PATCH /program/days/:id guarda notas del atleta y se leen después", async () => {
+    const { dayId } = seedWeekWithDay(db);
+
+    const patchRes = await request(app)
+      .patch(`/api/program/days/${dayId}`)
+      .set(AUTH)
+      .send({ notas: "Dolor leve en el hombro derecho durante el press." });
+    expect(patchRes.status).toBe(200);
+    expect(patchRes.body.notas).toBe("Dolor leve en el hombro derecho durante el press.");
+
+    const getRes = await request(app).get(`/api/program/days/${dayId}`).set(AUTH);
+    expect(getRes.status).toBe(200);
+    expect(getRes.body.notas).toBe("Dolor leve en el hombro derecho durante el press.");
+  });
+
+  it("PATCH /program/days/:id con notas vacías las borra (guarda null)", async () => {
+    const { dayId } = seedWeekWithDay(db);
+    await request(app).patch(`/api/program/days/${dayId}`).set(AUTH).send({ notas: "texto previo" });
+
+    const patchRes = await request(app)
+      .patch(`/api/program/days/${dayId}`)
+      .set(AUTH)
+      .send({ notas: null });
+    expect(patchRes.status).toBe(200);
+    expect(patchRes.body.notas).toBeNull();
+
+    const getRes = await request(app).get(`/api/program/days/${dayId}`).set(AUTH);
+    expect(getRes.body.notas).toBeNull();
+  });
 });
 
 describe("semanas y mesociclos", () => {
