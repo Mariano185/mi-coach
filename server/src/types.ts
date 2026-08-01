@@ -7,6 +7,94 @@ export interface Exercise {
   es_basico: 0 | 1;
 }
 
+// === Enciclopedia de ejercicios (ver docs/adr/0001) ===
+// Vocabularios controlados — documentados acá, no como union types estrictos:
+// la columna SQL es TEXT libre para no romper si el seed usa un valor nuevo
+// que todavía no se reflejó en el tipo.
+//   implemento:         barra | mancuerna | polea | maquina | smith | peso_corporal | banda | kettlebell
+//   tipo_variante:       angulo | agarre | postura | tempo | pausa | rom | resistencia_acomodada | implemento | unilateral
+//   mecanica:            compuesto | aislamiento
+//   fuerza:              empuje | traccion | estatico
+//   sesgo_longitud:      alargado | medio | acortado   (criterio de desempate, no ley — ver ADR)
+//   perfil_resistencia:  ascendente | descendente | campana | constante
+//   cadena:              abierta | cerrada
+//   rol (en EjercicioMusculo): agonista | sinergista | estabilizador
+
+export interface Musculo {
+  id: number;
+  nombre: string;
+  nombre_en: string | null;
+  grupo: string;
+  region: string | null;
+  biarticular: 0 | 1;
+}
+
+export interface Patron {
+  id: number;
+  nombre: string;
+  plano: string | null;
+  descripcion: string | null;
+}
+
+export interface EjercicioMusculo {
+  id: number;
+  exercise_id: number;
+  musculo_id: number;
+  rol: string;
+  orden: number;
+  fraccion_volumen: number;
+}
+
+// Detalle completo de un ejercicio: identidad, biomecánica y su grilla muscular
+// propia (cada variante lleva la suya, no la hereda del padre — ver ADR).
+export interface ExerciseDetalle extends Exercise {
+  patron_id: number | null;
+  patron_nombre: string | null;
+  ejercicio_padre_id: number | null;
+  ejercicio_padre_nombre: string | null;
+  tipo_variante: string | null;
+  transferencia: number | null;
+  proposito: string | null;
+  implemento: string | null;
+  angulo_grados: number | null;
+  agarre: string | null;
+  postura: string | null;
+  unilateral: 0 | 1 | null;
+  mecanica: string | null;
+  fuerza: string | null;
+  sesgo_longitud: string | null;
+  perfil_resistencia: string | null;
+  cadena: string | null;
+  carga_axial: 0 | 1 | null;
+  costo_fatiga: number | null;
+  demanda_estabilidad: number | null;
+  demanda_tecnica: number | null;
+  rastrea_e1rm: 0 | 1 | null;
+  es_competitivo: 0 | 1 | null;
+  notas_tecnicas: string | null;
+  contraindicaciones: string | null;
+  cues: string | null;
+  variantes: Array<{ id: number; nombre: string; tipo_variante: string | null }>;
+  musculos: Array<{
+    musculo_id: number;
+    nombre: string;
+    grupo: string;
+    rol: string;
+    orden: number;
+    fraccion_volumen: number;
+  }>;
+}
+
+// Vista v_volumen_por_musculo — reemplaza a WeeklyVolume/volumen_por_categoria
+// una vez que ejercicio_musculos está poblada (fase 2).
+export interface VolumenMusculo {
+  semana: string;
+  musculo_id: number;
+  musculo: string;
+  grupo: string;
+  series: number;
+}
+
 export interface Bodyweight {
   id: number;
   fecha: string;
