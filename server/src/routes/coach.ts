@@ -3,6 +3,11 @@ import { db } from "../db.js";
 
 export const coachRouter = Router();
 
+// "Se le sigue el e1RM": los movimientos de competencia. rastrea_e1rm reemplaza a
+// es_basico; COALESCE mantiene el comportamiento en una DB que todavía no corrió
+// el seed de la enciclopedia (rastrea_e1rm en NULL). Ver docs/adr/0001.
+const RASTREA_E1RM = "COALESCE(e.rastrea_e1rm, e.es_basico) = 1";
+
 // GET /api/coach/analisis — todo lo que el coach lee para programar la semana nueva,
 // en un solo JSON. El coach es caja negra: pega un curl acá, no toca SQL ni el archivo.
 //   ?dias=42  ventana de análisis (default 42 = ~6 semanas)
@@ -17,7 +22,7 @@ coachRouter.get("/analisis", (req, res) => {
        FROM exercises e
        JOIN program_exercises pe ON pe.exercise_id = e.id
        JOIN v_program_sets_e1rm v ON v.program_exercise_id = pe.id
-       WHERE e.es_basico = 1 AND v.e1rm IS NOT NULL
+       WHERE ${RASTREA_E1RM} AND v.e1rm IS NOT NULL
        GROUP BY e.id, e.nombre`
     )
     .all();
@@ -32,7 +37,7 @@ coachRouter.get("/analisis", (req, res) => {
        JOIN program_exercises pe ON pe.id = ps.program_exercise_id
        JOIN program_days pd ON pd.id = pe.day_id
        JOIN exercises e ON e.id = pe.exercise_id
-       WHERE e.es_basico = 1 AND v.e1rm IS NOT NULL AND pd.fecha >= date('now', ?)
+       WHERE ${RASTREA_E1RM} AND v.e1rm IS NOT NULL AND pd.fecha >= date('now', ?)
        ORDER BY e.nombre, pd.fecha, ps.n_serie`
     )
     .all(desde);
@@ -45,7 +50,7 @@ coachRouter.get("/analisis", (req, res) => {
        JOIN program_exercises pe ON pe.id = ps.program_exercise_id
        JOIN program_days pd ON pd.id = pe.day_id
        JOIN exercises e ON e.id = pe.exercise_id
-       WHERE e.es_basico = 1 AND ps.hecha = 1 AND pd.fecha >= date('now', ?)
+       WHERE ${RASTREA_E1RM} AND ps.hecha = 1 AND pd.fecha >= date('now', ?)
        GROUP BY e.nombre, pd.fecha
        ORDER BY e.nombre, pd.fecha`
     )
@@ -61,23 +66,35 @@ coachRouter.get("/analisis", (req, res) => {
     )
     .all();
 
-  // 5) Volumen semanal por categoría (no saturar por sesión).
-  const volumen_por_categoria = db
+  // 5) Volumen semanal POR MÚSCULO, fraccionado. Reemplaza al viejo
+  // volumen_por_categoria, que agrupaba por un campo que mezclaba implemento,
+  // región y rol: "Smith/Multipower: 16 series" no decía nada sobre qué se
+  // entrenó realmente. Una serie de remo aporta 1.0 al dorsal y 0.5 al bíceps;
+  // los estabilizadores no acumulan volumen. Ver docs/adr/0001.
+  const volumen_por_musculo = db
     .prepare(
-      `SELECT strftime('%Y-%W', pd.fecha) AS semana, e.categoria, COUNT(*) AS series
-       FROM program_sets ps
-       JOIN program_exercises pe ON pe.id = ps.program_exercise_id
-       JOIN program_days pd ON pd.id = pe.day_id
-       JOIN exercises e ON e.id = pe.exercise_id
-       WHERE ps.hecha = 1 AND pd.fecha >= date('now', ?)
-       GROUP BY semana, e.categoria
-       ORDER BY semana, e.categoria`
+      `SELECT semana, musculo, grupo, series
+       FROM v_volumen_por_musculo
+       WHERE semana >= strftime('%Y-%W', date('now', ?))
+       ORDER BY semana, grupo, musculo`
     )
     .all(desde);
 
-  // 7) Library de ejercicios (para mapear nombre → id al armar la semana).
+  // 7) Library de ejercicios: forma COMPACTA a propósito. Con 90+ ejercicios,
+  // mandar la biomecánica completa de cada uno infla el payload sin que el coach
+  // la necesite para el 90% de las decisiones. El detalle (músculos, sesgo de
+  // longitud, contraindicaciones) se pide por GET /api/exercises/:id o
+  // GET /api/exercises?detalle=full cuando hace falta elegir entre variantes.
   const ejercicios = db
-    .prepare("SELECT id, nombre, categoria, es_basico FROM exercises ORDER BY id")
+    .prepare(
+      `SELECT e.id, e.nombre, p.nombre AS patron, e.implemento, e.mecanica,
+              e.ejercicio_padre_id, e.tipo_variante, e.proposito,
+              e.costo_fatiga, e.sesgo_longitud,
+              COALESCE(e.rastrea_e1rm, e.es_basico) AS rastrea_e1rm
+       FROM exercises e
+       LEFT JOIN patrones p ON p.id = e.patron_id
+       ORDER BY e.id`
+    )
     .all();
 
   // 8) Última semana programada (para numerar la próxima = max + 1).
@@ -160,7 +177,7 @@ coachRouter.get("/analisis", (req, res) => {
     progresion_basicos,
     rpe_basicos,
     peso_corporal,
-    volumen_por_categoria,
+    volumen_por_musculo,
     ejercicios,
     ultima_semana,
     mesociclos,

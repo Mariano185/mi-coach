@@ -10,6 +10,12 @@ export const statsRouter = Router();
 // el valor hacia abajo (siempre pierde contra el día pesado dentro de esas 3 sesiones).
 const SESIONES_ACTUAL = 3;
 
+// "Se le sigue el e1RM": los movimientos de competencia. rastrea_e1rm reemplaza a
+// es_basico (mismo significado, nombre honesto — es_basico sugería "compuesto", que
+// no era). COALESCE mantiene el comportamiento en una DB que todavía no corrió el
+// seed de la enciclopedia, donde rastrea_e1rm está en NULL.
+const RASTREA_E1RM = "COALESCE(e.rastrea_e1rm, e.es_basico) = 1";
+
 // GET /api/stats — e1RM por básico (histórico + actual), tendencia de peso (PM 7d), volumen semanal.
 statsRouter.get("/", (_req, res) => {
   // 1) e1RM por básico: PR histórico (MAX de siempre) + actual (MAX de las últimas
@@ -25,7 +31,7 @@ statsRouter.get("/", (_req, res) => {
          JOIN program_exercises pe ON pe.exercise_id = e.id
          JOIN program_days      pd ON pd.id = pe.day_id
          JOIN v_program_sets_e1rm v ON v.program_exercise_id = pe.id
-         WHERE e.es_basico = 1 AND v.e1rm IS NOT NULL AND pd.fecha IS NOT NULL
+         WHERE ${RASTREA_E1RM} AND v.e1rm IS NOT NULL AND pd.fecha IS NOT NULL
          GROUP BY e.id, pd.fecha
        ),
        rankeado AS (
@@ -41,7 +47,7 @@ statsRouter.get("/", (_req, res) => {
             WHERE r.exercise_id = e.id AND r.rn <= ?)                  AS actual_e1rm,
          (SELECT MAX(fecha) FROM dias d WHERE d.exercise_id = e.id)    AS ultima_fecha
        FROM exercises e
-       WHERE e.es_basico = 1
+       WHERE ${RASTREA_E1RM}
        ORDER BY e.id`
     )
     .all(SESIONES_ACTUAL) as BasicE1rm[];
@@ -66,8 +72,8 @@ statsRouter.get("/", (_req, res) => {
     .prepare(
       `SELECT
          strftime('%Y-%W', pd.fecha) AS semana,
-         SUM(CASE WHEN e.es_basico = 1 THEN 1 ELSE 0 END) AS series_basicos,
-         SUM(CASE WHEN e.es_basico = 0 THEN 1 ELSE 0 END) AS series_accesorios
+         SUM(CASE WHEN ${RASTREA_E1RM} THEN 1 ELSE 0 END) AS series_basicos,
+         SUM(CASE WHEN ${RASTREA_E1RM} THEN 0 ELSE 1 END) AS series_accesorios
        FROM program_sets ps
        JOIN program_exercises pe ON pe.id = ps.program_exercise_id
        JOIN program_days pd ON pd.id = pe.day_id
