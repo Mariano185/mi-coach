@@ -155,7 +155,9 @@ Todas las rutas (salvo las públicas) requieren cookie de sesión o header `X-Co
 |--------|------|----------|
 | GET | `/api/health` | healthcheck (público) |
 | POST | `/api/auth/login` · `/logout` · GET `/status` | auth de browser (público) |
-| GET/POST | `/api/exercises` | library de ejercicios |
+| GET/POST | `/api/exercises` | library de ejercicios; `?detalle=full` trae biomecánica completa; `?musculo_id=X&rol=` filtra por músculo |
+| GET/PATCH | `/api/exercises/:id` | ejercicio con biomecánica, grilla muscular y variantes / editar (merge parcial, sin DELETE) |
+| GET | `/api/musculos` · `/api/patrones` | catálogo canónico de la enciclopedia (solo lectura) |
 | GET/POST | `/api/bodyweight` | peso corporal + nutrición |
 | GET | `/api/stats` | e1RM por básico, tendencia de peso, volumen semanal |
 | GET | `/api/history` · `/api/history/:dayId` | días entrenados + series reales con e1RM |
