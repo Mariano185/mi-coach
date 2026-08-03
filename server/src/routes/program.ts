@@ -9,6 +9,7 @@ import type {
   ProgramSet,
   ProgramWeek,
   ProgramWeekDetail,
+  ReorderExercisesInput,
   UpdateProgramSetInput,
   UpdateProgramSetTargetInput,
 } from "../types.js";
@@ -17,6 +18,20 @@ export const programRouter = Router();
 
 // Nombre visible de un program_exercise: el de la tabla exercises, o el libre.
 const EX_NAME_SQL = "COALESCE(e.nombre, pe.nombre_libre)";
+
+// Ejercicios de un día con sus conteos de series (programadas/hechas). Compartido entre
+// GET /days/:id y POST /days/:id/exercises/reorder para no duplicar el SQL.
+const EXERCISES_DEL_DIA_SQL = `
+  SELECT
+    pe.*,
+    ${EX_NAME_SQL} AS nombre,
+    COALESCE(e.es_basico, 0) AS es_basico,
+    (SELECT COUNT(*) FROM program_sets ps WHERE ps.program_exercise_id = pe.id) AS n_series,
+    (SELECT COUNT(*) FROM program_sets ps WHERE ps.program_exercise_id = pe.id AND ps.hecha = 1) AS n_series_hechas
+  FROM program_exercises pe
+  LEFT JOIN exercises e ON e.id = pe.exercise_id
+  WHERE pe.day_id = ?
+  ORDER BY pe.orden, pe.id`;
 
 // ---------- SEMANAS ----------
 
@@ -62,10 +77,13 @@ programRouter.get("/weeks/:id", (req, res) => {
          (SELECT COUNT(*) FROM program_sets ps
             JOIN program_exercises pe ON pe.id = ps.program_exercise_id
             WHERE pe.day_id = pd.id AND ps.hecha = 1) AS n_series_hechas,
-         (SELECT GROUP_CONCAT(${EX_NAME_SQL}, ' · ')
+         (SELECT GROUP_CONCAT(nom, ' · ') FROM (
+            SELECT ${EX_NAME_SQL} AS nom
             FROM program_exercises pe
             LEFT JOIN exercises e ON e.id = pe.exercise_id
-            WHERE pe.day_id = pd.id AND pe.seccion = 'main') AS nombre_ejercicios
+            WHERE pe.day_id = pd.id AND pe.seccion = 'main'
+            ORDER BY pe.orden, pe.id
+          )) AS nombre_ejercicios
        FROM program_days pd
        WHERE pd.week_id = ?
        ORDER BY pd.orden, pd.dia`
@@ -150,20 +168,7 @@ programRouter.get("/days/:id", (req, res) => {
     .get(id) as (ProgramDay & { semana: number; nombre_semana: string | null }) | undefined;
   if (!day) return res.status(404).json({ error: "día no encontrado" });
 
-  const exercises = db
-    .prepare(
-      `SELECT
-         pe.*,
-         ${EX_NAME_SQL} AS nombre,
-         COALESCE(e.es_basico, 0) AS es_basico,
-         (SELECT COUNT(*) FROM program_sets ps WHERE ps.program_exercise_id = pe.id) AS n_series,
-         (SELECT COUNT(*) FROM program_sets ps WHERE ps.program_exercise_id = pe.id AND ps.hecha = 1) AS n_series_hechas
-       FROM program_exercises pe
-       LEFT JOIN exercises e ON e.id = pe.exercise_id
-       WHERE pe.day_id = ?
-       ORDER BY pe.orden, pe.id`
-    )
-    .all(id);
+  const exercises = db.prepare(EXERCISES_DEL_DIA_SQL).all(id);
 
   const detail: ProgramDayDetail = {
     ...(day as ProgramDay),
@@ -395,6 +400,53 @@ programRouter.post("/days/:id/exercises", (req, res) => {
      FROM program_exercises pe LEFT JOIN exercises e ON e.id = pe.exercise_id WHERE pe.id = ?`
   ).get(exId);
   res.status(201).json(created);
+});
+
+// POST /api/program/days/:id/exercises/reorder — reordena TODOS los ejercicios del día.
+// Body: {ids: [3, 1, 2]} → orden 0,1,2 en ese orden. El array debe ser exactamente el
+// conjunto de ejercicios del día (mismo tamaño, sin duplicados, todos del día): así el
+// resultado siempre es 0..n-1 denso, sin huecos ni empates (los datos viejos tienen
+// muchos orden=0 y esto los normaliza de paso). No existe un PATCH de orden suelto:
+// setear uno solo dejaría empates cuyo desempate dependería del id de inserción.
+programRouter.post("/days/:id/exercises/reorder", (req, res) => {
+  const dayId = Number(req.params.id);
+  if (!Number.isInteger(dayId)) return res.status(400).json({ error: "id inválido" });
+
+  const day = db.prepare("SELECT 1 FROM program_days WHERE id = ?").get(dayId);
+  if (!day) return res.status(404).json({ error: "día no encontrado" });
+
+  const body = (req.body ?? {}) as ReorderExercisesInput;
+  if (!Array.isArray(body.ids)) return res.status(400).json({ error: "ids debe ser un array" });
+  if (!body.ids.every((n) => Number.isInteger(n))) {
+    return res.status(400).json({ error: "ids debe contener enteros" });
+  }
+  if (new Set(body.ids).size !== body.ids.length) {
+    return res.status(400).json({ error: "ids tiene duplicados" });
+  }
+
+  const actuales = db
+    .prepare("SELECT id FROM program_exercises WHERE day_id = ?")
+    .all(dayId) as Array<{ id: number }>;
+  const setActual = new Set(actuales.map((r) => r.id));
+
+  if (body.ids.length !== setActual.size) {
+    return res.status(400).json({
+      error: `ids debe contener los ${setActual.size} ejercicios del día (llegaron ${body.ids.length})`,
+    });
+  }
+  const ajeno = body.ids.find((exId) => !setActual.has(exId));
+  if (ajeno !== undefined) {
+    return res.status(400).json({ error: `el ejercicio ${ajeno} no pertenece al día ${dayId}` });
+  }
+
+  // Validación terminada → recién ahora se abre la transacción.
+  const upd = db.prepare("UPDATE program_exercises SET orden = ? WHERE id = ? AND day_id = ?");
+  db.transaction(() => {
+    body.ids.forEach((exId, i) => upd.run(i, exId, dayId));
+  })();
+
+  const exercises = db.prepare(EXERCISES_DEL_DIA_SQL).all(dayId);
+  res.json({ ok: true, exercises });
 });
 
 // DELETE /api/program/exercises/:id — eliminar un ejercicio prescrito (y sus series target/real).

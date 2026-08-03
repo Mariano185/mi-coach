@@ -197,6 +197,11 @@ export interface UpdateProgramSetTargetInput {
   target_peso?: number | null;
 }
 
+// POST /program/days/:id/exercises/reorder — reasigna orden 0..n-1 según el array.
+export interface ReorderExercisesInput {
+  ids: number[];
+}
+
 // === Trac: tracker diario de bienestar/recuperación (independiente de sessions) ===
 export interface TracEntry {
   id: number;

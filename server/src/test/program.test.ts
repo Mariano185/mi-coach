@@ -681,3 +681,214 @@ describe("semanas y mesociclos", () => {
     expect(res.status).toBe(400);
   });
 });
+
+// Crea un día con 3 ejercicios (orden 0,1,2) para los tests de reorder.
+// No reutiliza seedWeekWithDay (crea uno solo) porque otros 6+ tests dependen de esa forma.
+function seedTresEjercicios(testDb: TestDb) {
+  const weekId = testDb
+    .prepare("INSERT INTO program_weeks (semana, nombre, fecha_creada, activa) VALUES (1, 'Test', '2024-01-01', 1)")
+    .run().lastInsertRowid as number;
+
+  const dayId = testDb
+    .prepare("INSERT INTO program_days (week_id, dia, tipo, titulo, orden) VALUES (?, 1, 'A', 'Día 1', 0)")
+    .run(weekId).lastInsertRowid as number;
+
+  const squat = (testDb.prepare("SELECT id FROM exercises WHERE nombre = 'Mid/High Bar Back Squat'").get() as { id: number }).id;
+  const bench = (testDb.prepare("SELECT id FROM exercises WHERE nombre = 'Flat Bench Press (barra)'").get() as { id: number }).id;
+  const deadlift = (testDb.prepare("SELECT id FROM exercises WHERE nombre = 'Conventional Deadlift'").get() as { id: number }).id;
+
+  const insEx = testDb.prepare(
+    "INSERT INTO program_exercises (day_id, exercise_id, seccion, orden) VALUES (?, ?, 'main', ?)"
+  );
+  const a = insEx.run(dayId, squat, 0).lastInsertRowid as number;
+  const b = insEx.run(dayId, bench, 1).lastInsertRowid as number;
+  const c = insEx.run(dayId, deadlift, 2).lastInsertRowid as number;
+
+  return { weekId, dayId, a, b, c };
+}
+
+describe("POST /api/program/days/:id/exercises/reorder", () => {
+  let app: Awaited<ReturnType<typeof createTestApp>>;
+
+  beforeEach(async () => {
+    db.exec("DELETE FROM program_weeks;");
+    app = await createTestApp(db);
+  });
+
+  it("reasigna orden 0..n-1 en el orden del array", async () => {
+    const { dayId, a, b, c } = seedTresEjercicios(db);
+
+    const res = await request(app)
+      .post(`/api/program/days/${dayId}/exercises/reorder`)
+      .set(AUTH)
+      .send({ ids: [c, a, b] });
+
+    expect(res.status).toBe(200);
+    const ordenes = db
+      .prepare("SELECT id, orden FROM program_exercises WHERE day_id = ? ORDER BY orden")
+      .all(dayId) as Array<{ id: number; orden: number }>;
+    expect(ordenes).toEqual([
+      { id: c, orden: 0 },
+      { id: a, orden: 1 },
+      { id: b, orden: 2 },
+    ]);
+  });
+
+  it("devuelve los ejercicios ya reordenados", async () => {
+    const { dayId, a, b, c } = seedTresEjercicios(db);
+
+    const res = await request(app)
+      .post(`/api/program/days/${dayId}/exercises/reorder`)
+      .set(AUTH)
+      .send({ ids: [c, a, b] });
+
+    expect(res.body.ok).toBe(true);
+    expect(res.body.exercises.map((e: { id: number }) => e.id)).toEqual([c, a, b]);
+    expect(res.body.exercises[0]).toHaveProperty("nombre");
+    expect(res.body.exercises[0]).toHaveProperty("n_series");
+  });
+
+  it("normaliza órdenes duplicados heredados", async () => {
+    const { dayId, a, b, c } = seedTresEjercicios(db);
+    db.prepare("UPDATE program_exercises SET orden = 0 WHERE day_id = ?").run(dayId);
+
+    const res = await request(app)
+      .post(`/api/program/days/${dayId}/exercises/reorder`)
+      .set(AUTH)
+      .send({ ids: [a, b, c] });
+
+    expect(res.status).toBe(200);
+    const ordenes = db
+      .prepare("SELECT orden FROM program_exercises WHERE day_id = ? ORDER BY id")
+      .all(dayId) as Array<{ orden: number }>;
+    expect(ordenes.map((o) => o.orden)).toEqual([0, 1, 2]);
+  });
+
+  it("400 si faltan ids", async () => {
+    const { dayId, a, b } = seedTresEjercicios(db);
+
+    const res = await request(app)
+      .post(`/api/program/days/${dayId}/exercises/reorder`)
+      .set(AUTH)
+      .send({ ids: [a, b] });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/3/);
+  });
+
+  it("400 si sobran ids", async () => {
+    const { dayId, a, b, c } = seedTresEjercicios(db);
+
+    const res = await request(app)
+      .post(`/api/program/days/${dayId}/exercises/reorder`)
+      .set(AUTH)
+      .send({ ids: [a, b, c, 999999] });
+
+    expect(res.status).toBe(400);
+  });
+
+  it("400 si hay ids duplicados", async () => {
+    const { dayId, a, b } = seedTresEjercicios(db);
+
+    const res = await request(app)
+      .post(`/api/program/days/${dayId}/exercises/reorder`)
+      .set(AUTH)
+      .send({ ids: [a, a, b] });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/duplicado/);
+  });
+
+  it("400 si ids no es un array", async () => {
+    const { dayId } = seedTresEjercicios(db);
+
+    const res = await request(app)
+      .post(`/api/program/days/${dayId}/exercises/reorder`)
+      .set(AUTH)
+      .send({ ids: 5 });
+
+    expect(res.status).toBe(400);
+  });
+
+  it("400 si un id pertenece a otro día", async () => {
+    const { dayId, a, b } = seedTresEjercicios(db);
+    const { a: otroEx } = seedTresEjercicios(db);
+
+    const res = await request(app)
+      .post(`/api/program/days/${dayId}/exercises/reorder`)
+      .set(AUTH)
+      .send({ ids: [otroEx, a, b] }); // reemplaza a c por un ejercicio ajeno, mismo length
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/no pertenece/);
+  });
+
+  it("404 si el día no existe", async () => {
+    const res = await request(app)
+      .post("/api/program/days/999999/exercises/reorder")
+      .set(AUTH)
+      .send({ ids: [] });
+
+    expect(res.status).toBe(404);
+  });
+
+  it("no modifica nada si la validación falla", async () => {
+    const { dayId, a, b } = seedTresEjercicios(db);
+    const antes = db
+      .prepare("SELECT id, orden FROM program_exercises WHERE day_id = ? ORDER BY id")
+      .all(dayId);
+
+    const res = await request(app)
+      .post(`/api/program/days/${dayId}/exercises/reorder`)
+      .set(AUTH)
+      .send({ ids: [a, b] }); // falta uno
+
+    expect(res.status).toBe(400);
+    const despues = db
+      .prepare("SELECT id, orden FROM program_exercises WHERE day_id = ? ORDER BY id")
+      .all(dayId);
+    expect(despues).toEqual(antes);
+  });
+
+  it("acepta un día sin ejercicios con ids vacío", async () => {
+    const weekId = db
+      .prepare("INSERT INTO program_weeks (semana, nombre, fecha_creada, activa) VALUES (1, 'Test', '2024-01-01', 1)")
+      .run().lastInsertRowid as number;
+    const dayId = db
+      .prepare("INSERT INTO program_days (week_id, dia, orden) VALUES (?, 1, 0)")
+      .run(weekId).lastInsertRowid as number;
+
+    const res = await request(app)
+      .post(`/api/program/days/${dayId}/exercises/reorder`)
+      .set(AUTH)
+      .send({ ids: [] });
+
+    expect(res.status).toBe(200);
+    expect(res.body.exercises).toEqual([]);
+  });
+
+  it("GET /days/:id devuelve los ejercicios en el nuevo orden", async () => {
+    const { dayId, a, b, c } = seedTresEjercicios(db);
+
+    await request(app)
+      .post(`/api/program/days/${dayId}/exercises/reorder`)
+      .set(AUTH)
+      .send({ ids: [b, c, a] });
+
+    const res = await request(app).get(`/api/program/days/${dayId}`).set(AUTH);
+    expect(res.body.exercises.map((e: { id: number }) => e.id)).toEqual([b, c, a]);
+  });
+
+  it("nombre_ejercicios respeta el orden de los ejercicios tras el reorder", async () => {
+    const { weekId, dayId, a, b, c } = seedTresEjercicios(db);
+
+    await request(app)
+      .post(`/api/program/days/${dayId}/exercises/reorder`)
+      .set(AUTH)
+      .send({ ids: [c, a, b] });
+
+    const res = await request(app).get(`/api/program/weeks/${weekId}`).set(AUTH);
+    const dia = res.body.days.find((d: { id: number }) => d.id === dayId);
+    expect(dia.nombre_ejercicios).toBe("Conventional Deadlift · Mid/High Bar Back Squat · Flat Bench Press (barra)");
+  });
+});
