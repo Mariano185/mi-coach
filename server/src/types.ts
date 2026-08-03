@@ -82,7 +82,8 @@ export interface ProgramDay {
   tipo: string | null;
   titulo: string | null;
   warmup: string | null;
-  notas: string | null;
+  notas: string | null; // canal del coach (read-only para el atleta, se renderiza con CoachNotes)
+  notas_atleta: string | null; // canal del atleta (textarea editable)
   fecha: string | null; // se autosetea al completar la primera serie; editable a mano
   hora_inicio: string | null;
   hora_fin: string | null;
@@ -170,6 +171,7 @@ export interface NewProgramWeekInput {
     tipo?: string | null;
     titulo?: string | null;
     warmup?: string | null;
+    notas?: string | null; // notas del coach para el día (no confundir con la notas de semana, arriba)
     exercises: Array<{
       exercise_id?: number | null;
       nombre_libre?: string | null;

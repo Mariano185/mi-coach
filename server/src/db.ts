@@ -166,6 +166,17 @@ function migrate(): void {
   // Debe correr DESPUÉS de backfillFechaRealDesdeSessions() y migrateFechaRealAFecha().
   dropSessionsYSets();
 
+  // Columnas agregadas DESPUÉS de los recreates de program_days de arriba
+  // (dropTipoCheckProgramDays/migrateFechaRealAFecha copian con INSERT..SELECT posicional: si
+  // esta columna existiera antes de que corran, la aridad no coincide y el arranque falla).
+  // notas_atleta: canal del atleta (editable), separado de notas (canal del coach, read-only
+  // para el atleta). Ver CLAUDE.md.
+  for (const col of [
+    "ALTER TABLE program_days ADD COLUMN notas_atleta TEXT",
+  ]) {
+    try { db.exec(col); } catch { /* columna ya existe */ }
+  }
+
   // v_sets_e1rm leía de sets (eliminada arriba); quedaba huérfana en DBs ya desplegadas porque
   // el CREATE VIEW viejo salió del DDL sin un DROP explícito que la limpiara.
   db.exec("DROP VIEW IF EXISTS v_sets_e1rm");

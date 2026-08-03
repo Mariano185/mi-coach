@@ -101,7 +101,8 @@ coachRouter.get("/analisis", (req, res) => {
   // 9) Sesiones realizadas: fecha + horarios + duración (para analizar frecuencia, días
   //    consecutivos y fatiga acumulada). Solo días con al menos una serie hecha, en la ventana.
   //    duracion_min se calcula cuando hay hora_inicio y hora_fin (mismo día).
-  //    notas: lo que el atleta escribió sobre el día (dolor, sensaciones, contexto).
+  //    notas_coach: lo que el coach escribió para el día (canal propio, editable por el coach).
+  //    notas_atleta: lo que el atleta escribió sobre el día (dolor, sensaciones, contexto).
   const sesiones_realizadas = db
     .prepare(
       `SELECT
@@ -111,7 +112,8 @@ coachRouter.get("/analisis", (req, res) => {
          pd.fecha,
          pd.hora_inicio,
          pd.hora_fin,
-         pd.notas,
+         pd.notas         AS notas_coach,
+         pd.notas_atleta  AS notas_atleta,
          CASE WHEN pd.hora_inicio IS NOT NULL AND pd.hora_fin IS NOT NULL
               THEN (
                 (CAST(substr(pd.hora_fin,1,2) AS INTEGER)*60 + CAST(substr(pd.hora_fin,4,2) AS INTEGER))

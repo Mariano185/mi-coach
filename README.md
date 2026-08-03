@@ -115,7 +115,7 @@ El coach es una caja negra que solo habla HTTP. El ciclo típico:
      -H "X-Coach-Key: $COACH_API_KEY"
    ```
 
-   Devuelve en un JSON: mejor e1RM por básico, progresión y RPE en la ventana (`?dias=42` por default), tendencia de peso corporal, volumen por categoría, sesiones realizadas (frecuencia/duración), bienestar reciente (Trac), la library de ejercicios y los mesociclos con su última semana.
+   Devuelve en un JSON: mejor e1RM por básico, progresión y RPE en la ventana (`?dias=42` por default), tendencia de peso corporal, volumen por categoría, sesiones realizadas (frecuencia/duración, con `notas_coach` y `notas_atleta` por separado), bienestar reciente (Trac), la library de ejercicios y los mesociclos con su última semana.
 
 2. **Prescribir la semana siguiente:**
 
@@ -132,6 +132,7 @@ El coach es una caja negra que solo habla HTTP. El ciclo típico:
          {
            "dia": 1, "tipo": "A", "titulo": "Squat + Bench",
            "warmup": "Movilidad + rampa de aproximación",
+           "notas": "Bajar volumen de accesorios de empuje esta semana.",
            "exercises": [
              {
                "exercise_id": 1, "seccion": "main",
@@ -149,6 +150,10 @@ El coach es una caja negra que solo habla HTTP. El ciclo típico:
    ```
 
    `exercise_id` sale de la library (`GET /api/exercises`, o del propio análisis); para ejercicios fuera de la library se usa `nombre_libre`. `seccion` es `main | accesorio | core`.
+
+   La `notas` de cada día en `days[]` es el canal del coach para ese día específico — distinta
+   de la `notas` de la semana (arriba) y de `notas_atleta` (que sólo escribe el atleta desde la
+   UI y nunca se puede sembrar desde acá).
 
 3. **Ajustar sobre la marcha** (opcional): `PATCH /api/program/sets/:id/target` corrige la prescripción de una serie; `PATCH /api/program/exercises/:id` swapea un ejercicio; `POST /api/program/days/:id/exercises` agrega uno.
 
@@ -205,7 +210,7 @@ Todas las rutas (salvo las públicas) requieren cookie de sesión o header `X-Co
 | GET | `/api/program/weeks?mesociclo_id=` | listar semanas |
 | POST | `/api/program/weeks` | crear semana estructurada completa (uso del coach) |
 | GET/PATCH/DELETE | `/api/program/weeks/:id` | semana + días / editar / borrar |
-| GET/PATCH | `/api/program/days/:id` | día + ejercicios / editar metadata (título, fecha, horarios, notas) |
+| GET/PATCH | `/api/program/days/:id` | día + ejercicios / editar metadata (título, fecha, horarios, notas del coach, notas del atleta) |
 | POST | `/api/program/days/:id/exercises` | agregar ejercicio (con series) a un día |
 | GET/PATCH/DELETE | `/api/program/exercises/:id` | ejercicio + series / swap-editar / borrar |
 | PATCH | `/api/program/sets/:id` | completar serie real (autosetea fecha/hora del día) |

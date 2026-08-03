@@ -459,7 +459,7 @@ describe("tipo de día libre y opcional (sin restricción A/B)", () => {
     expect(res.body.tipo).toBe("A");
   });
 
-  it("PATCH /program/days/:id guarda notas del atleta y se leen después", async () => {
+  it("PATCH /program/days/:id guarda notas del coach y se leen después", async () => {
     const { dayId } = seedWeekWithDay(db);
 
     const patchRes = await request(app)
@@ -474,7 +474,7 @@ describe("tipo de día libre y opcional (sin restricción A/B)", () => {
     expect(getRes.body.notas).toBe("Dolor leve en el hombro derecho durante el press.");
   });
 
-  it("PATCH /program/days/:id con notas vacías las borra (guarda null)", async () => {
+  it("PATCH /program/days/:id con notas del coach vacías las borra (guarda null)", async () => {
     const { dayId } = seedWeekWithDay(db);
     await request(app).patch(`/api/program/days/${dayId}`).set(AUTH).send({ notas: "texto previo" });
 
@@ -487,6 +487,79 @@ describe("tipo de día libre y opcional (sin restricción A/B)", () => {
 
     const getRes = await request(app).get(`/api/program/days/${dayId}`).set(AUTH);
     expect(getRes.body.notas).toBeNull();
+  });
+
+  it("PATCH /program/days/:id guarda notas_atleta y se leen después", async () => {
+    const { dayId } = seedWeekWithDay(db);
+
+    const patchRes = await request(app)
+      .patch(`/api/program/days/${dayId}`)
+      .set(AUTH)
+      .send({ notas_atleta: "Sentí flojo el hombro en la última serie." });
+    expect(patchRes.status).toBe(200);
+    expect(patchRes.body.notas_atleta).toBe("Sentí flojo el hombro en la última serie.");
+
+    const getRes = await request(app).get(`/api/program/days/${dayId}`).set(AUTH);
+    expect(getRes.status).toBe(200);
+    expect(getRes.body.notas_atleta).toBe("Sentí flojo el hombro en la última serie.");
+  });
+
+  it("PATCH /program/days/:id con notas_atleta null la borra", async () => {
+    const { dayId } = seedWeekWithDay(db);
+    await request(app).patch(`/api/program/days/${dayId}`).set(AUTH).send({ notas_atleta: "texto previo" });
+
+    const patchRes = await request(app)
+      .patch(`/api/program/days/${dayId}`)
+      .set(AUTH)
+      .send({ notas_atleta: null });
+    expect(patchRes.status).toBe(200);
+    expect(patchRes.body.notas_atleta).toBeNull();
+
+    const getRes = await request(app).get(`/api/program/days/${dayId}`).set(AUTH);
+    expect(getRes.body.notas_atleta).toBeNull();
+  });
+
+  it("notas (coach) y notas_atleta son canales independientes", async () => {
+    const { dayId } = seedWeekWithDay(db);
+
+    await request(app).patch(`/api/program/days/${dayId}`).set(AUTH).send({ notas: "coach" });
+    await request(app).patch(`/api/program/days/${dayId}`).set(AUTH).send({ notas_atleta: "atleta" });
+
+    const getRes = await request(app).get(`/api/program/days/${dayId}`).set(AUTH);
+    expect(getRes.body.notas).toBe("coach");
+    expect(getRes.body.notas_atleta).toBe("atleta");
+
+    // Pisar solo notas_atleta no debe tocar notas del coach.
+    await request(app).patch(`/api/program/days/${dayId}`).set(AUTH).send({ notas_atleta: "otra" });
+    const getRes2 = await request(app).get(`/api/program/days/${dayId}`).set(AUTH);
+    expect(getRes2.body.notas).toBe("coach");
+    expect(getRes2.body.notas_atleta).toBe("otra");
+  });
+
+  it("POST /program/weeks persiste notas del coach del día", async () => {
+    const squat = (db.prepare("SELECT id FROM exercises WHERE nombre = 'Mid/High Bar Back Squat'").get() as { id: number }).id;
+
+    const postRes = await request(app)
+      .post("/api/program/weeks")
+      .set(AUTH)
+      .send({
+        semana: 2,
+        days: [
+          {
+            dia: 1,
+            notas: "Ojo con el hombro derecho.",
+            exercises: [{ exercise_id: squat, sets: [{ n_serie: 1 }] }],
+          },
+        ],
+      });
+    expect(postRes.status).toBe(201);
+
+    const weekRes = await request(app).get(`/api/program/weeks/${postRes.body.id}`).set(AUTH);
+    const dayId = weekRes.body.days[0].id as number;
+
+    const getRes = await request(app).get(`/api/program/days/${dayId}`).set(AUTH);
+    expect(getRes.body.notas).toBe("Ojo con el hombro derecho.");
+    expect(getRes.body.notas_atleta).toBeNull();
   });
 });
 

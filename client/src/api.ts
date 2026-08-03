@@ -106,6 +106,7 @@ export const api = {
       titulo?: string | null;
       warmup?: string | null;
       notas?: string | null;
+      notas_atleta?: string | null;
       fecha?: string | null;
       hora_inicio?: string | null;
       hora_fin?: string | null;

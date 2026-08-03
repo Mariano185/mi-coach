@@ -191,6 +191,7 @@ programRouter.patch("/days/:id", (req, res) => {
     titulo?: string | null;
     warmup?: string | null;
     notas?: string | null;
+    notas_atleta?: string | null;
     fecha?: string | null;
     hora_inicio?: string | null;
     hora_fin?: string | null;
@@ -201,6 +202,7 @@ programRouter.patch("/days/:id", (req, res) => {
     titulo: pick(body.titulo, day.titulo),
     warmup: pick(body.warmup, day.warmup),
     notas: pick(body.notas, day.notas),
+    notas_atleta: pick(body.notas_atleta, day.notas_atleta),
     fecha: pick(body.fecha, day.fecha),
     hora_inicio: pick(body.hora_inicio, day.hora_inicio),
     hora_fin: pick(body.hora_fin, day.hora_fin),
@@ -208,7 +210,7 @@ programRouter.patch("/days/:id", (req, res) => {
 
   db.prepare(
     `UPDATE program_days
-       SET titulo=@titulo, warmup=@warmup, notas=@notas,
+       SET titulo=@titulo, warmup=@warmup, notas=@notas, notas_atleta=@notas_atleta,
            fecha=@fecha, hora_inicio=@hora_inicio, hora_fin=@hora_fin
        WHERE id=@id`
   ).run({ id, ...next });
@@ -554,8 +556,8 @@ programRouter.post("/weeks", (req, res) => {
      VALUES (@semana, @nombre, @bloque, @notas, @fecha_creada, 1, @mesociclo_id)`
   );
   const insDay = db.prepare(
-    `INSERT INTO program_days (week_id, dia, tipo, titulo, warmup, orden)
-     VALUES (@week_id, @dia, @tipo, @titulo, @warmup, @orden)`
+    `INSERT INTO program_days (week_id, dia, tipo, titulo, warmup, notas, orden)
+     VALUES (@week_id, @dia, @tipo, @titulo, @warmup, @notas, @orden)`
   );
   const insEx = db.prepare(
     `INSERT INTO program_exercises (day_id, exercise_id, nombre_libre, seccion, reps_text, carga_text, rpe_text, notas, orden)
@@ -583,6 +585,7 @@ programRouter.post("/weeks", (req, res) => {
         tipo: d.tipo ?? null,
         titulo: d.titulo ?? null,
         warmup: d.warmup ?? null,
+        notas: d.notas ?? null,
         orden: di,
       }).lastInsertRowid as number;
 
