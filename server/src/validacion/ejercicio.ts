@@ -69,12 +69,15 @@ function esEscala1a5(v: number | null): boolean {
   return v !== null && Number.isInteger(v) && v >= 1 && v <= 5;
 }
 
+/** `obligatorio` distingue "no vino" (error si es obligatorio) de "no aplica"
+ *  (perfil_resistencia/cadena/tipo_variante son legítimamente null). */
 function validarVocabulario(
   campo: string,
   valor: string | null,
-  permitidos: readonly string[]
+  permitidos: readonly string[],
+  obligatorio: boolean
 ): string | null {
-  if (valor === null) return null;
+  if (valor === null) return obligatorio ? `${campo} requerido` : null;
   return permitidos.includes(valor) ? null : `${campo} debe ser uno de: ${permitidos.join(", ")}`;
 }
 
@@ -87,17 +90,20 @@ export function validarEjercicio(ej: EjercicioNormalizado): string[] {
   const errores: string[] = [];
 
   // --- Vocabularios controlados y escalas ---
-  const vocab: Array<[string, string | null, readonly string[]]> = [
-    ["implemento", ej.implemento, IMPLEMENTOS],
-    ["tipo_variante", ej.tipo_variante, TIPOS_VARIANTE],
-    ["mecanica", ej.mecanica, MECANICAS],
-    ["fuerza", ej.fuerza, FUERZAS],
-    ["sesgo_longitud", ej.sesgo_longitud, SESGOS_LONGITUD],
-    ["perfil_resistencia", ej.perfil_resistencia, PERFILES_RESISTENCIA],
-    ["cadena", ej.cadena, CADENAS],
+  // implemento/mecanica/fuerza/sesgo_longitud son obligatorios (ver
+  // SeedEjercicio/NewExerciseInput); tipo_variante/perfil_resistencia/cadena
+  // son legítimamente null (variante sin padre, o valores con default).
+  const vocab: Array<[string, string | null, readonly string[], boolean]> = [
+    ["implemento", ej.implemento, IMPLEMENTOS, true],
+    ["mecanica", ej.mecanica, MECANICAS, true],
+    ["fuerza", ej.fuerza, FUERZAS, true],
+    ["sesgo_longitud", ej.sesgo_longitud, SESGOS_LONGITUD, true],
+    ["tipo_variante", ej.tipo_variante, TIPOS_VARIANTE, false],
+    ["perfil_resistencia", ej.perfil_resistencia, PERFILES_RESISTENCIA, false],
+    ["cadena", ej.cadena, CADENAS, false],
   ];
-  for (const [campo, valor, permitidos] of vocab) {
-    const err = validarVocabulario(campo, valor, permitidos);
+  for (const [campo, valor, permitidos, obligatorio] of vocab) {
+    const err = validarVocabulario(campo, valor, permitidos, obligatorio);
     if (err) errores.push(err);
   }
 

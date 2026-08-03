@@ -8,9 +8,10 @@ export interface Exercise {
 }
 
 // === Enciclopedia de ejercicios (ver docs/adr/0001) ===
-// Vocabularios controlados — documentados acá, no como union types estrictos:
-// la columna SQL es TEXT libre para no romper si el seed usa un valor nuevo
-// que todavía no se reflejó en el tipo.
+// Vocabularios controlados — documentados acá como referencia rápida del tipo
+// (TEXT libre en la columna SQL), pero la fuente de verdad en RUNTIME es
+// server/src/validacion/ejercicio.ts: POST/PATCH /api/exercises y el seed
+// (validarCatalogo) los validan desde ahí, no confían en el tipo de TS.
 //   implemento:         barra | mancuerna | polea | maquina | smith | peso_corporal | banda | kettlebell
 //   tipo_variante:       angulo | agarre | postura | tempo | pausa | rom | resistencia_acomodada | implemento | unilateral
 //   mecanica:            compuesto | aislamiento
@@ -94,6 +95,54 @@ export interface ExerciseDetalle extends Exercise {
     fraccion_volumen: number;
   }>;
 }
+
+// Grilla muscular de entrada: musculo_id (no slug) + rol + fraccion. El orden
+// del array ES el `orden` de la tabla (1 = mayor contribución) — mismo
+// contrato que MusculoRef en el seed, pero por id en vez de por slug.
+export interface MusculoGridInput {
+  musculo_id: number;
+  rol: string;
+  fraccion_volumen: number;
+}
+
+// POST /api/exercises — mismos campos obligatorios que un ejercicio curado a
+// mano (ver SeedEjercicio): un ejercicio de la API es indistinguible en
+// calidad de uno del catálogo curado. rastrea_e1rm/es_competitivo NO están acá
+// a propósito: no son editables por API (ver validacion/ejercicio-db.ts).
+export interface NewExerciseInput {
+  nombre: string;
+  categoria: string;
+  patron_id: number;
+  ejercicio_padre_id?: number | null;
+  tipo_variante?: string | null;
+  transferencia?: number | null;
+  proposito?: string | null;
+  implemento: string;
+  angulo_grados?: number | null;
+  agarre?: string | null;
+  postura?: string | null;
+  unilateral?: boolean;
+  mecanica: string;
+  fuerza: string;
+  sesgo_longitud: string;
+  perfil_resistencia?: string;
+  cadena?: string;
+  carga_axial?: boolean;
+  costo_fatiga: number;
+  demanda_estabilidad: number;
+  demanda_tecnica: number;
+  notas_tecnicas?: string | null;
+  contraindicaciones?: string | null;
+  cues?: string | null;
+  musculos: MusculoGridInput[];
+}
+
+// PATCH /api/exercises/:id — todos opcionales (merge parcial: `undefined` no
+// toca el campo, `null` explícito lo limpia). `musculos` ausente no toca la
+// grilla; presente reemplaza la grilla entera (nunca un merge fila a fila).
+export type UpdateExerciseInput = Partial<Omit<NewExerciseInput, "musculos">> & {
+  musculos?: MusculoGridInput[];
+};
 
 // Vista v_volumen_por_musculo — reemplaza a WeeklyVolume/volumen_por_categoria
 // una vez que ejercicio_musculos está poblada (fase 2).

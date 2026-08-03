@@ -95,6 +95,54 @@ export interface ExerciseDetalle extends Exercise {
   }>;
 }
 
+// Grilla muscular de entrada: musculo_id (no slug) + rol + fraccion. El orden
+// del array ES el `orden` de la tabla (1 = mayor contribución) — mismo
+// contrato que MusculoRef en el seed, pero por id en vez de por slug.
+export interface MusculoGridInput {
+  musculo_id: number;
+  rol: string;
+  fraccion_volumen: number;
+}
+
+// POST /api/exercises — mismos campos obligatorios que un ejercicio curado a
+// mano (ver SeedEjercicio): un ejercicio de la API es indistinguible en
+// calidad de uno del catálogo curado. rastrea_e1rm/es_competitivo NO están acá
+// a propósito: no son editables por API.
+export interface NewExerciseInput {
+  nombre: string;
+  categoria: string;
+  patron_id: number;
+  ejercicio_padre_id?: number | null;
+  tipo_variante?: string | null;
+  transferencia?: number | null;
+  proposito?: string | null;
+  implemento: string;
+  angulo_grados?: number | null;
+  agarre?: string | null;
+  postura?: string | null;
+  unilateral?: boolean;
+  mecanica: string;
+  fuerza: string;
+  sesgo_longitud: string;
+  perfil_resistencia?: string;
+  cadena?: string;
+  carga_axial?: boolean;
+  costo_fatiga: number;
+  demanda_estabilidad: number;
+  demanda_tecnica: number;
+  notas_tecnicas?: string | null;
+  contraindicaciones?: string | null;
+  cues?: string | null;
+  musculos: MusculoGridInput[];
+}
+
+// PATCH /api/exercises/:id — todos opcionales (merge parcial: `undefined` no
+// toca el campo, `null` explícito lo limpia). `musculos` ausente no toca la
+// grilla; presente reemplaza la grilla entera (nunca un merge fila a fila).
+export type UpdateExerciseInput = Partial<Omit<NewExerciseInput, "musculos">> & {
+  musculos?: MusculoGridInput[];
+};
+
 // Vista v_volumen_por_musculo — reemplaza a WeeklyVolume/volumen_por_categoria
 // una vez que ejercicio_musculos está poblada (fase 2).
 export interface VolumenMusculo {
