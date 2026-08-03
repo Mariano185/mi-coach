@@ -11,12 +11,41 @@ import type { SeedEjercicio } from "./tipos.js";
 import { PECHO_HOMBRO } from "./pecho-hombro.js";
 import { ESPALDA_BRAZO } from "./espalda-brazo.js";
 import { PIERNA_CORE } from "./pierna-core.js";
+import { validarEjercicio, type EjercicioNormalizado } from "../../validacion/ejercicio.js";
+import { ROL_LARGO } from "./tipos.js";
 
 export const EJERCICIOS: SeedEjercicio[] = [
   ...PECHO_HOMBRO,
   ...ESPALDA_BRAZO,
   ...PIERNA_CORE,
 ];
+
+/** SeedEjercicio (slugs, roles cortos "A"/"S"/"E") → EjercicioNormalizado
+ *  (la forma que valida el módulo compartido con la API: roles largos). */
+function normalizarSeed(ej: SeedEjercicio): EjercicioNormalizado {
+  return {
+    nombre: ej.nombre,
+    patron: ej.patron,
+    padre: ej.padre ?? null,
+    tipo_variante: ej.tipo_variante ?? null,
+    transferencia: ej.transferencia ?? null,
+    proposito: ej.proposito ?? null,
+    implemento: ej.implemento,
+    mecanica: ej.mecanica,
+    fuerza: ej.fuerza,
+    sesgo_longitud: ej.sesgo_longitud,
+    perfil_resistencia: ej.perfil_resistencia ?? null,
+    cadena: ej.cadena ?? null,
+    costo_fatiga: ej.costo_fatiga,
+    demanda_estabilidad: ej.demanda_estabilidad,
+    demanda_tecnica: ej.demanda_tecnica,
+    musculos: ej.musculos.map(([slug, rol, fraccion]) => ({
+      clave: slug,
+      rol: ROL_LARGO[rol],
+      fraccion,
+    })),
+  };
+}
 
 /** Lanza si el catálogo tiene inconsistencias internas. */
 export function validarCatalogo(ejercicios: SeedEjercicio[] = EJERCICIOS): void {
@@ -27,56 +56,32 @@ export function validarCatalogo(ejercicios: SeedEjercicio[] = EJERCICIOS): void 
   const nombres = new Set<string>();
 
   for (const ej of ejercicios) {
+    // (1) nombre único — invariante de catálogo entero, no delegable.
     if (nombres.has(ej.nombre)) {
       errores.push(`nombre duplicado: "${ej.nombre}"`);
     }
     nombres.add(ej.nombre);
 
+    // (2) patrón conocido y (4) músculos conocidos: resueltos contra los
+    // catálogos estáticos (la API resuelve las mismas dos contra la DB).
     if (!slugsPatron.has(ej.patron)) {
       errores.push(`"${ej.nombre}": patrón desconocido "${ej.patron}"`);
     }
-
-    if (ej.musculos.length === 0) {
-      errores.push(`"${ej.nombre}": sin músculos asignados`);
-    }
-    const vistos = new Set<string>();
-    let tieneAgonista = false;
-    for (const [slug, rol, fraccion] of ej.musculos) {
+    for (const [slug] of ej.musculos) {
       if (!slugsMusculo.has(slug)) {
         errores.push(`"${ej.nombre}": músculo desconocido "${slug}"`);
       }
-      if (vistos.has(slug)) {
-        errores.push(`"${ej.nombre}": músculo repetido "${slug}"`);
-      }
-      vistos.add(slug);
-      if (rol === "A") tieneAgonista = true;
-      if (fraccion < 0 || fraccion > 1) {
-        errores.push(`"${ej.nombre}": fraccion_volumen fuera de rango en "${slug}" (${fraccion})`);
-      }
-      // Un estabilizador que sumara volumen inflaría el conteo de series por
-      // músculo, que es justo la métrica que esta tabla existe para calcular.
-      if (rol === "E" && fraccion !== 0) {
-        errores.push(`"${ej.nombre}": estabilizador "${slug}" con fraccion_volumen ${fraccion} (debe ser 0)`);
-      }
-    }
-    if (!tieneAgonista) {
-      errores.push(`"${ej.nombre}": no tiene ningún músculo agonista`);
     }
 
-    if (ej.transferencia !== undefined && (ej.transferencia <= 0 || ej.transferencia > 1)) {
-      errores.push(`"${ej.nombre}": transferencia fuera de rango (${ej.transferencia})`);
-    }
-    // El linaje y el tipo de variante van juntos: una variante sin padre no se
-    // puede resolver, y un padre con tipo_variante es una contradicción.
-    if (ej.padre && !ej.tipo_variante) {
-      errores.push(`"${ej.nombre}": tiene padre pero no tipo_variante`);
-    }
-    if (!ej.padre && ej.tipo_variante) {
-      errores.push(`"${ej.nombre}": tiene tipo_variante pero no padre`);
+    // (3, 5-11) reglas por-ejercicio, compartidas con la API.
+    for (const err of validarEjercicio(normalizarSeed(ej))) {
+      errores.push(`"${ej.nombre}": ${err}`);
     }
   }
 
-  // Padres existentes y sin ciclos.
+  // (12) linaje: padre existente, no auto-padre, sin ciclos. Contra el array
+  // estático (la API hace lo mismo contra ejercicio_padre_id en la DB, con un
+  // CTE recursivo — ver validacion/ejercicio-db.ts).
   const porNombre = new Map(ejercicios.map((e) => [e.nombre, e]));
   for (const ej of ejercicios) {
     if (!ej.padre) continue;

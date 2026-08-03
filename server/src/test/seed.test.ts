@@ -125,4 +125,28 @@ describe("validarCatalogo detecta catálogos rotos", () => {
       /tipo_variante/
     );
   });
+
+  it("rechaza padre sin transferencia (endurecimiento: coincide con seed.test 'toda variante declara transferencia')", () => {
+    expect(() =>
+      validarCatalogo([
+        { ...base, nombre: "X" },
+        { ...base, nombre: "Y", padre: "X", tipo_variante: "tempo", proposito: "Algo" },
+      ])
+    ).toThrow(/transferencia/);
+  });
+
+  it("rechaza padre sin proposito", () => {
+    expect(() =>
+      validarCatalogo([
+        { ...base, nombre: "X" },
+        { ...base, nombre: "Y", padre: "X", tipo_variante: "tempo", transferencia: 0.9 },
+      ])
+    ).toThrow(/proposito/);
+  });
+
+  it("el refactor conserva el prefijo del nombre en los mensajes delegados", () => {
+    expect(() =>
+      validarCatalogo([{ ...base, nombre: "Sentadilla Test", musculos: [["pec-esternal", "S", 0.5]] }])
+    ).toThrow(/"Sentadilla Test": no tiene ningún músculo agonista/);
+  });
 });
