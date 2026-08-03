@@ -103,6 +103,7 @@ export function createTestDb() {
       titulo TEXT,
       warmup TEXT,
       notas TEXT,
+      notas_atleta TEXT,
       fecha TEXT,
       hora_inicio TEXT,
       hora_fin TEXT,

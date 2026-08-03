@@ -19,8 +19,12 @@ import { DayView } from "./pages/program/DayView";
 import { ExerciseView } from "./pages/program/ExerciseView";
 import { SWRConfig } from "swr";
 import { BottomNav } from "./components/BottomNav";
-import { api } from "./api";
+import { OfflineBanner } from "./components/OfflineBanner";
+import { UpdatePrompt } from "./components/UpdatePrompt";
+import { api, isNetworkError } from "./api";
 import { swrConfig } from "./swr";
+import { ConnectivityProvider } from "./connectivity";
+import { hasRecentAuth, setAuthedFlag } from "./authState";
 
 const NAV: Array<{ to: string; label: string; end?: boolean }> = [
   { to: "/dashboard", label: "Dashboard", end: true },
@@ -33,6 +37,7 @@ function RootLayout({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
 
   async function logout() {
+    setAuthedFlag(false); // primero y siempre, aunque el POST falle
     try {
       await api.logout();
     } catch {
@@ -43,6 +48,7 @@ function RootLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="app">
+      <OfflineBanner />
       <header className="topbar">
         <h1>
           Powerbuilding <span className="accent">Coach</span>
@@ -73,17 +79,35 @@ function RootLayout({ children }: { children: React.ReactNode }) {
 }
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
-  const [status, setStatus] = useState<"loading" | "ok" | "no">("loading");
   const location = useLocation();
+
+  // Render optimista: si hay evidencia de sesión reciente, mostramos la app
+  // YA, sin esperar el round-trip. Offline eso es lo único que vamos a tener;
+  // online, la verificación de abajo corrige en un instante si hace falta.
+  const [status, setStatus] = useState<"loading" | "ok" | "no">(() =>
+    hasRecentAuth() ? "ok" : "loading"
+  );
+
   useEffect(() => {
     let cancelled = false;
     api
       .authStatus()
       .then((s) => {
-        if (!cancelled) setStatus(s.authenticated ? "ok" : "no");
+        if (cancelled) return;
+        setAuthedFlag(s.authenticated);
+        setStatus(s.authenticated ? "ok" : "no");
       })
-      .catch(() => {
-        if (!cancelled) setStatus("no");
+      .catch((e) => {
+        if (cancelled) return;
+        if (isNetworkError(e)) {
+          // El server no contestó: no sabemos si la sesión es válida. Si
+          // hubo sesión reciente, dejamos pasar (modo offline); si no,
+          // no hay nada que mostrar igual.
+          setStatus(hasRecentAuth() ? "ok" : "no");
+          return;
+        }
+        // Error real del server (401 ya redirigió solo; otro 5xx, etc.)
+        setStatus("no");
       });
     return () => {
       cancelled = true;
@@ -115,8 +139,10 @@ function NotFound() {
 export function App() {
   return (
     <SWRConfig value={swrConfig}>
-      <BrowserRouter>
-        <Routes>
+      <ConnectivityProvider>
+        <BrowserRouter>
+          <UpdatePrompt />
+          <Routes>
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
         <Route path="/login" element={<Login />} />
@@ -190,8 +216,9 @@ export function App() {
             </RequireAuth>
           }
         />
-        </Routes>
-      </BrowserRouter>
+          </Routes>
+        </BrowserRouter>
+      </ConnectivityProvider>
     </SWRConfig>
   );
 }

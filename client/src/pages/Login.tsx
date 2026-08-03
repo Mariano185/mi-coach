@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../api";
+import { setAuthedFlag } from "../authState";
 
 export function Login() {
   const [password, setPassword] = useState("");
@@ -29,6 +30,7 @@ export function Login() {
     setErr("");
     try {
       await api.login(password);
+      setAuthedFlag(true);
       navigate(next, { replace: true });
     } catch (e) {
       setErr((e as Error).message);

@@ -4,6 +4,7 @@ import type { ProgramWeekDetail } from "../../types";
 import { swrKeys } from "../../swr";
 import { useProgramsContext } from "../Programs";
 import { CoachNotes } from "../../components/CoachNotes";
+import { Expandable } from "../../components/Expandable";
 import { IconList, IconCalendar } from "../../components/icons";
 
 function fmtFecha(iso: string | null): string | null {
@@ -130,7 +131,9 @@ export function WeekView() {
           {detail.notas ? (
             <div className="panel" style={{ marginTop: 22 }}>
               <h2>Notas del coach</h2>
-              <CoachNotes text={detail.notas} />
+              <Expandable>
+                <CoachNotes text={detail.notas} />
+              </Expandable>
             </div>
           ) : null}
         </>

@@ -693,8 +693,38 @@ tbody tr:hover { background: var(--panel-2); }
 .coach-notes { color: var(--muted); font-size: 13px; line-height: 1.6; }
 .coach-notes strong { color: var(--text); }
 
-/* notas del día (editable por el atleta) */
-.notas-dia {
+/* contenido largo colapsable (notas del coach, warmup, etc.) */
+.expandable-content {
+  position: relative;
+}
+.expandable-content[style*="overflow: hidden"]::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 32px;
+  background: linear-gradient(to bottom, transparent, var(--panel));
+  pointer-events: none;
+}
+.expandable-toggle {
+  background: none;
+  border: none;
+  color: var(--lime);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  margin-top: 6px;
+  padding: 4px 0;
+}
+.expandable-toggle:focus-visible {
+  outline: 1px solid var(--lime);
+  outline-offset: 2px;
+}
+
+/* notas del atleta (editable) */
+.notas-atleta {
   background: var(--surface2);
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -707,7 +737,7 @@ tbody tr:hover { background: var(--panel-2); }
   box-sizing: border-box;
   resize: vertical;
 }
-.notas-dia:focus {
+.notas-atleta:focus {
   outline: none;
   border-color: var(--lime);
 }
@@ -962,4 +992,88 @@ summary { cursor: pointer; padding: 8px 0; }
 .topbar-logout:focus-visible { outline: 2px solid var(--lime); outline-offset: 2px; }
 @media (max-width: 600px) {
   .topbar-logout { font-size: 10px; padding: 5px 10px; }
+}
+
+/* ---------- Banner offline ---------- */
+.offline-banner {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 -20px 12px;
+  padding: 10px 20px;
+  padding-top: calc(10px + env(safe-area-inset-top));
+  background: #2a1113;
+  border-bottom: 1px solid var(--danger);
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+@supports (background: color-mix(in srgb, red, blue)) {
+  .offline-banner {
+    background: color-mix(in srgb, var(--danger) 18%, var(--panel));
+  }
+}
+.offline-banner-dot {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 99px;
+  background: var(--danger);
+  animation: offline-pulse 1.8s ease-in-out infinite;
+}
+@keyframes offline-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .offline-banner-dot { animation: none; }
+}
+.offline-banner-text { flex: 1 1 auto; }
+.offline-banner-retry {
+  flex: 0 0 auto;
+  background: none;
+  border: 1px solid var(--danger);
+  color: var(--danger);
+  font: inherit;
+  padding: 4px 11px;
+  border-radius: 99px;
+  cursor: pointer;
+}
+.offline-banner-retry:focus-visible { outline: 2px solid var(--lime); outline-offset: 2px; }
+@media (max-width: 600px) {
+  .offline-banner { font-size: 10.5px; gap: 8px; padding-left: 14px; padding-right: 14px; }
+  .offline-banner-text { text-transform: none; letter-spacing: 0.02em; }
+}
+
+/* ---------- Prompt de actualización (PWA) ---------- */
+.update-prompt {
+  position: fixed;
+  left: 50%;
+  bottom: 84px;
+  transform: translateX(-50%);
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  font-family: var(--font-display);
+  font-size: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+.update-prompt-later {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline;
 }

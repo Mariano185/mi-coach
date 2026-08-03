@@ -4,6 +4,7 @@ import { api } from "../../api";
 import type { ProgramExerciseDetail, ProgramSet } from "../../types";
 import { IconBack, IconCloudCheck, IconCloudOff, IconCloudSync } from "../../components/icons";
 import { CoachNotes } from "../../components/CoachNotes";
+import { Expandable } from "../../components/Expandable";
 
 type Tab = "objetivo" | "real";
 type SyncState = "synced" | "saving" | "error";
@@ -223,7 +224,13 @@ export function ExerciseView() {
 
       <div className="panel" style={{ marginBottom: 18 }}>
         <h3 style={{ marginTop: 0 }}>Notas del coach</h3>
-        {data.notas ? <CoachNotes text={data.notas} /> : <p className="muted" style={{ margin: 0 }}>Sin notas.</p>}
+        {data.notas ? (
+          <Expandable>
+            <CoachNotes text={data.notas} />
+          </Expandable>
+        ) : (
+          <p className="muted" style={{ margin: 0 }}>Sin notas.</p>
+        )}
       </div>
 
       <div className="panel">

@@ -6,6 +6,7 @@ import type { ProgramDayDetail, ProgramExerciseCard, Seccion } from "../../types
 import { swrKeys } from "../../swr";
 import { IconBack, IconLayers } from "../../components/icons";
 import { CoachNotes } from "../../components/CoachNotes";
+import { Expandable } from "../../components/Expandable";
 
 const SECCION_LABEL: Record<Seccion, string> = {
   main: "Básicos",
@@ -33,7 +34,7 @@ export function DayView() {
   const [fecha, setFecha] = useState("");
   const [horaInicio, setHoraInicio] = useState("");
   const [horaFin, setHoraFin] = useState("");
-  const [notas, setNotas] = useState("");
+  const [notasAtleta, setNotasAtleta] = useState("");
 
   // Sembrar los inputs locales desde el dato cargado (una vez por día).
   const seededFor = useRef<number | null>(null);
@@ -43,7 +44,7 @@ export function DayView() {
     setFecha(data.fecha ?? today());
     setHoraInicio(data.hora_inicio ?? "");
     setHoraFin(data.hora_fin ?? "");
-    setNotas(data.notas ?? "");
+    setNotasAtleta(data.notas_atleta ?? "");
   }, [data, dayId]);
 
   const grouped = useMemo(() => {
@@ -149,21 +150,20 @@ export function DayView() {
       {data.warmup ? (
         <div className="panel" style={{ marginBottom: 18 }}>
           <h3 style={{ marginTop: 0 }}>Warm-up</h3>
-          <CoachNotes text={data.warmup} />
+          <Expandable>
+            <CoachNotes text={data.warmup} />
+          </Expandable>
         </div>
       ) : null}
 
-      <div className="panel" style={{ marginBottom: 18 }}>
-        <h3 style={{ marginTop: 0 }}>Notas del día</h3>
-        <textarea
-          className="notas-dia"
-          value={notas}
-          placeholder="Escribí algo sobre este día…"
-          onChange={(e) => setNotas(e.target.value)}
-          onBlur={() => patchDay({ notas: notas || null })}
-          rows={4}
-        />
-      </div>
+      {data.notas ? (
+        <div className="panel" style={{ marginBottom: 18 }}>
+          <h3 style={{ marginTop: 0 }}>Notas del coach</h3>
+          <Expandable>
+            <CoachNotes text={data.notas} />
+          </Expandable>
+        </div>
+      ) : null}
 
       {grouped.map(([sec, items]) => (
         <section key={sec}>
@@ -204,7 +204,7 @@ export function DayView() {
         </section>
       ))}
 
-      <div className="panel" style={{ marginTop: 24, display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+      <div className="panel" style={{ marginTop: 24, marginBottom: 18, display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
         <div style={{ flex: 1, minWidth: 180 }}>
           <div className="muted" style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: "0.05em" }}>
             Progreso del día
@@ -214,6 +214,18 @@ export function DayView() {
             {progreso.hechas > 0 ? <span className="done-chip" style={{ marginLeft: 12 }}>✓ en historial</span> : null}
           </div>
         </div>
+      </div>
+
+      <div className="panel">
+        <h3 style={{ marginTop: 0 }}>Notas atleta</h3>
+        <textarea
+          className="notas-atleta"
+          value={notasAtleta}
+          placeholder="Escribí algo sobre este día…"
+          onChange={(e) => setNotasAtleta(e.target.value)}
+          onBlur={() => patchDay({ notas_atleta: notasAtleta || null })}
+          rows={4}
+        />
       </div>
     </div>
   );

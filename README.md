@@ -16,7 +16,7 @@ El coach puede ser **cualquier agente de IA** (Claude, ChatGPT, Gemini, un scrip
 - **Mesociclos**: agrupador de semanas con numeración propia por bloque.
 - **Endpoint de análisis para el coach** (`/api/coach/analisis`): progresión de e1RM, RPE, volumen, frecuencia y bienestar en un solo JSON.
 - **Auth** simple de un solo usuario: password + cookie, y una API key (`X-Coach-Key`) para el coach.
-- **PWA**: manifest + íconos; se agrega a la pantalla de inicio del celular.
+- **PWA con soporte offline** (solo lectura): instalada en la pantalla de inicio, la rutina queda disponible aunque se caiga el internet o el server. Ver [Modo offline](#modo-offline-pwa) más abajo.
 
 ## Stack
 
@@ -57,6 +57,47 @@ Corre en cualquier lado donde corra Node: **tu PC, un homelab (Proxmox, Raspberr
 
 Guía completa (systemd, datos persistentes, backups, acceso remoto con Tailscale): [`deploy/README.md`](deploy/README.md).
 
+## Modo offline (PWA)
+
+La app funciona como guardavidas si se corta el internet, el homelab o el server mientras estás
+entrenando: la rutina que ya viste queda disponible sin conexión, y un banner rojo avisa
+"Trabajando en modo offline" apenas no logra hablar con el server (ya sea porque no hay red o
+porque el server está caído con internet funcionando).
+
+**Alcance: solo lectura.** Podés *ver* tu rutina offline. Cargar series sin conexión y que se
+sincronicen solas al volver la red **no está soportado** — si intentás completar una serie
+offline, va a fallar con un error (no se pierde nada, pero tampoco se guarda hasta que vuelva la
+conexión).
+
+**Probado en iOS/iPhone.** Otros sistemas (Android) no están verificados.
+
+### Requisito: instalarla en la pantalla de inicio
+
+Esto **no es opcional** — es lo que hace que el modo offline funcione de verdad en iOS:
+
+1. Abrí la app en **Safari** (no en Chrome ni otro navegador; en iOS todos usan el motor de
+   Safari pero solo desde Safari mismo se puede instalar).
+2. Tocá el botón de compartir (el cuadrado con la flecha hacia arriba) → **"Agregar a pantalla
+   de inicio"**.
+3. Abrí la app siempre **desde ese ícono**, no desde una pestaña de Safari.
+
+Si la dejás como una pestaña de Safari en vez de instalarla, iOS puede borrar los datos
+guardados a los 7 días de inactividad (política de `Intelligent Tracking Prevention` de
+WebKit). Las apps instaladas en la pantalla de inicio están exentas de ese borrado.
+
+### Cómo se ceba el cache
+
+Con conexión, al abrir el Dashboard la app precarga en segundo plano la semana activa completa
+(días y ejercicios) para que esté disponible offline sin que tengas que acordarte de abrir cada
+pantalla manualmente antes de ir al gimnasio. Igual conviene, la primera vez que instalás la
+PWA, navegar un poco por Programas con internet antes de confiar en el modo offline.
+
+### Actualizaciones
+
+Cuando se deploya una versión nueva, la próxima vez que abras la app va a aparecer un cartelito
+"Hay una versión nueva" con un botón para actualizar. No se actualiza sola en el momento — así
+no te interrumpe si estás a mitad de cargar una serie.
+
 ## Auth
 
 - **Atleta (browser):** login con password único. El hash bcrypt vive en la DB (`settings`); el password inicial se toma de `AUTH_PASSWORD` la primera vez. Cookie de sesión firmada, 30 días.
@@ -74,7 +115,7 @@ El coach es una caja negra que solo habla HTTP. El ciclo típico:
      -H "X-Coach-Key: $COACH_API_KEY"
    ```
 
-   Devuelve en un JSON: mejor e1RM por básico, progresión y RPE en la ventana (`?dias=42` por default), tendencia de peso corporal, volumen por categoría, sesiones realizadas (frecuencia/duración), bienestar reciente (Trac), la library de ejercicios y los mesociclos con su última semana.
+   Devuelve en un JSON: mejor e1RM por básico, progresión y RPE en la ventana (`?dias=42` por default), tendencia de peso corporal, volumen por categoría, sesiones realizadas (frecuencia/duración, con `notas_coach` y `notas_atleta` por separado), bienestar reciente (Trac), la library de ejercicios y los mesociclos con su última semana.
 
 2. **Prescribir la semana siguiente:**
 
@@ -91,6 +132,7 @@ El coach es una caja negra que solo habla HTTP. El ciclo típico:
          {
            "dia": 1, "tipo": "A", "titulo": "Squat + Bench",
            "warmup": "Movilidad + rampa de aproximación",
+           "notas": "Bajar volumen de accesorios de empuje esta semana.",
            "exercises": [
              {
                "exercise_id": 1, "seccion": "main",
@@ -108,6 +150,10 @@ El coach es una caja negra que solo habla HTTP. El ciclo típico:
    ```
 
    `exercise_id` sale de la library (`GET /api/exercises`, o del propio análisis); para ejercicios fuera de la library se usa `nombre_libre`. `seccion` es `main | accesorio | core`.
+
+   La `notas` de cada día en `days[]` es el canal del coach para ese día específico — distinta
+   de la `notas` de la semana (arriba) y de `notas_atleta` (que sólo escribe el atleta desde la
+   UI y nunca se puede sembrar desde acá).
 
 3. **Ajustar sobre la marcha** (opcional): `PATCH /api/program/sets/:id/target` corrige la prescripción de una serie; `PATCH /api/program/exercises/:id` swapea un ejercicio; `POST /api/program/days/:id/exercises` agrega uno.
 
@@ -166,7 +212,7 @@ Todas las rutas (salvo las públicas) requieren cookie de sesión o header `X-Co
 | GET | `/api/program/weeks?mesociclo_id=` | listar semanas |
 | POST | `/api/program/weeks` | crear semana estructurada completa (uso del coach) |
 | GET/PATCH/DELETE | `/api/program/weeks/:id` | semana + días / editar / borrar |
-| GET/PATCH | `/api/program/days/:id` | día + ejercicios / editar metadata (título, fecha, horarios, notas) |
+| GET/PATCH | `/api/program/days/:id` | día + ejercicios / editar metadata (título, fecha, horarios, notas del coach, notas del atleta) |
 | POST | `/api/program/days/:id/exercises` | agregar ejercicio (con series) a un día |
 | GET/PATCH/DELETE | `/api/program/exercises/:id` | ejercicio + series / swap-editar / borrar |
 | PATCH | `/api/program/sets/:id` | completar serie real (autosetea fecha/hora del día) |

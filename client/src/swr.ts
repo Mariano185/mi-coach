@@ -5,7 +5,7 @@
 // `req()`, así que el fetcher es un passthrough tipado. Para revalidar tras una
 // mutación, llamá `mutate(key)` con la misma URL.
 import type { SWRConfiguration } from "swr";
-import { req } from "./api";
+import { isNetworkError, req } from "./api";
 
 // Fetcher genérico: la key ES la URL. SWR cachea por key.
 export function swrFetcher<T>(url: string): Promise<T> {
@@ -38,4 +38,7 @@ export const swrConfig: SWRConfiguration = {
   revalidateOnReconnect: true,
   // Dedup de requests idénticas en una ventana corta (navegación rápida).
   dedupingInterval: 2000,
+  // Offline, cada request rebota con backoff y llena la consola de ruido sin
+  // ganar nada: el service worker ya sirvió el cache o no hay nada que servir.
+  shouldRetryOnError: (err) => !isNetworkError(err),
 };

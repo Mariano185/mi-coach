@@ -2,7 +2,7 @@ import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import { fileURLToPath } from "node:url";
-import { dirname, resolve } from "node:path";
+import { dirname, resolve, sep } from "node:path";
 import { existsSync } from "node:fs";
 import { initDb } from "./db.js";
 import { authRouter, bootstrapAuth, requireAuth } from "./auth.js";
@@ -50,9 +50,36 @@ app.use("/api", catalogoRouter);
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const CLIENT_DIST = resolve(__dirname, "..", "..", "client", "dist");
 if (existsSync(CLIENT_DIST)) {
-  app.use(express.static(CLIENT_DIST));
+  // Assets del service worker: nunca cachear por HTTP. Si el browser sirve un
+  // sw.js viejo desde su cache, las actualizaciones del PWA nunca llegan.
+  const SW_ASSETS = ["/sw.js", "/registerSW.js", "/manifest.json"];
+  app.get(SW_ASSETS, (_req, res, next) => {
+    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    res.setHeader("Service-Worker-Allowed", "/");
+    next();
+  });
+
+  app.use(
+    express.static(CLIENT_DIST, {
+      setHeaders(res, filePath) {
+        // Assets con hash en el nombre (dist/assets/*) son inmutables.
+        if (filePath.includes(`${sep}assets${sep}`)) {
+          res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+        }
+      },
+    })
+  );
+
+  // Guarda: si el build de client quedó a medias y sw.js no existe en dist,
+  // devolver 404 real en vez de dejar que el catch-all sirva index.html con
+  // MIME text/html — eso rompe el registro del SW de forma confusa.
+  app.get(["/sw.js", "/registerSW.js", /^\/workbox-.*\.js$/], (_req, res) => {
+    res.status(404).type("application/javascript").send("// not built");
+  });
+
   // Fallback SPA: cualquier ruta no-API devuelve index.html.
   app.get(/^(?!\/api\/).*/, (_req, res) => {
+    res.setHeader("Cache-Control", "no-cache");
     res.sendFile(resolve(CLIENT_DIST, "index.html"));
   });
   console.log(`[server] sirviendo frontend desde ${CLIENT_DIST}`);
