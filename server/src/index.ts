@@ -14,6 +14,7 @@ import { mesociclosRouter } from "./routes/mesociclos.js";
 import { statsRouter } from "./routes/stats.js";
 import { coachRouter } from "./routes/coach.js";
 import { tracRouter } from "./routes/trac.js";
+import { catalogoRouter } from "./routes/catalogo.js";
 
 const PORT = Number(process.env.PORT) || 3001;
 
@@ -42,6 +43,7 @@ app.use("/api/mesociclos", mesociclosRouter);
 app.use("/api/stats", statsRouter);
 app.use("/api/coach", coachRouter);
 app.use("/api/trac", tracRouter);
+app.use("/api", catalogoRouter);
 
 // En producción, servir el frontend buildeado (client/dist) desde el mismo proceso.
 // Así no hace falta vite ni nginx: un solo server en :3001 sirve API + SPA.

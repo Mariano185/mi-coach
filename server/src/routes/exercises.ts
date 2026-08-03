@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "../db.js";
-import type { Exercise, ExerciseDetalle } from "../types.js";
+import type { Exercise, ExerciseConRol, ExerciseDetalle } from "../types.js";
 
 export const exercisesRouter = Router();
 
@@ -10,10 +10,39 @@ const DETALLE_COLS = `
   padre.nombre AS ejercicio_padre_nombre
 `;
 
+const ROLES = ["agonista", "sinergista", "estabilizador"] as const;
+
 // GET /api/exercises — catálogo. Por default, forma compacta (no romper al cliente
 // actual). ?detalle=full trae todas las columnas de la enciclopedia + músculos +
-// variantes por ejercicio, para el coach.
+// variantes por ejercicio, para el coach. ?musculo_id=X[&rol=agonista] filtra a
+// los ejercicios que trabajan ese músculo (filtro inverso: "qué entrena el glúteo
+// medio"), ordenados por orden (los que más lo trabajan primero).
 exercisesRouter.get("/", (req, res) => {
+  if (req.query.musculo_id !== undefined) {
+    const musculoId = Number(req.query.musculo_id);
+    if (!Number.isInteger(musculoId)) {
+      return res.status(400).json({ error: "musculo_id inválido" });
+    }
+    const rol = req.query.rol;
+    if (rol !== undefined && !ROLES.includes(rol as (typeof ROLES)[number])) {
+      return res.status(400).json({ error: `rol debe ser uno de: ${ROLES.join(", ")}` });
+    }
+
+    const rows = db
+      .prepare(
+        `SELECT e.id, e.nombre, e.categoria, e.es_basico,
+                em.rol, em.orden, em.fraccion_volumen
+         FROM exercises e
+         JOIN ejercicio_musculos em ON em.exercise_id = e.id
+         WHERE em.musculo_id = @musculo_id
+           AND (@rol IS NULL OR em.rol = @rol)
+         ORDER BY em.orden`
+      )
+      .all({ musculo_id: musculoId, rol: rol ?? null }) as ExerciseConRol[];
+
+    return res.json(rows);
+  }
+
   if (req.query.detalle !== "full") {
     const rows = db
       .prepare("SELECT id, nombre, categoria, es_basico FROM exercises ORDER BY es_basico DESC, categoria, nombre")

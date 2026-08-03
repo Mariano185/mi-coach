@@ -27,6 +27,7 @@ export interface Musculo {
   grupo: string;
   region: string | null;
   biarticular: 0 | 1;
+  n_ejercicios: number;
 }
 
 export interface Patron {
@@ -34,6 +35,15 @@ export interface Patron {
   nombre: string;
   plano: string | null;
   descripcion: string | null;
+  n_ejercicios: number;
+}
+
+// Fila de GET /api/exercises?musculo_id=X — forma compacta + el rol de ese
+// ejercicio para el músculo filtrado.
+export interface ExerciseConRol extends Exercise {
+  rol: string;
+  orden: number;
+  fraccion_volumen: number;
 }
 
 export interface EjercicioMusculo {

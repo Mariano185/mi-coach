@@ -211,6 +211,7 @@ export async function createTestApp(db: TestDb) {
   const { exercisesRouter } = await import("../routes/exercises.js");
   const { tracRouter } = await import("../routes/trac.js");
   const { mesociclosRouter } = await import("../routes/mesociclos.js");
+  const { catalogoRouter } = await import("../routes/catalogo.js");
 
   const app = express();
   app.use(cors({ origin: true, credentials: true }));
@@ -232,6 +233,7 @@ export async function createTestApp(db: TestDb) {
   app.use("/api/exercises", exercisesRouter);
   app.use("/api/trac", tracRouter);
   app.use("/api/mesociclos", mesociclosRouter);
+  app.use("/api", catalogoRouter);
 
   return app;
 }
