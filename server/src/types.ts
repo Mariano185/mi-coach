@@ -458,3 +458,28 @@ export interface AdherenciaResponse {
   por_largo_de_dia: AdherenciaPorLargo[];
   por_ejercicio: AdherenciaPorEjercicio[];
 }
+
+// === Coach (docs) ===
+// GET /coach/docs — la doc operativa del coach, servida desde el repo para que
+// no pueda desincronizarse del código que describe.
+export interface CoachDocsEndpoint {
+  metodo: string;
+  ruta: string;
+}
+
+export interface CoachDocsGenerado {
+  endpoints: CoachDocsEndpoint[];
+  analisis_bloques: string[];
+  version_deploy: string;
+}
+
+export interface CoachDocsSeccion {
+  id: string;
+  titulo: string;
+  markdown: string;
+}
+
+export interface CoachDocsResponse {
+  generado: CoachDocsGenerado;
+  secciones: CoachDocsSeccion[];
+}

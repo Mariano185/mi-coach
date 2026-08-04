@@ -1,23 +1,36 @@
 import { Router } from "express";
+import { readdirSync, readFileSync } from "node:fs";
+import { dirname, resolve, basename } from "node:path";
+import { fileURLToPath } from "node:url";
 import { db } from "../db.js";
 import type {
   AdherenciaPorEjercicio,
   AdherenciaPorLargo,
   AdherenciaPorPosicion,
+  CoachDocsEndpoint,
+  CoachDocsResponse,
+  CoachDocsSeccion,
 } from "../types.js";
 
 export const coachRouter = Router();
+
+// La lista de endpoints del coach solo la conoce index.ts (es el único lugar
+// que sabe con qué prefijo se montó cada router). Se inyecta una vez al
+// arrancar, después de montar todo — ver setEndpointsCoach() más abajo.
+let ENDPOINTS_COACH: CoachDocsEndpoint[] = [];
+export function setEndpointsCoach(endpoints: CoachDocsEndpoint[]): void {
+  ENDPOINTS_COACH = endpoints;
+}
 
 // "Se le sigue el e1RM": los movimientos de competencia. rastrea_e1rm reemplaza a
 // es_basico; COALESCE mantiene el comportamiento en una DB que todavía no corrió
 // el seed de la enciclopedia (rastrea_e1rm en NULL). Ver docs/adr/0001.
 const RASTREA_E1RM = "COALESCE(e.rastrea_e1rm, e.es_basico) = 1";
 
-// GET /api/coach/analisis — todo lo que el coach lee para programar la semana nueva,
-// en un solo JSON. El coach es caja negra: pega un curl acá, no toca SQL ni el archivo.
-//   ?dias=42  ventana de análisis (default 42 = ~6 semanas)
-coachRouter.get("/analisis", (req, res) => {
-  const dias = Number(req.query.dias) || 42;
+// Arma el objeto de /analisis. Extraído a función para que GET /docs pueda pedir
+// Object.keys() de una respuesta real como generado.analisis_bloques, en vez de
+// mantener la lista de bloques a mano en otro lugar (eso es lo que se desincroniza).
+function buildAnalisis(dias: number): Record<string, unknown> {
   const desde = `-${dias} days`;
 
   // 1) Mejor e1RM histórico por básico.
@@ -178,7 +191,7 @@ coachRouter.get("/analisis", (req, res) => {
     )
     .all();
 
-  res.json({
+  return {
     ventana_dias: dias,
     mejor_e1rm_basicos,
     progresion_basicos,
@@ -190,7 +203,15 @@ coachRouter.get("/analisis", (req, res) => {
     mesociclos,
     sesiones_realizadas,
     trac_reciente,
-  });
+  };
+}
+
+// GET /api/coach/analisis — todo lo que el coach lee para programar la semana nueva,
+// en un solo JSON. El coach es caja negra: pega un curl acá, no toca SQL ni el archivo.
+//   ?dias=42  ventana de análisis (default 42 = ~6 semanas)
+coachRouter.get("/analisis", (req, res) => {
+  const dias = Number(req.query.dias) || 42;
+  res.json(buildAnalisis(dias));
 });
 
 // GET /api/coach/adherencia — adherencia por posición en el día: ¿los ejercicios que van
@@ -286,4 +307,69 @@ coachRouter.get("/adherencia", (req, res) => {
     por_largo_de_dia,
     por_ejercicio,
   });
+});
+
+// GET /api/coach/docs — la doc operativa del coach, servida desde el repo para que
+// no pueda desincronizarse del código que describe (ver docs/adr y CLAUDE.md sobre
+// por qué el coach lee esto por HTTP en vez de tener una copia a mano en su propio
+// directorio). Dos capas en la respuesta:
+//   - generado: introspección de runtime (endpoints reales, claves reales de
+//     /analisis) — imposible que quede vieja porque no la escribe nadie a mano.
+//   - secciones: prosa (criterio, caveats, ejemplos) migrada de la doc del coach,
+//     leída de los .md en src/docs/ (dev) o dist/docs/ (prod, copiados en el build
+//     por scripts/copy-docs.mjs — tsc no copia .md).
+//   ?seccion=<id>  devuelve solo esa sección (404 si no existe)
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const DOCS_DIR = resolve(__dirname, "..", "docs");
+const VERSION_DEPLOY = new Date().toISOString(); // fecha de arranque del proceso
+
+let seccionesCache: CoachDocsSeccion[] | null = null;
+function leerSecciones(): CoachDocsSeccion[] {
+  if (seccionesCache) return seccionesCache;
+  let archivos: string[] = [];
+  try {
+    archivos = readdirSync(DOCS_DIR).filter((f) => f.endsWith(".md"));
+  } catch {
+    seccionesCache = [];
+    return seccionesCache;
+  }
+  seccionesCache = archivos
+    .sort()
+    .map((archivo) => {
+      const markdown = readFileSync(resolve(DOCS_DIR, archivo), "utf-8");
+      const primerHeading = markdown.match(/^#\s+(.+)$/m);
+      return {
+        id: basename(archivo, ".md"),
+        titulo: primerHeading ? primerHeading[1].trim() : basename(archivo, ".md"),
+        markdown,
+      };
+    });
+  return seccionesCache;
+}
+
+// Las claves de /analisis no dependen de los datos ni de `dias` (son literales
+// del objeto), así que alcanza con derivarlas una vez, sin pagar el costo de
+// las queries reales en cada request de /docs.
+let analisisBloquesCache: string[] | null = null;
+function getAnalisisBloques(): string[] {
+  if (!analisisBloquesCache) analisisBloquesCache = Object.keys(buildAnalisis(42));
+  return analisisBloquesCache;
+}
+
+coachRouter.get("/docs", (req, res) => {
+  const secciones = leerSecciones();
+  const seccionQuery = req.query.seccion as string | undefined;
+  const generado = {
+    endpoints: ENDPOINTS_COACH,
+    analisis_bloques: getAnalisisBloques(),
+    version_deploy: VERSION_DEPLOY,
+  };
+
+  if (seccionQuery !== undefined) {
+    const seccion = secciones.find((s) => s.id === seccionQuery);
+    if (!seccion) return res.status(404).json({ error: `sección "${seccionQuery}" no encontrada` });
+    return res.json({ generado, secciones: [seccion] } satisfies CoachDocsResponse);
+  }
+
+  res.json({ generado, secciones } satisfies CoachDocsResponse);
 });

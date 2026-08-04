@@ -202,13 +202,27 @@ export function createTestDb() {
 
 export type TestDb = ReturnType<typeof createTestDb>;
 
+// Mismo cálculo que server/src/index.ts: método+ruta reales de un router,
+// leídos de su .stack (no es API pública de Express, de ahí el `any`).
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function rutasDelRouter(prefijo: string, router: any): Array<{ metodo: string; ruta: string }> {
+  const rutas: Array<{ metodo: string; ruta: string }> = [];
+  for (const capa of router.stack ?? []) {
+    if (!capa.route) continue;
+    const ruta = prefijo + capa.route.path;
+    const metodos = Object.keys(capa.route.methods).filter((m) => capa.route.methods[m]);
+    for (const metodo of metodos) rutas.push({ metodo: metodo.toUpperCase(), ruta });
+  }
+  return rutas;
+}
+
 // Monta la app Express con la DB inyectada. Llama a esto DESPUÉS de vi.mock("../db.js").
 export async function createTestApp(db: TestDb) {
   // Importar los routers después de que vi.mock haya reemplazado db.
   const { programRouter } = await import("../routes/program.js");
   const { historyRouter } = await import("../routes/history.js");
   const { statsRouter } = await import("../routes/stats.js");
-  const { coachRouter } = await import("../routes/coach.js");
+  const { coachRouter, setEndpointsCoach } = await import("../routes/coach.js");
   const { exercisesRouter } = await import("../routes/exercises.js");
   const { tracRouter } = await import("../routes/trac.js");
   const { mesociclosRouter } = await import("../routes/mesociclos.js");
@@ -235,6 +249,18 @@ export async function createTestApp(db: TestDb) {
   app.use("/api/trac", tracRouter);
   app.use("/api/mesociclos", mesociclosRouter);
   app.use("/api", catalogoRouter);
+
+  // Igual que index.ts: se inyecta después de montar todo, para que GET
+  // /api/coach/docs devuelva rutas reales también en tests.
+  setEndpointsCoach(
+    [
+      ...rutasDelRouter("/api/exercises", exercisesRouter),
+      ...rutasDelRouter("/api/program", programRouter),
+      ...rutasDelRouter("/api/mesociclos", mesociclosRouter),
+      ...rutasDelRouter("/api/coach", coachRouter),
+      ...rutasDelRouter("/api", catalogoRouter),
+    ].sort((a, b) => a.ruta.localeCompare(b.ruta) || a.metodo.localeCompare(b.metodo))
+  );
 
   return app;
 }

@@ -108,6 +108,22 @@ no te interrumpe si estás a mitad de cargar una serie.
 
 El coach es una caja negra que solo habla HTTP. El ciclo típico:
 
+0. **Leer la doc operativa** (una sola vez al arrancar, o cuando algo no cuadre):
+
+   ```bash
+   curl -s http://<host>:3001/api/coach/docs \
+     -H "X-Coach-Key: $COACH_API_KEY"
+   ```
+
+   Devuelve la doc completa del flujo del coach: cómo leer datos, prescribir la semana,
+   modificar sin recrear, el diccionario de campos de la enciclopedia de ejercicios, y los
+   caveats de `/analisis`/`/adherencia`. **Esta es la fuente de verdad — no una copia** — porque
+   se sirve desde el propio repo (`server/src/docs/*.md`) y se deploya con el código. La
+   respuesta trae dos capas: `generado` (endpoints reales y claves reales de `/analisis`,
+   leídos por introspección — imposible que queden desactualizados) y `secciones` (la prosa,
+   `?seccion=<id>` para pedir una sola). El resto de este documento (`README.md`) es la
+   referencia para quien desarrolla la app; el coach usa `/coach/docs`, no este archivo.
+
 1. **Leer el estado del atleta:**
 
    ```bash
@@ -221,3 +237,4 @@ Todas las rutas (salvo las públicas) requieren cookie de sesión o header `X-Co
 | PATCH | `/api/program/sets/:id/target` | corregir la prescripción de una serie |
 | GET | `/api/coach/analisis?dias=42` | análisis agregado para el coach |
 | GET | `/api/coach/adherencia?dias=90` | adherencia por posición en el día |
+| GET | `/api/coach/docs?seccion=` | doc operativa del coach (fuente de verdad, se deploya con el código) |

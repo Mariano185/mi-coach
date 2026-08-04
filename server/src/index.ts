@@ -12,7 +12,7 @@ import { programRouter } from "./routes/program.js";
 import { historyRouter } from "./routes/history.js";
 import { mesociclosRouter } from "./routes/mesociclos.js";
 import { statsRouter } from "./routes/stats.js";
-import { coachRouter } from "./routes/coach.js";
+import { coachRouter, setEndpointsCoach } from "./routes/coach.js";
 import { tracRouter } from "./routes/trac.js";
 import { catalogoRouter } from "./routes/catalogo.js";
 
@@ -44,6 +44,35 @@ app.use("/api/stats", statsRouter);
 app.use("/api/coach", coachRouter);
 app.use("/api/trac", tracRouter);
 app.use("/api", catalogoRouter);
+
+// Introspección de rutas para GET /api/coach/docs: recorre el router.stack real
+// de cada router (`.stack` no es API pública de Express 4, de ahí el `any`
+// acotado) para listar sus métodos+paths reales — si alguien agrega un
+// endpoint a coach.ts o program.ts, aparece acá solo, sin tocar este archivo.
+// El prefijo de cada router SÍ se declara a mano, una vez, junto al app.use
+// que ya lo declara — no hay forma de leerlo de Express de forma confiable
+// entre versiones, y este es el único lugar del proyecto que lo sabe.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function rutasDelRouter(prefijo: string, router: any): Array<{ metodo: string; ruta: string }> {
+  const rutas: Array<{ metodo: string; ruta: string }> = [];
+  for (const capa of router.stack ?? []) {
+    if (!capa.route) continue;
+    const ruta = prefijo + capa.route.path;
+    const metodos = Object.keys(capa.route.methods).filter((m) => capa.route.methods[m]);
+    for (const metodo of metodos) rutas.push({ metodo: metodo.toUpperCase(), ruta });
+  }
+  return rutas;
+}
+
+setEndpointsCoach(
+  [
+    ...rutasDelRouter("/api/exercises", exercisesRouter),
+    ...rutasDelRouter("/api/program", programRouter),
+    ...rutasDelRouter("/api/mesociclos", mesociclosRouter),
+    ...rutasDelRouter("/api/coach", coachRouter),
+    ...rutasDelRouter("/api", catalogoRouter),
+  ].sort((a, b) => a.ruta.localeCompare(b.ruta) || a.metodo.localeCompare(b.metodo))
+);
 
 // En producción, servir el frontend buildeado (client/dist) desde el mismo proceso.
 // Así no hace falta vite ni nginx: un solo server en :3001 sirve API + SPA.
