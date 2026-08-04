@@ -97,6 +97,20 @@ export const PATRONES: SeedPatron[] = [
       "Aislamiento de isquiotibiales. La flexión de cadera (sentado vs tumbado) cambia la longitud de las porciones biarticulares.",
   },
   {
+    slug: "abduccion-cadera",
+    nombre: "Abducción de cadera",
+    plano: "frontal",
+    descripcion:
+      "Aislamiento de glúteo medio y menor separando el fémur de la línea media. Único patrón que los carga como agonistas: en sentadillas, zancadas y bisagras solo estabilizan. La flexión de cadera (sentado vs de pie) desplaza el énfasis entre fibras posteriores y anteriores.",
+  },
+  {
+    slug: "aduccion-cadera",
+    nombre: "Aducción de cadera",
+    plano: "frontal",
+    descripcion:
+      "Aislamiento del grupo aductor acercando el fémur a la línea media. Complemento del patrón de abducción: los aductores contribuyen a la extensión de cadera en sentadilla pero nunca son agonistas en el plano frontal.",
+  },
+  {
     slug: "abduccion-hombro",
     nombre: "Abducción de hombro",
     plano: "frontal",
