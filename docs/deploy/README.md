@@ -45,7 +45,7 @@ Si arrancás de cero, salteá este paso: el server crea y seedea `coach.db` solo
 ## 4. systemd
 
 ```bash
-cp /opt/mi-coach/deploy/mi-coach.service /etc/systemd/system/
+cp /opt/mi-coach/docs/deploy/mi-coach.service /etc/systemd/system/
 # Editá el service antes de arrancar: como mínimo AUTH_PASSWORD (password del login).
 systemctl daemon-reload
 systemctl enable --now mi-coach
