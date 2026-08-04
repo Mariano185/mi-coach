@@ -428,3 +428,33 @@ export interface HistoryDayDetail extends HistoryDay {
     e1rm: number | null;
   }>;
 }
+
+// === Coach (adherencia) ===
+export interface AdherenciaPorPosicion {
+  posicion: number;
+  dias: number;
+  series_programadas: number;
+  series_completadas: number;
+  pct: number;
+}
+
+export interface AdherenciaPorLargo extends AdherenciaPorPosicion {
+  n_ejercicios_dia: number;
+}
+
+export interface AdherenciaPorEjercicio {
+  nombre: string;
+  dias: number;
+  posicion_prom: number;
+  series_programadas: number;
+  series_completadas: number;
+  pct: number;
+}
+
+export interface AdherenciaResponse {
+  ventana_dias: number;
+  dias_analizados: number;
+  por_posicion: AdherenciaPorPosicion[];
+  por_largo_de_dia: AdherenciaPorLargo[];
+  por_ejercicio: AdherenciaPorEjercicio[];
+}

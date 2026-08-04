@@ -1,5 +1,10 @@
 import { Router } from "express";
 import { db } from "../db.js";
+import type {
+  AdherenciaPorEjercicio,
+  AdherenciaPorLargo,
+  AdherenciaPorPosicion,
+} from "../types.js";
 
 export const coachRouter = Router();
 
@@ -185,5 +190,100 @@ coachRouter.get("/analisis", (req, res) => {
     mesociclos,
     sesiones_realizadas,
     trac_reciente,
+  });
+});
+
+// GET /api/coach/adherencia — adherencia por posición en el día: ¿los ejercicios que van
+// más tarde en el orden del día se completan menos, sin importar cuál sean? (pedido del
+// coach: "si los ejercicios 5-6 se caen sistemáticamente, el problema es que estoy
+// programando días demasiado largos").
+//
+// Solo entran días con fecha (efectivamente entrenados) — un día programado y nunca
+// empezado hundiría el pct de TODAS las posiciones por igual sin decir nada sobre el
+// efecto-posición; ese caso lo cubre `dias_programados` (endpoint aparte, pendiente).
+// La posición es un rank denso (ROW_NUMBER), no `pe.orden` crudo: hay datos viejos con
+// varios ejercicios en orden=0 (el DEFAULT antes del endpoint de reorder).
+//   ?dias=90  ventana de análisis (default 90: varias semanas para que el patrón signifique algo)
+coachRouter.get("/adherencia", (req, res) => {
+  const dias = Number(req.query.dias) || 90;
+  const desde = `-${dias} days`;
+
+  const CTE = `
+    WITH ejercicios_posicionados AS (
+      SELECT
+        pe.id     AS pe_id,
+        pe.day_id AS day_id,
+        COALESCE(e.nombre, pe.nombre_libre) AS nombre,
+        ROW_NUMBER() OVER (PARTITION BY pe.day_id ORDER BY pe.orden, pe.id) AS posicion,
+        COUNT(*)   OVER (PARTITION BY pe.day_id) AS n_ejercicios_dia
+      FROM program_exercises pe
+      JOIN program_days pd  ON pd.id = pe.day_id
+      LEFT JOIN exercises e ON e.id = pe.exercise_id
+      WHERE pd.fecha IS NOT NULL
+        AND pd.fecha >= date('now', ?)
+        AND EXISTS (SELECT 1 FROM program_sets ps WHERE ps.program_exercise_id = pe.id)
+    ),
+    series AS (
+      SELECT ep.pe_id, ep.day_id, ep.nombre, ep.posicion, ep.n_ejercicios_dia,
+             COUNT(*)                                      AS programadas,
+             SUM(CASE WHEN ps.hecha = 1 THEN 1 ELSE 0 END) AS completadas
+      FROM ejercicios_posicionados ep
+      JOIN program_sets ps ON ps.program_exercise_id = ep.pe_id
+      GROUP BY ep.pe_id
+    )`;
+
+  const por_posicion = db
+    .prepare(
+      `${CTE}
+       SELECT posicion,
+              COUNT(DISTINCT day_id)  AS dias,
+              SUM(programadas)        AS series_programadas,
+              SUM(completadas)        AS series_completadas,
+              ROUND(100.0 * SUM(completadas) / SUM(programadas), 1) AS pct
+       FROM series GROUP BY posicion ORDER BY posicion`
+    )
+    .all(desde) as AdherenciaPorPosicion[];
+
+  const por_largo_de_dia = db
+    .prepare(
+      `${CTE}
+       SELECT n_ejercicios_dia, posicion,
+              COUNT(DISTINCT day_id)  AS dias,
+              SUM(programadas)        AS series_programadas,
+              SUM(completadas)        AS series_completadas,
+              ROUND(100.0 * SUM(completadas) / SUM(programadas), 1) AS pct
+       FROM series GROUP BY n_ejercicios_dia, posicion ORDER BY n_ejercicios_dia, posicion`
+    )
+    .all(desde) as AdherenciaPorLargo[];
+
+  const por_ejercicio = db
+    .prepare(
+      `${CTE}
+       SELECT nombre,
+              COUNT(DISTINCT day_id)       AS dias,
+              ROUND(AVG(posicion), 1)      AS posicion_prom,
+              SUM(programadas)             AS series_programadas,
+              SUM(completadas)             AS series_completadas,
+              ROUND(100.0 * SUM(completadas) / SUM(programadas), 1) AS pct
+       FROM series
+       GROUP BY nombre
+       HAVING SUM(programadas) >= 3
+       ORDER BY pct ASC`
+    )
+    .all(desde) as AdherenciaPorEjercicio[];
+
+  const dias_analizados = db
+    .prepare(
+      `${CTE}
+       SELECT COUNT(DISTINCT day_id) AS n FROM series`
+    )
+    .get(desde) as { n: number };
+
+  res.json({
+    ventana_dias: dias,
+    dias_analizados: dias_analizados.n,
+    por_posicion,
+    por_largo_de_dia,
+    por_ejercicio,
   });
 });
