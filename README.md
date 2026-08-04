@@ -55,7 +55,7 @@ Variables de entorno útiles:
 
 Corre en cualquier lado donde corra Node: **tu PC, un homelab (Proxmox, Raspberry Pi…) o un VPS**. Un solo proceso Express sirve todo — no hace falta nginx ni Docker.
 
-Guía completa (systemd, datos persistentes, backups, acceso remoto con Tailscale): [`deploy/README.md`](deploy/README.md).
+Guía completa (systemd, datos persistentes, backups, acceso remoto con Tailscale): [`docs/deploy/README.md`](docs/deploy/README.md).
 
 ## Modo offline (PWA)
 
@@ -179,7 +179,7 @@ mi-coach/
 │   ├── pages/              Dashboard · History · Bodyweight · Programs · Trac · Login
 │   └── pages/program/      WeekView · DayView · ExerciseView
 ├── client/public/          favicon, íconos PWA, manifest
-└── deploy/                 systemd service + guía de deploy + Tailscale opcional
+└── docs/deploy/            systemd service + guía de deploy + Tailscale opcional
 ```
 
 ## Modelo de datos

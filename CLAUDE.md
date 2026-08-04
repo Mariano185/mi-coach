@@ -34,9 +34,9 @@ mi-coach/
 │                 pages/program/{WeekView,DayView,ExerciseView}.tsx
 │                 components/{BottomNav,Toast,TrendChart,CoachNotes,icons}.tsx
 │                 constants/trac.ts
-├── deploy/       mi-coach.service · README.md (deploy genérico) · TAILSCALE.md (acceso remoto)
+├── docs/deploy/  mi-coach.service · README.md (deploy genérico) · TAILSCALE.md (acceso remoto)
 ├── docs/agents/  issue tracker, triage labels, domain docs (meta-docs para skills)
-└── memory/       notas históricas de proyecto para el agente
+└── .claude/memory/ notas históricas de proyecto para el agente
 ```
 
 ## Correr local (dev)
@@ -133,8 +133,8 @@ firmada con HMAC (secret en `settings["auth_session_secret"]`), 30 días.
 
 ## Deploy
 
-Genérico (Linux + systemd, cualquier PC/homelab/VPS): `deploy/README.md`. Acceso remoto
-opcional con Tailscale Funnel: `deploy/TAILSCALE.md`. `coach.db` vive fuera del repo
+Genérico (Linux + systemd, cualquier PC/homelab/VPS): `docs/deploy/README.md`. Acceso remoto
+opcional con Tailscale Funnel: `docs/deploy/TAILSCALE.md`. `coach.db` vive fuera del repo
 (`COACH_DB_PATH`) → `git pull` + `npm run build` + restart no tocan los datos.
 
 ---
