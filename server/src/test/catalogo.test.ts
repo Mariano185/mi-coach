@@ -2,6 +2,8 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import request from "supertest";
 import { createTestDb, createTestApp, type TestDb } from "./setup.js";
 import { seedEnciclopedia } from "../seed/index.js";
+import { MUSCULOS } from "../seed/musculos.js";
+import { PATRONES } from "../seed/patrones.js";
 
 const db: TestDb = createTestDb();
 
@@ -26,10 +28,10 @@ describe("GET /api/musculos", () => {
     app = await createTestApp(db);
   });
 
-  it("devuelve los 48 músculos del catálogo con n_ejercicios", async () => {
+  it("devuelve todos los músculos del catálogo con n_ejercicios", async () => {
     const res = await request(app).get("/api/musculos").set(AUTH);
     expect(res.status).toBe(200);
-    expect(res.body).toHaveLength(48);
+    expect(res.body).toHaveLength(MUSCULOS.length);
     expect(res.body[0]).toHaveProperty("n_ejercicios");
     expect(res.body[0].n_ejercicios).toBeTypeOf("number");
   });
@@ -68,10 +70,10 @@ describe("GET /api/patrones", () => {
     app = await createTestApp(db);
   });
 
-  it("devuelve los 20 patrones con descripcion y n_ejercicios", async () => {
+  it("devuelve todos los patrones con descripcion y n_ejercicios", async () => {
     const res = await request(app).get("/api/patrones").set(AUTH);
     expect(res.status).toBe(200);
-    expect(res.body).toHaveLength(20);
+    expect(res.body).toHaveLength(PATRONES.length);
     expect(res.body[0].descripcion).not.toBeNull();
     expect(res.body[0].n_ejercicios).toBeTypeOf("number");
   });
