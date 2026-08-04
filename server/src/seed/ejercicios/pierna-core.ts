@@ -1189,6 +1189,132 @@ export const PIERNA_CORE: SeedEjercicio[] = [
       ["gastrocnemio", "S", 0.25],
     ],
   },
+  {
+    nombre: "Elevación de pantorrilla en prensa",
+    categoria: "Piernas",
+    patron: "flexion-plantar",
+    padre: "Elevaciones de pantorrilla en Smith",
+    tipo_variante: "implemento",
+    transferencia: 0.9,
+    proposito:
+      "Misma flexión plantar con rodilla extendida pero sin carga axial ni necesidad de equilibrio: se puede cargar más y llevar la serie al fallo sin que la estabilidad de pie sea el limitante.",
+    implemento: "maquina",
+    postura: "tumbado (rodilla extendida)",
+    mecanica: "aislamiento",
+    fuerza: "empuje",
+    sesgo_longitud: "alargado",
+    perfil_resistencia: "descendente",
+    costo_fatiga: 1,
+    demanda_estabilidad: 1,
+    demanda_tecnica: 1,
+    notas_tecnicas:
+      "Rodilla extendida, así que el gastrocnemio sigue siendo el motor como en la versión de pie. La ventaja está en poder usar el ROM completo con carga alta sin comprometer la columna.",
+    cues: "Antepié en el borde de la plataforma; bajá hasta el estiramiento completo antes de empujar.",
+    musculos: [
+      ["gastrocnemio", "A", 1.0],
+      ["soleo", "S", 0.5],
+    ],
+  },
+  {
+    nombre: "Elevación de sóleo sentado con mancuerna",
+    categoria: "Piernas",
+    patron: "flexion-plantar",
+    padre: "Elevación de pantorrilla sentado",
+    tipo_variante: "implemento",
+    transferencia: 0.85,
+    proposito:
+      "Sóleo sin depender de la máquina: mancuernas apoyadas sobre las rodillas. Alternativa cuando la máquina está ocupada o para agregar series al final.",
+    implemento: "mancuerna",
+    postura: "sentado (rodilla flexionada)",
+    mecanica: "aislamiento",
+    fuerza: "empuje",
+    sesgo_longitud: "medio",
+    perfil_resistencia: "descendente",
+    costo_fatiga: 1,
+    demanda_estabilidad: 1,
+    demanda_tecnica: 1,
+    notas_tecnicas:
+      "Rodilla flexionada, igual que la versión en máquina: el gastrocnemio queda acortado y la carga la lleva el sóleo. La carga útil está limitada por lo que se pueda apoyar cómodamente sobre el muslo.",
+    cues: "Apoyá el antepié en un disco para ganar rango por debajo de la horizontal.",
+    musculos: [
+      ["soleo", "A", 1.0],
+      ["gastrocnemio", "S", 0.25],
+    ],
+  },
+
+  // ======================= ADUCTORES =======================
+  // El catálogo no tenía ningún ejercicio con los aductores como agonistas:
+  // solo aparecían como sinergistas en sentadilla y sumo. Krommes et al. 2017
+  // muestra que la aducción resistida alcanza intensidades de entrenamiento de
+  // fuerza (84-118% nEMG en adductor longus), no es solo trabajo preventivo.
+  {
+    nombre: "Aducción de cadera en máquina",
+    categoria: "Piernas",
+    patron: "aduccion-cadera",
+    implemento: "maquina",
+    postura: "sentado",
+    mecanica: "aislamiento",
+    fuerza: "traccion",
+    sesgo_longitud: "alargado",
+    perfil_resistencia: "constante",
+    costo_fatiga: 1,
+    demanda_estabilidad: 1,
+    demanda_tecnica: 1,
+    notas_tecnicas:
+      "Primer ejercicio del catálogo con los aductores como agonistas. Arranca desde abducción, así que el grupo trabaja desde posición alargada: relevante porque los aductores contribuyen a la extensión de cadera en sentadilla y sumo, donde nunca son el limitante.",
+    cues: "Rango completo: dejá que las piernas se abran hasta sentir estiramiento antes de cerrar, sin rebote.",
+    musculos: [
+      ["aductores", "A", 1.0],
+      ["gluteo-mayor", "S", 0.25],
+    ],
+  },
+  {
+    nombre: "Aducción de cadera en polea de pie",
+    categoria: "Piernas",
+    patron: "aduccion-cadera",
+    implemento: "polea",
+    unilateral: true,
+    mecanica: "aislamiento",
+    fuerza: "traccion",
+    sesgo_longitud: "alargado",
+    perfil_resistencia: "constante",
+    costo_fatiga: 1,
+    demanda_estabilidad: 3,
+    demanda_tecnica: 2,
+    notas_tecnicas:
+      "Versión unilateral y de pie de la aducción: permite igualar entre lados y, al estar en apoyo monopodal, la pierna de soporte trabaja estabilizando la pelvis.",
+    cues: "Torso quieto: si te inclinás hacia el lado de la polea, estás usando el tronco en vez de los aductores.",
+    musculos: [
+      ["aductores", "A", 1.0],
+      ["gluteo-medio", "E", 0],
+      ["cuadrado-lumbar", "E", 0],
+    ],
+  },
+  {
+    nombre: "Copenhagen Adduction",
+    categoria: "Piernas",
+    patron: "aduccion-cadera",
+    implemento: "peso_corporal",
+    unilateral: true,
+    mecanica: "aislamiento",
+    fuerza: "traccion",
+    sesgo_longitud: "alargado",
+    perfil_resistencia: "ascendente",
+    cadena: "cerrada",
+    costo_fatiga: 2,
+    demanda_estabilidad: 4,
+    demanda_tecnica: 3,
+    notas_tecnicas:
+      "Aducción isométrica y excéntrica sosteniendo el cuerpo con la pierna de arriba apoyada en un banco. Krommes et al. 2017 midió intensidades por encima del 80% nEMG en adductor longus en ejercicios de aducción de este tipo, suficiente para considerarse entrenamiento de fuerza. Muy exigente: progresar desde la versión con rodilla apoyada.",
+    contraindicaciones: "Alta tensión sobre la inserción del aductor; no empezar por la versión completa ni usar con molestia inguinal activa.",
+    cues: "Cuerpo en línea recta de hombros a tobillos; bajá controlado y subí sin dejar caer la cadera.",
+    musculos: [
+      ["aductores", "A", 1.0],
+      ["oblicuo-externo", "S", 0.25],
+      ["gluteo-medio", "E", 0],
+      ["recto-abdominal", "E", 0],
+    ],
+  },
 
   // ======================= CORE =======================
   {
