@@ -60,6 +60,9 @@ export const MUSCULOS: SeedMusculo[] = [
   { slug: "triceps-lateral", nombre: "Tríceps braquial (cabeza lateral)", nombre_en: "Triceps brachii (lateral head)", grupo: "brazo", region: "cabeza lateral", biarticular: 0 },
   { slug: "triceps-medial", nombre: "Tríceps braquial (cabeza medial)", nombre_en: "Triceps brachii (medial head)", grupo: "brazo", region: "cabeza medial", biarticular: 0 },
   { slug: "antebrazo-flexores", nombre: "Flexores del antebrazo (agarre)", nombre_en: "Forearm flexors (grip)", grupo: "brazo", region: null, biarticular: 0 },
+  // Antagonistas de los flexores. Nunca participan del agarre, así que no aparecen
+  // como estabilizadores en tirones: solo se cargan con extensión de muñeca directa.
+  { slug: "antebrazo-extensores", nombre: "Extensores del antebrazo", nombre_en: "Forearm extensors", grupo: "brazo", region: null, biarticular: 0 },
 
   // ---------- PIERNA ----------
   // El recto femoral cruza cadera y rodilla: en sentadilla está en desventaja

@@ -151,6 +151,13 @@ export const PATRONES: SeedPatron[] = [
       "Aislamiento de pantorrilla. La flexión de rodilla determina si domina el gastrocnemio (rodilla extendida) o el sóleo (rodilla flexionada).",
   },
   {
+    slug: "flexion-extension-muneca",
+    nombre: "Flexión / extensión de muñeca",
+    plano: "sagital",
+    descripcion:
+      "Aislamiento del antebrazo. Los flexores ya trabajan como estabilizadores en todo tirón cargado; los extensores, en cambio, solo se cargan con extensión de muñeca directa.",
+  },
+  {
     slug: "elevacion-escapular",
     nombre: "Elevación escapular",
     plano: "frontal",
