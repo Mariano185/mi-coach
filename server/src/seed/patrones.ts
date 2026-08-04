@@ -172,6 +172,13 @@ export const PATRONES: SeedPatron[] = [
     descripcion: "El core resiste un momento rotacional externo. Oblicuos y transverso.",
   },
   {
+    slug: "anti-flexion-lateral",
+    nombre: "Anti-flexión lateral (core)",
+    plano: "frontal",
+    descripcion:
+      "El core resiste la inclinación lateral del tronco ante una carga asimétrica. Cuadrado lumbar y oblicuos del lado contrario a la carga. Es el tercer plano del core: completa a anti-extensión (sagital) y anti-rotación (transversal).",
+  },
+  {
     slug: "flexion-tronco",
     nombre: "Flexión de tronco (core)",
     plano: "sagital",

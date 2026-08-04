@@ -1419,6 +1419,53 @@ export const PIERNA_CORE: SeedEjercicio[] = [
       ["gluteo-mayor", "E", 0],
     ],
   },
+  {
+    nombre: "Crunch inverso en banco declinado",
+    categoria: "Core",
+    patron: "flexion-tronco",
+    implemento: "peso_corporal",
+    postura: "tumbado en banco declinado",
+    mecanica: "aislamiento",
+    fuerza: "traccion",
+    sesgo_longitud: "alargado",
+    perfil_resistencia: "campana",
+    costo_fatiga: 1,
+    demanda_estabilidad: 1,
+    demanda_tecnica: 2,
+    notas_tecnicas:
+      "Flexión de tronco moviendo la pelvis hacia las costillas en vez de al revés. El banco declinado agrega resistencia en la porción inicial del recorrido. Si no hay retroversión pélvica al final, el trabajo se lo lleva el psoas y no el recto abdominal.",
+    cues: "Enrollá la pelvis hacia arriba; el movimiento termina cuando la cadera despega, no cuando las rodillas llegan al pecho.",
+    musculos: [
+      ["recto-abdominal", "A", 1.0],
+      ["oblicuo-externo", "S", 0.5],
+      ["psoas", "S", 0.25],
+    ],
+  },
+  {
+    nombre: "Suitcase carry",
+    categoria: "Core",
+    patron: "anti-flexion-lateral",
+    implemento: "mancuerna",
+    unilateral: true,
+    mecanica: "compuesto",
+    fuerza: "estatico",
+    sesgo_longitud: "medio",
+    perfil_resistencia: "constante",
+    costo_fatiga: 2,
+    demanda_estabilidad: 4,
+    demanda_tecnica: 2,
+    notas_tecnicas:
+      "Caminar con una carga en una sola mano: el core resiste la inclinación lateral. Es el único ejercicio del catálogo en el plano frontal para el core, que hasta ahora solo tenía anti-extensión (sagital) y anti-rotación (transversal). Suma trabajo de agarre bajo carga sostenida.",
+    cues: "Hombros y cadera nivelados; no te inclines hacia el lado libre para compensar.",
+    musculos: [
+      ["cuadrado-lumbar", "A", 1.0],
+      ["oblicuo-externo", "A", 1.0],
+      ["oblicuo-interno", "S", 0.5],
+      ["transverso", "S", 0.5],
+      ["antebrazo-flexores", "S", 0.5],
+      ["trapecio-superior", "E", 0],
+    ],
+  },
 
   // === Glúteo: abducción de cadera y extensión sin carga axial ===
   // El catálogo tenía glúteo medio y menor SOLO como estabilizadores: no había
