@@ -117,6 +117,8 @@ El coach es una caja negra que solo habla HTTP. El ciclo típico:
 
    Devuelve en un JSON: mejor e1RM por básico, progresión y RPE en la ventana (`?dias=42` por default), tendencia de peso corporal, volumen por categoría, sesiones realizadas (frecuencia/duración, con `notas_coach` y `notas_atleta` por separado), bienestar reciente (Trac), la library de ejercicios y los mesociclos con su última semana.
 
+   **Adherencia por posición en el día** (`GET /api/coach/adherencia?dias=90`, endpoint aparte): responde si los ejercicios que van más tarde en el orden del día se completan menos, sin importar cuál sea. Devuelve tres agregaciones sobre la misma base — `por_posicion` (pct de series completadas por posición 1, 2, 3...), `por_largo_de_dia` (lo mismo cruzado con la cantidad de ejercicios del día, para separar "es la posición" de "son los días largos los que fallan") y `por_ejercicio` (pct por nombre de ejercicio, con su posición promedio, para el efecto opuesto: un ejercicio puntual que se cae siempre). Cada fila trae `dias` (cuántos días distintos la sostienen) para no sacar conclusiones de una sola muestra. Solo entran días efectivamente entrenados (`fecha` no nula) — un día programado y nunca empezado no es una señal sobre el orden de ejercicios, es otra pregunta (adherencia global).
+
 2. **Prescribir la semana siguiente:**
 
    ```bash
@@ -216,3 +218,4 @@ Todas las rutas (salvo las públicas) requieren cookie de sesión o header `X-Co
 | PATCH | `/api/program/sets/:id` | completar serie real (autosetea fecha/hora del día) |
 | PATCH | `/api/program/sets/:id/target` | corregir la prescripción de una serie |
 | GET | `/api/coach/analisis?dias=42` | análisis agregado para el coach |
+| GET | `/api/coach/adherencia?dias=90` | adherencia por posición en el día |
