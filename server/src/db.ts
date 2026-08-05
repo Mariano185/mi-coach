@@ -272,26 +272,50 @@ function migrate(): void {
   // coach.ts, que agrupaba por implemento/región mezclados — ver ADR). Una serie de
   // remo no es "una serie de espalda": aporta 1.0 a dorsal ancho y 0.5 a bíceps.
   // Devuelve 0 filas hasta que ejercicio_musculos esté poblada (fase 2).
+  //
+  // Distingue programado de completado (issue #7): cada fila de program_sets existe
+  // porque fue prescrita, así que contarlas todas = programado, y filtrar hecha=1 =
+  // completado. Agrupa por semana de PROGRAMA (pw.id), no por semana ISO: las semanas
+  // duran 8-9 días corridos, no 7, así que la ISO mezcla dos semanas de programa
+  // distintas la mayoría de las veces. pw.id (no semana_programa) porque la numeración
+  // se reinicia por mesociclo (UNIQUE(mesociclo_id, semana)) — agrupar por el número
+  // colapsaría la semana 1 de un mesociclo con la semana 1 de otro.
   db.exec("DROP VIEW IF EXISTS v_volumen_por_musculo");
   db.exec(`
     CREATE VIEW v_volumen_por_musculo AS
       SELECT
-        strftime('%Y-%W', pd.fecha) AS semana,
-        m.id AS musculo_id,
-        m.nombre AS musculo,
-        m.grupo,
-        ROUND(SUM(em.fraccion_volumen), 2) AS series
+        -- La ISO es atributo de la SEMANA, no del grupo (semana, músculo): con MIN()
+        -- sobre el grupo, un músculo que solo aparece en los días sin fecha de una
+        -- semana ya entrenada daría ISO NULL mientras el resto de esa misma semana da
+        -- '2026-24' — dos ISO para la misma semana de programa. NULL acá significa
+        -- "semana entera sin entrenar todavía".
+        (SELECT MIN(strftime('%Y-%W', pd2.fecha))
+           FROM program_days pd2
+          WHERE pd2.week_id = pw.id AND pd2.fecha IS NOT NULL) AS semana,
+        pw.semana        AS semana_programa,
+        pw.mesociclo_id  AS mesociclo_id,
+        pw.id            AS week_id,
+        pw.fecha_creada  AS semana_creada,
+        m.id             AS musculo_id,
+        m.nombre         AS musculo,
+        m.grupo          AS grupo,
+        ROUND(SUM(em.fraccion_volumen), 2) AS series_programadas,
+        ROUND(SUM(CASE WHEN ps.hecha = 1 THEN em.fraccion_volumen ELSE 0 END), 2) AS series_completadas
       FROM program_sets ps
-      JOIN program_exercises pe ON pe.id = ps.program_exercise_id
-      JOIN program_days pd ON pd.id = pe.day_id
+      JOIN program_exercises pe  ON pe.id = ps.program_exercise_id
+      JOIN program_days pd       ON pd.id = pe.day_id
+      JOIN program_weeks pw      ON pw.id = pd.week_id
       JOIN ejercicio_musculos em ON em.exercise_id = pe.exercise_id
-      JOIN musculos m ON m.id = em.musculo_id
-      WHERE ps.hecha = 1 AND pd.fecha IS NOT NULL
-        -- Los estabilizadores tienen fraccion_volumen = 0: sin este filtro
-        -- aparecerían como filas en 0 inflando el payload del coach sin aportar.
-        AND em.fraccion_volumen > 0
-      GROUP BY semana, m.id
-      ORDER BY semana, m.grupo, m.nombre;
+      JOIN musculos m            ON m.id = em.musculo_id
+      -- Sin filtro por pd.fecha: un día programado y nunca entrenado es justo lo que
+      -- hay que mostrar (mismo criterio que dias_programados en coach.ts).
+      -- Los estabilizadores tienen fraccion_volumen = 0: sin este filtro
+      -- aparecerían como filas en 0 inflando el payload del coach sin aportar.
+      WHERE em.fraccion_volumen > 0
+      GROUP BY pw.id, m.id
+      -- Por semana_creada (NOT NULL) y no por la ISO: en SQLite NULL ordena primero
+      -- en ASC, así que una semana programada-no-entrenada saldría arriba de todo.
+      ORDER BY semana_creada, week_id, m.grupo, m.nombre;
   `);
 }
 

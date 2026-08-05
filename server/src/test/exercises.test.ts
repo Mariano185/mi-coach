@@ -130,7 +130,7 @@ describe("integridad del schema de la enciclopedia", () => {
     ).toThrow();
   });
 
-  it("v_volumen_por_musculo suma fraccion_volumen por músculo y semana", () => {
+  it("v_volumen_por_musculo suma fraccion_volumen por músculo y semana de programa", () => {
     db.exec("DELETE FROM program_weeks; DELETE FROM ejercicio_musculos; DELETE FROM musculos;");
     const benchId = (db.prepare("SELECT id FROM exercises WHERE nombre = 'Flat Bench Press (barra)'").get() as { id: number }).id;
 
@@ -153,20 +153,168 @@ describe("integridad del schema de la enciclopedia", () => {
     const peId = db
       .prepare("INSERT INTO program_exercises (day_id, exercise_id, seccion, orden) VALUES (?, ?, 'main', 0)")
       .run(dayId, benchId).lastInsertRowid as number;
-    // 4 series hechas -> dorsal aporta 4*1.0=4.0, bíceps 4*0.5=2.0
+    // 4 series hechas -> dorsal aporta 4*1.0=4.0, bíceps 4*0.5=2.0. Todas hechas,
+    // así que programado == completado (blinda contra un CASE invertido).
     for (let i = 1; i <= 4; i++) {
       db.prepare(
         "INSERT INTO program_sets (program_exercise_id, n_serie, real_peso, real_reps, hecha) VALUES (?, ?, 80, 5, 1)"
       ).run(peId, i);
     }
 
-    const rows = db.prepare("SELECT musculo, series FROM v_volumen_por_musculo ORDER BY musculo").all() as Array<{
-      musculo: string;
-      series: number;
-    }>;
+    const rows = db
+      .prepare("SELECT musculo, series_programadas, series_completadas FROM v_volumen_por_musculo ORDER BY musculo")
+      .all() as Array<{ musculo: string; series_programadas: number; series_completadas: number }>;
     expect(rows).toEqual([
-      { musculo: "Bíceps braquial", series: 2 },
-      { musculo: "Dorsal ancho", series: 4 },
+      { musculo: "Bíceps braquial", series_programadas: 2, series_completadas: 2 },
+      { musculo: "Dorsal ancho", series_programadas: 4, series_completadas: 4 },
+    ]);
+  });
+
+  it("v_volumen_por_musculo distingue series programadas de completadas", () => {
+    db.exec("DELETE FROM program_weeks; DELETE FROM ejercicio_musculos; DELETE FROM musculos;");
+    const benchId = (db.prepare("SELECT id FROM exercises WHERE nombre = 'Flat Bench Press (barra)'").get() as { id: number }).id;
+
+    const dorsalId = db.prepare("INSERT INTO musculos (nombre, grupo) VALUES (?, ?)").run("Dorsal ancho", "espalda")
+      .lastInsertRowid as number;
+    const bicepsId = db.prepare("INSERT INTO musculos (nombre, grupo) VALUES (?, ?)").run("Bíceps braquial", "brazo")
+      .lastInsertRowid as number;
+    db.prepare(
+      "INSERT INTO ejercicio_musculos (exercise_id, musculo_id, rol, orden, fraccion_volumen) VALUES (?, ?, 'agonista', 1, 1.0)"
+    ).run(benchId, dorsalId);
+    db.prepare(
+      "INSERT INTO ejercicio_musculos (exercise_id, musculo_id, rol, orden, fraccion_volumen) VALUES (?, ?, 'sinergista', 2, 0.5)"
+    ).run(benchId, bicepsId);
+
+    const weekId = db.prepare("INSERT INTO program_weeks (semana, fecha_creada, activa) VALUES (1, '2026-01-01', 1)")
+      .run().lastInsertRowid as number;
+    const dayId = db
+      .prepare("INSERT INTO program_days (week_id, dia, fecha, orden) VALUES (?, 1, '2026-07-20', 0)")
+      .run(weekId).lastInsertRowid as number;
+    const peId = db
+      .prepare("INSERT INTO program_exercises (day_id, exercise_id, seccion, orden) VALUES (?, ?, 'main', 0)")
+      .run(dayId, benchId).lastInsertRowid as number;
+    // 4 series programadas, solo 2 hechas -> dorsal: prog 4.0/comp 2.0, bíceps: prog 2.0/comp 1.0
+    for (let i = 1; i <= 4; i++) {
+      db.prepare(
+        "INSERT INTO program_sets (program_exercise_id, n_serie, real_peso, real_reps, hecha) VALUES (?, ?, ?, ?, ?)"
+      ).run(peId, i, i <= 2 ? 80 : null, i <= 2 ? 5 : null, i <= 2 ? 1 : 0);
+    }
+
+    const rows = db
+      .prepare("SELECT musculo, series_programadas, series_completadas FROM v_volumen_por_musculo ORDER BY musculo")
+      .all() as Array<{ musculo: string; series_programadas: number; series_completadas: number }>;
+    expect(rows).toEqual([
+      { musculo: "Bíceps braquial", series_programadas: 2, series_completadas: 1 },
+      { musculo: "Dorsal ancho", series_programadas: 4, series_completadas: 2 },
+    ]);
+  });
+
+  it("una semana programada y nunca entrenada aparece con series_completadas en 0 y semana ISO null", () => {
+    db.exec("DELETE FROM program_weeks; DELETE FROM ejercicio_musculos; DELETE FROM musculos;");
+    const benchId = (db.prepare("SELECT id FROM exercises WHERE nombre = 'Flat Bench Press (barra)'").get() as { id: number }).id;
+    const dorsalId = db.prepare("INSERT INTO musculos (nombre, grupo) VALUES (?, ?)").run("Dorsal ancho", "espalda")
+      .lastInsertRowid as number;
+    db.prepare(
+      "INSERT INTO ejercicio_musculos (exercise_id, musculo_id, rol, orden, fraccion_volumen) VALUES (?, ?, 'agonista', 1, 1.0)"
+    ).run(benchId, dorsalId);
+
+    const weekId = db.prepare("INSERT INTO program_weeks (semana, fecha_creada, activa) VALUES (5, '2026-08-01', 1)")
+      .run().lastInsertRowid as number;
+    const dayId = db
+      .prepare("INSERT INTO program_days (week_id, dia, fecha, orden) VALUES (?, 1, NULL, 0)")
+      .run(weekId).lastInsertRowid as number;
+    const peId = db
+      .prepare("INSERT INTO program_exercises (day_id, exercise_id, seccion, orden) VALUES (?, ?, 'main', 0)")
+      .run(dayId, benchId).lastInsertRowid as number;
+    for (let i = 1; i <= 3; i++) {
+      db.prepare(
+        "INSERT INTO program_sets (program_exercise_id, n_serie, hecha) VALUES (?, ?, 0)"
+      ).run(peId, i);
+    }
+
+    const row = db
+      .prepare("SELECT semana, semana_programa, series_programadas, series_completadas FROM v_volumen_por_musculo WHERE musculo = 'Dorsal ancho'")
+      .get() as { semana: string | null; semana_programa: number; series_programadas: number; series_completadas: number };
+    expect(row).toEqual({ semana: null, semana_programa: 5, series_programadas: 3, series_completadas: 0 });
+  });
+
+  it("no colapsa dos semanas con el mismo número en mesociclos distintos", () => {
+    db.exec("DELETE FROM program_weeks; DELETE FROM ejercicio_musculos; DELETE FROM musculos; DELETE FROM mesociclos;");
+    const benchId = (db.prepare("SELECT id FROM exercises WHERE nombre = 'Flat Bench Press (barra)'").get() as { id: number }).id;
+    const dorsalId = db.prepare("INSERT INTO musculos (nombre, grupo) VALUES (?, ?)").run("Dorsal ancho", "espalda")
+      .lastInsertRowid as number;
+    db.prepare(
+      "INSERT INTO ejercicio_musculos (exercise_id, musculo_id, rol, orden, fraccion_volumen) VALUES (?, ?, 'agonista', 1, 1.0)"
+    ).run(benchId, dorsalId);
+    const mesoId = db
+      .prepare("INSERT INTO mesociclos (nombre, fecha_creada) VALUES ('Bloque fuerza', '2026-07-01')")
+      .run().lastInsertRowid as number;
+
+    function crearSemanaConSet(mesocicloId: number | null, fecha: string): void {
+      const weekId = db
+        .prepare("INSERT INTO program_weeks (semana, mesociclo_id, fecha_creada, activa) VALUES (1, ?, ?, 1)")
+        .run(mesocicloId, fecha).lastInsertRowid as number;
+      const dayId = db
+        .prepare("INSERT INTO program_days (week_id, dia, fecha, orden) VALUES (?, 1, ?, 0)")
+        .run(weekId, fecha).lastInsertRowid as number;
+      const peId = db
+        .prepare("INSERT INTO program_exercises (day_id, exercise_id, seccion, orden) VALUES (?, ?, 'main', 0)")
+        .run(dayId, benchId).lastInsertRowid as number;
+      db.prepare(
+        "INSERT INTO program_sets (program_exercise_id, n_serie, real_peso, real_reps, hecha) VALUES (?, 1, 80, 5, 1)"
+      ).run(peId);
+    }
+    crearSemanaConSet(null, "2026-07-20");
+    crearSemanaConSet(mesoId, "2026-07-20");
+
+    const rows = db
+      .prepare("SELECT mesociclo_id, semana_programa, series_completadas FROM v_volumen_por_musculo WHERE musculo = 'Dorsal ancho' ORDER BY week_id")
+      .all() as Array<{ mesociclo_id: number | null; semana_programa: number; series_completadas: number }>;
+    expect(rows).toEqual([
+      { mesociclo_id: null, semana_programa: 1, series_completadas: 1 },
+      { mesociclo_id: mesoId, semana_programa: 1, series_completadas: 1 },
+    ]);
+  });
+
+  it("la semana ISO es la misma para todas las filas de una semana con días fechados y sin fechar", () => {
+    db.exec("DELETE FROM program_weeks; DELETE FROM ejercicio_musculos; DELETE FROM musculos;");
+    const benchId = (db.prepare("SELECT id FROM exercises WHERE nombre = 'Flat Bench Press (barra)'").get() as { id: number }).id;
+    const squatId = (db.prepare("SELECT id FROM exercises WHERE nombre = 'Mid/High Bar Back Squat'").get() as { id: number }).id;
+    const dorsalId = db.prepare("INSERT INTO musculos (nombre, grupo) VALUES (?, ?)").run("Dorsal ancho", "espalda")
+      .lastInsertRowid as number;
+    const cuadricepsId = db.prepare("INSERT INTO musculos (nombre, grupo) VALUES (?, ?)").run("Cuádriceps", "pierna")
+      .lastInsertRowid as number;
+    db.prepare(
+      "INSERT INTO ejercicio_musculos (exercise_id, musculo_id, rol, orden, fraccion_volumen) VALUES (?, ?, 'agonista', 1, 1.0)"
+    ).run(benchId, dorsalId);
+    db.prepare(
+      "INSERT INTO ejercicio_musculos (exercise_id, musculo_id, rol, orden, fraccion_volumen) VALUES (?, ?, 'agonista', 1, 1.0)"
+    ).run(squatId, cuadricepsId);
+
+    const weekId = db.prepare("INSERT INTO program_weeks (semana, fecha_creada, activa) VALUES (1, '2026-07-15', 1)")
+      .run().lastInsertRowid as number;
+    // Día 1: fechado (bench -> dorsal). Día 2: sin fecha todavía (squat -> cuádriceps).
+    const day1 = db
+      .prepare("INSERT INTO program_days (week_id, dia, fecha, orden) VALUES (?, 1, '2026-07-20', 0)")
+      .run(weekId).lastInsertRowid as number;
+    const day2 = db
+      .prepare("INSERT INTO program_days (week_id, dia, fecha, orden) VALUES (?, 2, NULL, 1)")
+      .run(weekId).lastInsertRowid as number;
+    const pe1 = db
+      .prepare("INSERT INTO program_exercises (day_id, exercise_id, seccion, orden) VALUES (?, ?, 'main', 0)")
+      .run(day1, benchId).lastInsertRowid as number;
+    const pe2 = db
+      .prepare("INSERT INTO program_exercises (day_id, exercise_id, seccion, orden) VALUES (?, ?, 'main', 0)")
+      .run(day2, squatId).lastInsertRowid as number;
+    db.prepare("INSERT INTO program_sets (program_exercise_id, n_serie, real_peso, real_reps, hecha) VALUES (?, 1, 80, 5, 1)").run(pe1);
+    db.prepare("INSERT INTO program_sets (program_exercise_id, n_serie, hecha) VALUES (?, 1, 0)").run(pe2);
+
+    const rows = db
+      .prepare("SELECT musculo, semana FROM v_volumen_por_musculo ORDER BY musculo")
+      .all() as Array<{ musculo: string; semana: string | null }>;
+    expect(rows).toEqual([
+      { musculo: "Cuádriceps", semana: "2026-29" },
+      { musculo: "Dorsal ancho", semana: "2026-29" },
     ]);
   });
 });

@@ -144,17 +144,17 @@ describe("seedEnciclopedia", () => {
         .run(peId, i);
     }
 
-    const filas = db.prepare("SELECT musculo, series FROM v_volumen_por_musculo").all() as Array<{
+    const filas = db.prepare("SELECT musculo, series_completadas FROM v_volumen_por_musculo").all() as Array<{
       musculo: string;
-      series: number;
+      series_completadas: number;
     }>;
 
     // 4 series de remo: completo para el dorsal, la mitad para el bíceps,
     // y el erector estabiliza sin acumular volumen.
     const dorsal = filas.find((f) => f.musculo === "Dorsal ancho");
     const biceps = filas.find((f) => f.musculo.includes("Bíceps braquial"));
-    expect(dorsal?.series).toBe(4);
-    expect(biceps?.series).toBe(2);
+    expect(dorsal?.series_completadas).toBe(4);
+    expect(biceps?.series_completadas).toBe(2);
     expect(filas.find((f) => f.musculo === "Erector espinal")).toBeUndefined();
   });
 });

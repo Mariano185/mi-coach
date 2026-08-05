@@ -145,13 +145,21 @@ export type UpdateExerciseInput = Partial<Omit<NewExerciseInput, "musculos">> & 
 };
 
 // Vista v_volumen_por_musculo — reemplaza a WeeklyVolume/volumen_por_categoria
-// una vez que ejercicio_musculos está poblada (fase 2).
+// una vez que ejercicio_musculos está poblada (fase 2). Una fila por (semana de
+// programa, músculo); distingue lo prescrito de lo hecho.
 export interface VolumenMusculo {
-  semana: string;
+  /** ISO (%Y-%W) de la semana. NULL si todavía no se entrenó ningún día. No es
+   *  clave: dos semanas de programa distintas pueden caer en la misma ISO. */
+  semana: string | null;
+  semana_programa: number; // se reinicia por mesociclo
+  mesociclo_id: number | null;
+  week_id: number; // clave real: desambigua semana 1 del meso 1 vs. semana 1 sin meso
+  semana_creada: string;
   musculo_id: number;
   musculo: string;
   grupo: string;
-  series: number;
+  series_programadas: number;
+  series_completadas: number;
 }
 
 export interface Bodyweight {

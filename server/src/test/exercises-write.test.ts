@@ -446,9 +446,9 @@ describe("PATCH /api/exercises/:id — grilla muscular", () => {
     db.prepare("INSERT INTO program_sets (program_exercise_id, n_serie, real_peso, real_reps, hecha) VALUES (?, 1, 20, 10, 1)").run(peId);
 
     const volumen = db
-      .prepare("SELECT musculo, series FROM v_volumen_por_musculo WHERE musculo = 'Deltoides anterior'")
-      .get() as { musculo: string; series: number } | undefined;
-    expect(volumen?.series).toBe(1);
+      .prepare("SELECT musculo, series_completadas FROM v_volumen_por_musculo WHERE musculo = 'Deltoides anterior'")
+      .get() as { musculo: string; series_completadas: number } | undefined;
+    expect(volumen?.series_completadas).toBe(1);
 
     const pectoral = db
       .prepare("SELECT 1 FROM v_volumen_por_musculo WHERE musculo LIKE 'Pectoral%esternocostal%'")

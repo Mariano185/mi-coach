@@ -19,10 +19,16 @@ vi.mock("../db.js", () => ({
 const AUTH = { "x-coach-key": "test-coach-key" };
 const hoy = new Date().toISOString().slice(0, 10);
 
-function registrarSeries(exerciseId: number, nSeries: number, fecha = hoy): void {
-  const weekId = db
-    .prepare("INSERT INTO program_weeks (semana, fecha_creada, activa) VALUES (?, '2026-01-01', 1)")
-    .run(Math.floor(Math.random() * 100000)).lastInsertRowid as number;
+function crearSemana(fechaCreada = "2026-01-01"): number {
+  return db
+    .prepare("INSERT INTO program_weeks (semana, fecha_creada, activa) VALUES (?, ?, 1)")
+    .run(Math.floor(Math.random() * 100000), fechaCreada).lastInsertRowid as number;
+}
+
+// weekId opcional: por defecto crea una semana nueva (aislamiento entre tests), pero
+// dos llamadas pueden compartir semana pasando el mismo weekId — necesario para
+// probar que la vista suma DENTRO de una semana sin colapsar dos semanas distintas.
+function registrarSeries(exerciseId: number, nSeries: number, fecha = hoy, weekId = crearSemana()): void {
   const dayId = db
     .prepare("INSERT INTO program_days (week_id, dia, fecha, orden) VALUES (?, 1, ?, 0)")
     .run(weekId, fecha).lastInsertRowid as number;
@@ -57,10 +63,10 @@ describe("GET /api/coach/analisis — volumen por músculo", () => {
     registrarSeries(remoId, 4);
 
     const res = await request(app).get("/api/coach/analisis").set(AUTH);
-    const vol = res.body.volumen_por_musculo as Array<{ musculo: string; series: number }>;
+    const vol = res.body.volumen_por_musculo as Array<{ musculo: string; series_completadas: number }>;
 
-    expect(vol.find((v) => v.musculo === "Dorsal ancho")?.series).toBe(4);
-    expect(vol.find((v) => v.musculo.includes("Bíceps braquial"))?.series).toBe(2);
+    expect(vol.find((v) => v.musculo === "Dorsal ancho")?.series_completadas).toBe(4);
+    expect(vol.find((v) => v.musculo.includes("Bíceps braquial"))?.series_completadas).toBe(2);
   });
 
   it("los estabilizadores no aparecen: no acumulan volumen computable", async () => {
@@ -73,17 +79,70 @@ describe("GET /api/coach/analisis — volumen por músculo", () => {
     expect(vol.find((v) => v.musculo === "Erector espinal")).toBeUndefined();
   });
 
-  it("suma el volumen de un mismo músculo a través de ejercicios distintos", async () => {
-    // Dos empujes horizontales distintos que comparten el pectoral esternal.
+  it("suma el volumen de un mismo músculo a través de ejercicios distintos, dentro de la misma semana", async () => {
+    // Dos empujes horizontales distintos que comparten el pectoral esternal, en la
+    // MISMA semana de programa — si cada uno creara su propia semana, la vista (que
+    // agrupa por semana de programa, no por ISO) los dejaría en filas separadas.
     const banca = (db.prepare("SELECT id FROM exercises WHERE nombre = 'Flat Bench Press (barra)'").get() as { id: number }).id;
     const mancuernas = (db.prepare("SELECT id FROM exercises WHERE nombre = 'Flat Dumbbell Bench Press'").get() as { id: number }).id;
-    registrarSeries(banca, 3);
-    registrarSeries(mancuernas, 2);
+    const weekId = crearSemana();
+    registrarSeries(banca, 3, hoy, weekId);
+    registrarSeries(mancuernas, 2, hoy, weekId);
 
     const res = await request(app).get("/api/coach/analisis").set(AUTH);
-    const vol = res.body.volumen_por_musculo as Array<{ musculo: string; series: number }>;
+    const vol = res.body.volumen_por_musculo as Array<{ musculo: string; series_completadas: number }>;
     const esternal = vol.find((v) => v.musculo.includes("esternocostal"));
-    expect(esternal?.series).toBe(5); // 3 + 2, ambos agonista a 1.0
+    expect(esternal?.series_completadas).toBe(5); // 3 + 2, ambos agonista a 1.0
+  });
+
+  it("incluye una semana recién creada y no entrenada dentro de la ventana", async () => {
+    const remoId = (db.prepare("SELECT id FROM exercises WHERE nombre = 'Remo con barra'").get() as { id: number }).id;
+    const weekId = crearSemana(hoy);
+    const dayId = db
+      .prepare("INSERT INTO program_days (week_id, dia, fecha, orden) VALUES (?, 1, NULL, 0)")
+      .run(weekId).lastInsertRowid as number;
+    const peId = db
+      .prepare("INSERT INTO program_exercises (day_id, exercise_id, seccion, orden) VALUES (?, ?, 'main', 0)")
+      .run(dayId, remoId).lastInsertRowid as number;
+    db.prepare(
+      "INSERT INTO program_sets (program_exercise_id, n_serie, hecha) VALUES (?, 1, 0)"
+    ).run(peId);
+
+    const res = await request(app).get("/api/coach/analisis?dias=42").set(AUTH);
+    const vol = res.body.volumen_por_musculo as Array<{ musculo: string; series_programadas: number; series_completadas: number }>;
+    const dorsal = vol.find((v) => v.musculo === "Dorsal ancho");
+    expect(dorsal).toMatchObject({ series_programadas: 1, series_completadas: 0 });
+  });
+
+  it("una ventana chica deja afuera una semana vieja y nunca entrenada", async () => {
+    const remoId = (db.prepare("SELECT id FROM exercises WHERE nombre = 'Remo con barra'").get() as { id: number }).id;
+    const fechaVieja = new Date(Date.now() - 120 * 86400000).toISOString().slice(0, 10);
+    const weekId = crearSemana(fechaVieja);
+    const dayId = db
+      .prepare("INSERT INTO program_days (week_id, dia, fecha, orden) VALUES (?, 1, NULL, 0)")
+      .run(weekId).lastInsertRowid as number;
+    const peId = db
+      .prepare("INSERT INTO program_exercises (day_id, exercise_id, seccion, orden) VALUES (?, ?, 'main', 0)")
+      .run(dayId, remoId).lastInsertRowid as number;
+    db.prepare(
+      "INSERT INTO program_sets (program_exercise_id, n_serie, hecha) VALUES (?, 1, 0)"
+    ).run(peId);
+
+    const res = await request(app).get("/api/coach/analisis?dias=14").set(AUTH);
+    const vol = res.body.volumen_por_musculo as Array<{ musculo: string }>;
+    expect(vol.find((v) => v.musculo === "Dorsal ancho")).toBeUndefined();
+  });
+
+  it("cada fila trae semana_programa y mesociclo_id", async () => {
+    const remoId = (db.prepare("SELECT id FROM exercises WHERE nombre = 'Remo con barra'").get() as { id: number }).id;
+    registrarSeries(remoId, 2);
+
+    const res = await request(app).get("/api/coach/analisis").set(AUTH);
+    const vol = res.body.volumen_por_musculo as Array<{ musculo: string; semana_programa: number; mesociclo_id: number | null }>;
+    const dorsal = vol.find((v) => v.musculo === "Dorsal ancho");
+    expect(dorsal).toHaveProperty("semana_programa");
+    expect(dorsal).toHaveProperty("mesociclo_id");
+    expect(dorsal?.mesociclo_id).toBeNull();
   });
 });
 

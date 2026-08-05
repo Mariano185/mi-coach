@@ -20,9 +20,15 @@ Usá `?dias=56` si querés más historial. El JSON incluye:
 - `rpe_basicos` — RPE promedio por sesión (señal de fatiga)
 - `mejor_e1rm_basicos` — mejor e1RM histórico por básico
 - `peso_corporal` — tendencia con PM 7d
-- `volumen_por_musculo` — series por semana y músculo, fraccionado por rol (agonista suma 1.0,
-  sinergista 0.5, estabilizador no suma). No es directamente comparable con volumen viejo por
-  categoría: una serie de remo ahora aporta 1.0 a dorsal Y 0.5 a bíceps, no "1 serie de espalda".
+- `volumen_por_musculo` — series por semana de programa y músculo, fraccionado por rol (agonista
+  suma 1.0, sinergista 0.5, estabilizador no suma). Cada fila trae `series_programadas` (todo lo
+  prescrito, hecho o no) y `series_completadas` (solo lo que el atleta cerró) — compará las dos
+  para ver adherencia de volumen por grupo muscular, pregunta que ningún otro bloque contesta
+  directamente. También trae `semana_programa`, `mesociclo_id` y `week_id` (la clave real de la
+  semana) además de la `semana` ISO — agrupa por semana de programa, no por ISO, porque las
+  semanas duran 8-9 días y la ISO mezcla dos semanas de programa distintas la mayoría de las
+  veces. No es directamente comparable con volumen viejo por categoría: una serie de remo aporta
+  1.0 a dorsal Y 0.5 a bíceps, no "1 serie de espalda". Detalle completo en `analisis.md`.
 - `ejercicios` — **opt-in, no viene por defecto.** Pedilo con `?incluir=ejercicios` (agregado a
   `?dias=`, ej. `?dias=42&incluir=ejercicios`; admite lista separada por comas si en el futuro
   hay más bloques opt-in). Es el catálogo completo (148 ejercicios) y pesa ~55% del payload —

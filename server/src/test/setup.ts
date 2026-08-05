@@ -162,20 +162,27 @@ export function createTestDb() {
       FROM program_sets ps;
     CREATE VIEW IF NOT EXISTS v_volumen_por_musculo AS
       SELECT
-        strftime('%Y-%W', pd.fecha) AS semana,
-        m.id AS musculo_id,
-        m.nombre AS musculo,
-        m.grupo,
-        ROUND(SUM(em.fraccion_volumen), 2) AS series
+        (SELECT MIN(strftime('%Y-%W', pd2.fecha))
+           FROM program_days pd2
+          WHERE pd2.week_id = pw.id AND pd2.fecha IS NOT NULL) AS semana,
+        pw.semana        AS semana_programa,
+        pw.mesociclo_id  AS mesociclo_id,
+        pw.id            AS week_id,
+        pw.fecha_creada  AS semana_creada,
+        m.id             AS musculo_id,
+        m.nombre         AS musculo,
+        m.grupo          AS grupo,
+        ROUND(SUM(em.fraccion_volumen), 2) AS series_programadas,
+        ROUND(SUM(CASE WHEN ps.hecha = 1 THEN em.fraccion_volumen ELSE 0 END), 2) AS series_completadas
       FROM program_sets ps
-      JOIN program_exercises pe ON pe.id = ps.program_exercise_id
-      JOIN program_days pd ON pd.id = pe.day_id
+      JOIN program_exercises pe  ON pe.id = ps.program_exercise_id
+      JOIN program_days pd       ON pd.id = pe.day_id
+      JOIN program_weeks pw      ON pw.id = pd.week_id
       JOIN ejercicio_musculos em ON em.exercise_id = pe.exercise_id
-      JOIN musculos m ON m.id = em.musculo_id
-      WHERE ps.hecha = 1 AND pd.fecha IS NOT NULL
-        AND em.fraccion_volumen > 0
-      GROUP BY semana, m.id
-      ORDER BY semana, m.grupo, m.nombre;
+      JOIN musculos m            ON m.id = em.musculo_id
+      WHERE em.fraccion_volumen > 0
+      GROUP BY pw.id, m.id
+      ORDER BY semana_creada, week_id, m.grupo, m.nombre;
   `);
 
   // Ejercicios básicos mínimos para los tests

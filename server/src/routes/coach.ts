@@ -103,21 +103,27 @@ function buildAnalisis(dias: number, incluir: Set<BloqueOptIn> = new Set()): Rec
     )
     .all();
 
-  // 5) Volumen semanal POR MÚSCULO, fraccionado. Reemplaza al viejo
-  // volumen_por_categoria, que agrupaba por un campo que mezclaba implemento,
-  // región y rol: "Smith/Multipower: 16 series" no decía nada sobre qué se
-  // entrenó realmente. Una serie de remo aporta 1.0 al dorsal y 0.5 al bíceps;
-  // los estabilizadores no acumulan volumen. Ver docs/adr/0001.
-  // Ya respeta ?dias= (verificado: dias=42 -> 7 semanas ISO, dias=14 -> 3). El bloque
-  // pesa por ser 7 semanas × ~29 músculos, no por una ventana mal acotada.
+  // 5) Volumen semanal POR MÚSCULO, fraccionado, programado vs. completado. Reemplaza
+  // al viejo volumen_por_categoria, que agrupaba por un campo que mezclaba implemento,
+  // región y rol: "Smith/Multipower: 16 series" no decía nada sobre qué se entrenó
+  // realmente. Una serie de remo aporta 1.0 al dorsal y 0.5 al bíceps; los
+  // estabilizadores no acumulan volumen. Ver docs/adr/0001.
+  //
+  // Ventana por semana_creada (NOT NULL, mismo patrón que dias_programados), con la
+  // ISO como red de seguridad: semana_creada >= ventana deja entrar semanas nuevas
+  // aunque no tengan ninguna fecha todavía (justo lo que este bloque quiere mostrar);
+  // el OR por ISO cubre la semana vieja pero entrenada hace poco. Un `OR semana IS
+  // NULL` a secas arrastraría para siempre cualquier semana vieja nunca entrenada.
   const volumen_por_musculo = db
     .prepare(
-      `SELECT semana, musculo, grupo, series
+      `SELECT semana, semana_programa, mesociclo_id, week_id, musculo, grupo,
+              series_programadas, series_completadas
        FROM v_volumen_por_musculo
-       WHERE semana >= strftime('%Y-%W', date('now', ?))
-       ORDER BY semana, grupo, musculo`
+       WHERE semana_creada >= date('now', ?)
+          OR semana >= strftime('%Y-%W', date('now', ?))
+       ORDER BY semana_creada, week_id, grupo, musculo`
     )
-    .all(desde);
+    .all(desde, desde);
 
   // 7) Library de ejercicios: forma COMPACTA a propósito. Con 90+ ejercicios,
   // mandar la biomecánica completa de cada uno infla el payload sin que el coach
