@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import request from "supertest";
 import { createTestDb, createTestApp, type TestDb } from "./setup.js";
+import type { DiaProgramado } from "../types.js";
 
 const db: TestDb = createTestDb();
 
@@ -257,5 +258,246 @@ describe("GET /api/coach/adherencia", () => {
 
     const res = await request(app).get("/api/coach/adherencia?dias=90").set(AUTH);
     expect(res.body.dias_analizados).toBe(1);
+  });
+});
+
+describe("GET /api/coach/analisis — dias_programados", () => {
+  let app: Awaited<ReturnType<typeof createTestApp>>;
+
+  beforeEach(async () => {
+    db.exec("DELETE FROM program_weeks;");
+    db.exec("DELETE FROM mesociclos;");
+    app = await createTestApp(db);
+  });
+
+  function diasAtras(n: number): string {
+    const d = new Date();
+    d.setDate(d.getDate() - n);
+    return d.toISOString().slice(0, 10);
+  }
+
+  // Idempotente: exercises no se limpia en beforeEach.
+  function seedEjercicio(nombre: string): number {
+    db.prepare(
+      `INSERT INTO exercises (nombre, categoria, es_basico)
+       SELECT ?, 'Accesorio', 0
+       WHERE NOT EXISTS (SELECT 1 FROM exercises WHERE nombre = ?)`
+    ).run(nombre, nombre);
+    return (db.prepare("SELECT id FROM exercises WHERE nombre = ?").get(nombre) as { id: number }).id;
+  }
+
+  // A diferencia de seedDia() de arriba (que hardcodea fecha_creada = '2024-01-01', una
+  // fecha vieja), este helper controla fecha_creada y mesociclo_id — los dos ejes que
+  // decide el filtro de ventana de dias_programados.
+  function seedSemana(opts: {
+    semana: number;
+    fechaCreada: string;
+    mesocicloId?: number | null;
+  }): number {
+    return db
+      .prepare(
+        "INSERT INTO program_weeks (semana, nombre, fecha_creada, activa, mesociclo_id) VALUES (?, 'Test', ?, 1, ?)"
+      )
+      .run(opts.semana, opts.fechaCreada, opts.mesocicloId ?? null).lastInsertRowid as number;
+  }
+
+  function seedDiaConEjercicios(opts: {
+    weekId: number;
+    dia: number;
+    titulo?: string | null;
+    tipo?: string | null;
+    fecha: string | null;
+    orden?: number;
+    ejercicios: Array<{ nombre: string; nSeries: number; hechas: number }>;
+  }): number {
+    const dayId = db
+      .prepare(
+        "INSERT INTO program_days (week_id, dia, tipo, titulo, fecha, orden) VALUES (?, ?, ?, ?, ?, ?)"
+      )
+      .run(opts.weekId, opts.dia, opts.tipo ?? null, opts.titulo ?? null, opts.fecha, opts.orden ?? 0)
+      .lastInsertRowid as number;
+
+    opts.ejercicios.forEach((ej, i) => {
+      const exId = seedEjercicio(ej.nombre);
+      const peId = db
+        .prepare("INSERT INTO program_exercises (day_id, exercise_id, seccion, orden) VALUES (?, ?, 'main', ?)")
+        .run(dayId, exId, i).lastInsertRowid as number;
+
+      for (let n = 1; n <= ej.nSeries; n++) {
+        const hecha = n <= ej.hechas ? 1 : 0;
+        db.prepare(
+          "INSERT INTO program_sets (program_exercise_id, n_serie, target_reps, real_peso, real_reps, hecha) VALUES (?, ?, 8, ?, ?, ?)"
+        ).run(peId, n, hecha ? 50 : null, hecha ? 8 : null, hecha);
+      }
+    });
+
+    return dayId;
+  }
+
+  it("un día programado y nunca entrenado (fecha NULL) aparece con series_completadas: 0", async () => {
+    const weekId = seedSemana({ semana: 1, fechaCreada: diasAtras(2) });
+    seedDiaConEjercicios({
+      weekId,
+      dia: 4,
+      titulo: "Bench + accesorios (sin carga axial)",
+      tipo: "B",
+      fecha: null,
+      ejercicios: [{ nombre: "Bench Press", nSeries: 19, hechas: 0 }],
+    });
+
+    const res = await request(app).get("/api/coach/analisis?dias=42").set(AUTH);
+    expect(res.status).toBe(200);
+
+    const dia = (res.body.dias_programados as Array<{ dia: number; fecha: string | null }>).find(
+      (d) => d.dia === 4
+    );
+    expect(dia).toBeDefined();
+    expect(dia).toMatchObject({
+      fecha: null,
+      series_programadas: 19,
+      series_completadas: 0,
+      titulo: "Bench + accesorios (sin carga axial)",
+    });
+  });
+
+  it("un día entrenado a medias reporta el par correcto", async () => {
+    const weekId = seedSemana({ semana: 1, fechaCreada: diasAtras(2) });
+    seedDiaConEjercicios({
+      weekId,
+      dia: 1,
+      fecha: diasAtras(1),
+      ejercicios: [{ nombre: "Squat", nSeries: 6, hechas: 4 }],
+    });
+
+    const res = await request(app).get("/api/coach/analisis?dias=42").set(AUTH);
+    const dia = (res.body.dias_programados as DiaProgramado[]).find((d) => d.dia === 1);
+    expect(dia).toBeDefined();
+    expect(dia!.series_programadas).toBe(6);
+    expect(dia!.series_completadas).toBe(4);
+  });
+
+  it("un día sin ejercicios aparece con 0/0, no se cae del listado", async () => {
+    const weekId = seedSemana({ semana: 1, fechaCreada: diasAtras(1) });
+    seedDiaConEjercicios({ weekId, dia: 1, fecha: null, ejercicios: [] });
+
+    const res = await request(app).get("/api/coach/analisis?dias=42").set(AUTH);
+    const dia = (res.body.dias_programados as DiaProgramado[]).find((d) => d.dia === 1);
+    expect(dia).toBeDefined();
+    expect(dia!.series_programadas).toBe(0);
+    expect(dia!.series_completadas).toBe(0);
+  });
+
+  it("cada fila trae semana, dia, titulo, tipo y fecha", async () => {
+    const weekId = seedSemana({ semana: 3, fechaCreada: diasAtras(1) });
+    seedDiaConEjercicios({
+      weekId,
+      dia: 2,
+      titulo: "Piernas",
+      tipo: "A",
+      fecha: diasAtras(1),
+      ejercicios: [{ nombre: "Leg Press", nSeries: 3, hechas: 3 }],
+    });
+
+    const res = await request(app).get("/api/coach/analisis?dias=42").set(AUTH);
+    const dia = (res.body.dias_programados as Array<Record<string, unknown>>).find((d) => d.dia === 2);
+    expect(dia).toMatchObject({ semana: 3, dia: 2, titulo: "Piernas", tipo: "A" });
+    expect(dia!.fecha).toBeTruthy();
+  });
+
+  it("una semana con mesociclo trae mesociclo_id/mesociclo_nombre; una huérfana los trae null", async () => {
+    const mesocicloId = db
+      .prepare("INSERT INTO mesociclos (nombre, orden, fecha_creada) VALUES ('Hipertrofia', 0, '2024-01-01')")
+      .run().lastInsertRowid as number;
+
+    const weekConMeso = seedSemana({ semana: 1, fechaCreada: diasAtras(1), mesocicloId });
+    seedDiaConEjercicios({
+      weekId: weekConMeso,
+      dia: 1,
+      fecha: diasAtras(1),
+      ejercicios: [{ nombre: "Squat", nSeries: 1, hechas: 1 }],
+    });
+
+    const weekHuerfana = seedSemana({ semana: 99, fechaCreada: diasAtras(1) });
+    seedDiaConEjercicios({
+      weekId: weekHuerfana,
+      dia: 1,
+      fecha: diasAtras(1),
+      ejercicios: [{ nombre: "Bench", nSeries: 1, hechas: 1 }],
+    });
+
+    const res = await request(app).get("/api/coach/analisis?dias=42").set(AUTH);
+    const filas = res.body.dias_programados as Array<{
+      semana: number;
+      mesociclo_id: number | null;
+      mesociclo_nombre: string | null;
+    }>;
+
+    const filaConMeso = filas.find((f) => f.semana === 1);
+    expect(filaConMeso).toMatchObject({ mesociclo_id: mesocicloId, mesociclo_nombre: "Hipertrofia" });
+
+    const filaHuerfana = filas.find((f) => f.semana === 99);
+    expect(filaHuerfana).toMatchObject({ mesociclo_id: null, mesociclo_nombre: null });
+  });
+
+  it("una semana creada fuera de la ventana no aparece", async () => {
+    const weekId = seedSemana({ semana: 1, fechaCreada: diasAtras(100) });
+    seedDiaConEjercicios({
+      weekId,
+      dia: 1,
+      fecha: null,
+      ejercicios: [{ nombre: "Squat", nSeries: 3, hechas: 0 }],
+    });
+
+    const res = await request(app).get("/api/coach/analisis?dias=42").set(AUTH);
+    expect(res.body.dias_programados).toEqual([]);
+  });
+
+  it("una semana vieja SÍ aparece si tiene un día con fecha reciente (EXISTS)", async () => {
+    const weekId = seedSemana({ semana: 1, fechaCreada: diasAtras(100) });
+    seedDiaConEjercicios({
+      weekId,
+      dia: 1,
+      fecha: diasAtras(5), // entrenado hace poco, aunque la semana se creó hace 100 días
+      ejercicios: [{ nombre: "Squat", nSeries: 3, hechas: 3 }],
+    });
+
+    const res = await request(app).get("/api/coach/analisis?dias=42").set(AUTH);
+    expect(res.body.dias_programados).toHaveLength(1);
+  });
+
+  it("dos mesociclos con el mismo número de semana no se pisan", async () => {
+    const meso1 = db
+      .prepare("INSERT INTO mesociclos (nombre, orden, fecha_creada) VALUES ('Bloque 1', 0, '2024-01-01')")
+      .run().lastInsertRowid as number;
+    const meso2 = db
+      .prepare("INSERT INTO mesociclos (nombre, orden, fecha_creada) VALUES ('Bloque 2', 1, '2024-01-01')")
+      .run().lastInsertRowid as number;
+
+    const week1 = seedSemana({ semana: 1, fechaCreada: diasAtras(3), mesocicloId: meso1 });
+    seedDiaConEjercicios({
+      weekId: week1,
+      dia: 1,
+      fecha: diasAtras(3),
+      ejercicios: [{ nombre: "Squat", nSeries: 1, hechas: 1 }],
+    });
+
+    const week2 = seedSemana({ semana: 1, fechaCreada: diasAtras(1), mesocicloId: meso2 });
+    seedDiaConEjercicios({
+      weekId: week2,
+      dia: 1,
+      fecha: diasAtras(1),
+      ejercicios: [{ nombre: "Bench", nSeries: 1, hechas: 1 }],
+    });
+
+    const res = await request(app).get("/api/coach/analisis?dias=42").set(AUTH);
+    const filas = res.body.dias_programados as Array<{ semana: number; mesociclo_nombre: string | null }>;
+    expect(filas).toHaveLength(2);
+    expect(filas.map((f) => f.mesociclo_nombre).sort()).toEqual(["Bloque 1", "Bloque 2"]);
+  });
+
+  it("sin datos devuelve dias_programados: []", async () => {
+    const res = await request(app).get("/api/coach/analisis?dias=42").set(AUTH);
+    expect(res.status).toBe(200);
+    expect(res.body.dias_programados).toEqual([]);
   });
 });

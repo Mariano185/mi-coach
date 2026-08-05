@@ -10,6 +10,7 @@ import type {
   CoachDocsEndpoint,
   CoachDocsResponse,
   CoachDocsSeccion,
+  DiaProgramado,
 } from "../types.js";
 
 export const coachRouter = Router();
@@ -191,6 +192,56 @@ function buildAnalisis(dias: number): Record<string, unknown> {
     )
     .all();
 
+  // 11) Días programados vs. completados, incluyendo días NUNCA empezados (fecha NULL).
+  //     A diferencia de todos los bloques anteriores, este NO filtra por pd.fecha —
+  //     un día sin entrenar no tiene fecha, así que ese filtro lo dejaría invisible
+  //     (justo el caso que este bloque existe para mostrar: "19 programadas, 0 hechas").
+  //
+  //     La ventana se define por pw.fecha_creada (NOT NULL, siempre existe) en vez de
+  //     por pd.fecha. Alternativas descartadas:
+  //       - `OR pd.fecha IS NULL` a secas: arrastra para siempre cualquier día viejo
+  //         nunca entrenado, sin límite de tiempo.
+  //       - Acotar por mesociclo: mesociclos está vacío hoy y las semanas existentes
+  //         tienen mesociclo_id NULL; cuando se empiecen a usar, la semana 1 de un
+  //         mesociclo nuevo dejaría fuera todo lo anterior.
+  //     El EXISTS cubre el caso raro de una semana creada hace tiempo que se sigue
+  //     entrenando ahora (fecha_creada vieja, pero actividad reciente).
+  //
+  //     LEFT JOIN mesociclos (no JOIN): hoy las semanas tienen mesociclo_id NULL: con
+  //     JOIN normal desaparecerían todas.
+  //     Subqueries correlacionadas (no JOIN + GROUP BY) para series_programadas/
+  //     series_completadas: así un día sin ningún ejercicio sigue apareciendo con 0/0
+  //     en vez de caerse del resultado — mismo patrón que GET /program/weeks/:id.
+  //     ORDER BY pw.id (no pw.semana): semana se reinicia por mesociclo
+  //     (UNIQUE(mesociclo_id, semana)), pw.id es monotónico y no ambiguo entre mesociclos.
+  const dias_programados = db
+    .prepare(
+      `SELECT
+         m.id      AS mesociclo_id,
+         m.nombre  AS mesociclo_nombre,
+         pw.semana,
+         pd.dia,
+         pd.titulo,
+         pd.tipo,
+         pd.fecha,
+         (SELECT COUNT(*) FROM program_sets ps
+            JOIN program_exercises pe ON pe.id = ps.program_exercise_id
+            WHERE pe.day_id = pd.id) AS series_programadas,
+         (SELECT COUNT(*) FROM program_sets ps
+            JOIN program_exercises pe ON pe.id = ps.program_exercise_id
+            WHERE pe.day_id = pd.id AND ps.hecha = 1) AS series_completadas
+       FROM program_days pd
+       JOIN program_weeks pw ON pw.id = pd.week_id
+       LEFT JOIN mesociclos m ON m.id = pw.mesociclo_id
+       WHERE pw.fecha_creada >= date('now', ?)
+          OR EXISTS (
+            SELECT 1 FROM program_days pd2
+            WHERE pd2.week_id = pw.id AND pd2.fecha >= date('now', ?)
+          )
+       ORDER BY pw.id, pd.orden, pd.dia`
+    )
+    .all(desde, desde) as DiaProgramado[];
+
   return {
     ventana_dias: dias,
     mejor_e1rm_basicos,
@@ -203,6 +254,7 @@ function buildAnalisis(dias: number): Record<string, unknown> {
     mesociclos,
     sesiones_realizadas,
     trac_reciente,
+    dias_programados,
   };
 }
 
@@ -221,7 +273,7 @@ coachRouter.get("/analisis", (req, res) => {
 //
 // Solo entran días con fecha (efectivamente entrenados) — un día programado y nunca
 // empezado hundiría el pct de TODAS las posiciones por igual sin decir nada sobre el
-// efecto-posición; ese caso lo cubre `dias_programados` (endpoint aparte, pendiente).
+// efecto-posición; ese caso lo cubre el bloque `dias_programados` de /analisis.
 // La posición es un rank denso (ROW_NUMBER), no `pe.orden` crudo: hay datos viejos con
 // varios ejercicios en orden=0 (el DEFAULT antes del endpoint de reorder).
 //   ?dias=90  ventana de análisis (default 90: varias semanas para que el patrón signifique algo)

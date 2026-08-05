@@ -46,6 +46,13 @@ Usá `?dias=56` si querés más historial. El JSON incluye:
   - `tecnica` — comodidad técnica percibida
 
   Cualquier campo puede venir `null` si el atleta no cargó ese día o no completó esa dimensión (es normal, especialmente `tecnica`/`motivacion` en días sin entrenar — no lo trates como dato faltante grave, es esperable). **Usalo para cruzar con `sesiones_realizadas` y `rpe_basicos`:** una racha de `recuperacion` o `descanso_alimentacion` bajos (1-2) en los días previos a una sesión con RPE alto es una señal más directa de fatiga acumulada que el RPE solo. Fatiga alta y sostenida en un patrón específico (ej. `fatiga_traccion` bajo varios días) sugiere bajar volumen o intensidad en los ejercicios de ese patrón en la próxima semana, no en todos.
+- `dias_programados` — a diferencia de todos los bloques anteriores, **incluye días nunca
+  entrenados** (`fecha: null`). Una fila por día del programa, con `mesociclo_id`,
+  `mesociclo_nombre`, `semana`, `dia`, `titulo`, `tipo`, `fecha`, `series_programadas`,
+  `series_completadas`. Es el bloque para responder "¿de qué día vino el faltante?" — un día
+  con `series_completadas: 0` y `series_programadas` alto es un día entero saltado, distinto de
+  varias sesiones con un par de series sueltas al final. Detalle de cómo arma su ventana (por
+  `fecha_creada` de la semana, no por `pd.fecha`) → sección `analisis` de esta doc.
 
 ### Adherencia por posición en el día
 

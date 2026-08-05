@@ -459,6 +459,19 @@ export interface AdherenciaResponse {
   por_ejercicio: AdherenciaPorEjercicio[];
 }
 
+// === Coach (dias_programados, bloque de /analisis) ===
+export interface DiaProgramado {
+  mesociclo_id: number | null;
+  mesociclo_nombre: string | null;
+  semana: number;
+  dia: number;
+  titulo: string | null;
+  tipo: string | null;
+  fecha: string | null; // null = programado, nunca empezado
+  series_programadas: number;
+  series_completadas: number;
+}
+
 // === Coach (docs) ===
 // GET /coach/docs — la doc operativa del coach, servida desde el repo para que
 // no pueda desincronizarse del código que describe.
