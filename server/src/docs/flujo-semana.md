@@ -55,11 +55,28 @@ Usá `?dias=56` si querés más historial. El JSON incluye:
   primero).
 - `sesiones_realizadas` — días con al menos una serie real completada en la ventana, ordenados
   por fecha. Por día: `semana`, `dia`, `tipo`, `fecha`, `hora_inicio`, `hora_fin`, `duracion_min`,
-  `series_hechas`. La `fecha` y `hora_inicio` se autosetean solas en cuanto el atleta carga la
-  primera serie de ese día — no hay paso manual de "registrar" (ese concepto ya no existe). **Usalo
+  `series_hechas`, `notas_coach`, `notas_atleta`. La `fecha` y `hora_inicio` se autosetean solas en
+  cuanto el atleta carga la primera serie de ese día — no hay paso manual de "registrar" (ese
+  concepto ya no existe). **Usalo
   para analizar frecuencia real:** días consecutivos sin descanso, sesiones muy largas, horarios
   irregulares → todas señales de fatiga o adherencia. Ej: 3+ días seguidos o duraciones que se
   alargan progresivamente sugieren bajar volumen o intercalar descanso.
+
+  **`notas_atleta` es el canal del atleta y hay que leerlo en cada sesión.** Es la caja de texto
+  que el atleta escribe desde la app (`PATCH /program/days/:id`), separada de `notas_coach`, que
+  es tu propio canal y el atleta no puede editar. Es donde aparecen dolor, molestias, ejercicios
+  salteados y contexto que ningún número del análisis refleja: "rueda abdominal salteada por DOMS",
+  "sentí muy liviana la barra", "no llegué a hacer el último ejercicio". **Léelo antes de
+  interpretar los números de ese día** — una serie faltante con una nota que la explica no es
+  falta de adherencia, y un RPE alto con una nota de mala noche no es estancamiento.
+
+  Dos límites a tener presentes:
+  - Solo viaja en `sesiones_realizadas`, así que **una nota en un día que el atleta no llegó a
+    entrenar no aparece en ningún bloque del análisis** (`dias_programados` no trae este campo).
+  - Antes de que existiera la caja separada, el atleta escribía sus notas dentro de `notas_coach`
+    prefijadas con "Notas del atleta:". Si ves ese patrón en días viejos, es contenido del atleta
+    en el campo equivocado, no algo que hayas escrito vos. **No repliques esa práctica**: no copies
+    lo que dice el atleta dentro de `notas_coach`, ya llega por su canal propio.
 - `trac_reciente` — **últimos 7 días fijos** (hoy + 6 anteriores, orden ascendente), entrene o no el atleta ese día. 7 dimensiones en escala 1-5 (1=peor, 5=mejor) por día:
   - `fatiga_pierna`, `fatiga_empuje`, `fatiga_traccion` — dolor muscular/fatiga por patrón de movimiento
   - `descanso_alimentacion` — calidad de sueño + alimentación combinada
