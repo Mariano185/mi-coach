@@ -73,8 +73,15 @@ Cascadas `ON DELETE CASCADE` week→day→exercise→set.
 - `trac` — bienestar diario 1–5 (`fatiga_pierna/empuje/traccion, descanso_alimentacion, recuperacion, motivacion, tecnica`), una fila por fecha (upsert).
 - `settings` — clave/valor: `rm_squat/bench/deadlift`, hashes de auth, `coach_api_key`.
 
-**Vista (e1RM Epley, nunca hardcodear):**
-- `v_program_sets_e1rm` — `program_sets.* + e1rm + tonelaje + rir` (solo series reales completas).
+**Vistas (nunca recalcular a mano, siempre leer de acá):**
+- `v_program_sets_e1rm` — `program_sets.* + e1rm + tonelaje + rir` (Epley; solo series reales completas).
+- `v_volumen_por_musculo` — volumen fraccionado por rol (agonista 1.0, sinergista 0.5,
+  estabilizador no suma), una fila por `(week_id, musculo_id)`. Trae `series_programadas` y
+  `series_completadas` por separado, más `semana_programa`/`mesociclo_id`/`week_id` y la semana
+  ISO (`semana`, puede ser NULL). Agrupa por `week_id`, no por `semana` ISO ni por
+  `semana_programa` a secas: las semanas de programa duran 8-9 días (no 7, así que la ISO mezcla
+  semanas distintas) y `semana_programa` se reinicia por mesociclo (así que colisiona entre
+  mesociclos). `week_id` es la única clave no ambigua.
 
 > Las tablas `sessions`/`sets` y el blob legacy `programs` (.md) **ya no existen**: se
 > eliminaron cuando `program_sets` pasó a ser la única fuente de verdad. Las migraciones en
