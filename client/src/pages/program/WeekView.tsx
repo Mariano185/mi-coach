@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import useSWR from "swr";
 import { useNavigate, useParams } from "react-router-dom";
 import type { ProgramWeekDetail } from "../../types";
@@ -23,6 +24,18 @@ export function WeekView() {
   const { data: detail, error } = useSWR<ProgramWeekDetail>(
     valid ? swrKeys.programWeek(weekId) : null
   );
+
+  // La semana de la URL puede pertenecer a otro mesociclo que el guardado en
+  // localStorage (ej. navegación directa, o un mesociclo activo desactualizado
+  // tras crear uno nuevo). Sin esto, el selector de semana queda filtrado por
+  // mesocicloActivo mientras la URL apunta a una semana que no está en esa
+  // lista: el <select> no encuentra su value entre las opciones y muestra
+  // cualquier cosa, aunque el contenido de la página sea el correcto.
+  useEffect(() => {
+    if (detail && detail.mesociclo_id !== mesocicloActivo) {
+      setMesocicloActivo(detail.mesociclo_id);
+    }
+  }, [detail, mesocicloActivo, setMesocicloActivo]);
 
   const weeksDelMesociclo =
     mesociclos.length === 0 ? weeks : weeks.filter((w) => w.mesociclo_id === mesocicloActivo);
