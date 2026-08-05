@@ -482,6 +482,60 @@ export interface ProgresionBasico {
   n_series: number;
 }
 
+// === Coach (GET /coach/progresion/:exercise_id) ===
+// La historia de UN ejercicio de la library, sesión por sesión. A diferencia de
+// ProgresionBasico (bloque de /analisis, limitado a rastrea_e1rm = 1 y con una fila
+// por combinación de carga), este cubre CUALQUIER ejercicio y anida las series dentro
+// de su sesión — la lista `sesiones` en orden ascendente ES la curva de progresión.
+
+export interface ProgresionEjercicioSerie {
+  day_id: number; // el program_day del que salió: dos days distintos pueden compartir sesión
+  n_serie: number;
+  peso_kg: number;
+  reps: number;
+  rpe: number | null;
+  rir: number | null; // derivado en la vista: MAX(0, ROUND(10 - real_rpe))
+  e1rm: number; // de v_program_sets_e1rm, nunca recalculado
+  tonelaje: number; // idem: real_peso * real_reps
+}
+
+// Una sesión = un DÍA CALENDARIO de ese ejercicio. El mismo ejercicio prescrito dos
+// veces en el mismo día se fusiona acá en una sola sesión (por eso day_ids es array).
+export interface ProgresionEjercicioSesion {
+  fecha: string; // YYYY-MM-DD. Nunca null: se filtran los días sin fecha.
+  day_ids: number[]; // >1 elemento = hubo fusión de dos program_days
+  n_series: number; // series completadas (hecha=1 con peso Y reps)
+  /** Máximo e1RM de la sesión. OJO: mejor_e1rm y mejor_tonelaje son máximos
+   *  INDEPENDIENTES — pueden venir de series distintas. No son "la mejor serie". */
+  mejor_e1rm: number;
+  mejor_tonelaje: number;
+  tonelaje_total: number; // volumen real de la sesión (suma, no máximo)
+  rpe_min: number | null; // null si ninguna serie registró RPE
+  rpe_max: number | null;
+  series: ProgresionEjercicioSerie[];
+}
+
+export interface ProgresionEjercicio {
+  ventana_dias: number;
+  ejercicio: {
+    id: number;
+    nombre: string;
+    categoria: string;
+    mecanica: string | null;
+    implemento: string | null;
+    patron: string | null;
+    es_basico: 0 | 1;
+    /** 1 = movimiento de competencia; su progresión YA está en progresion_basicos
+     *  de /analisis. 0 = accesorio, que es el caso para el que existe este endpoint. */
+    rastrea_e1rm: 0 | 1;
+  };
+  n_sesiones: number;
+  /** Orden ASCENDENTE por fecha (la más vieja primero): se lee como una curva.
+   *  Vacío = el ejercicio existe pero no se entrenó DENTRO DE LA VENTANA (no
+   *  necesariamente "nunca") — subí ?dias para descartar lo segundo. */
+  sesiones: ProgresionEjercicioSesion[];
+}
+
 // === Coach (dias_programados, bloque de /analisis) ===
 export interface DiaProgramado {
   mesociclo_id: number | null;

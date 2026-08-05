@@ -1,4 +1,4 @@
-# Caveats de `/coach/analisis` y `/coach/adherencia`
+# Caveats de `/coach/analisis`, `/coach/adherencia` y `/coach/progresion`
 
 Referencia rápida de los denominadores y ventanas de cada bloque — para no comparar números que
 no son comparables entre sí. El detalle de cómo usar cada bloque para armar la semana está en
@@ -12,6 +12,7 @@ la sección `flujo-semana`.
 | `GET /coach/adherencia` | `?dias=90` | Un patrón de posición necesita varias semanas para no ser ruido de una sesión mala. |
 | `dias_programados` (en `/analisis`) | Mismo `?dias=` que `/analisis` | Ventana propia, contada por `fecha_creada` de la semana, no por `pd.fecha` — ver abajo. |
 | `volumen_por_musculo` (en `/analisis`) | Mismo `?dias=` que `/analisis` | Ventana por `fecha_creada` de la semana de programa (no por semana ISO) — mismo criterio que `dias_programados`, ver abajo. |
+| `GET /coach/progresion/:exercise_id` | `?dias=180` (~26 semanas) | Un accesorio se entrena ~1x/semana: 42 días son ~6 sesiones, muy poco para leer una tendencia. |
 
 ## Denominadores que NO son comparables entre sí
 
@@ -32,6 +33,10 @@ la sección `flujo-semana`.
   día en vez de por músculo: "¿cuánto programé vs. cuánto completé, incluyendo lo que no toqué?"
   No mezcles los números agregados de estos dos bloques con los de `sesiones_realizadas` o
   `/adherencia`: esos últimos solo ven una parte del programa (lo ya entrenado).
+- **`GET /coach/progresion/:exercise_id`** cuenta solo series completadas **con peso y reps
+  presentes** (no alcanza con `hecha = 1`, ver más abajo) y agrupa por **fecha calendario**, no
+  por `program_day`. Su `n_series` de una fecha puede no coincidir con el `series_hechas` de
+  `sesiones_realizadas` para ese mismo día si hubo fusión de dos `program_days`.
 
 ## `dias_programados` — cómo arma su ventana (y por qué es distinto)
 
@@ -85,7 +90,9 @@ entrenados — si armás tu propio análisis cruzando datos de más de un bloque
 - El e1RM (Epley) viene **siempre precomputado** en los bloques que lo incluyen. No lo
   recalcules a mano con peso y reps — usá el valor que trae la respuesta.
 - `rastrea_e1rm` marca solo los 3 movimientos de competencia (Squat, Bench, Deadlift). Las
-  variantes no contaminan el e1RM del básico — su progresión se mide dentro de la variante.
+  variantes no contaminan el e1RM del básico — su progresión se mide dentro de la variante, y
+  para eso está `GET /coach/progresion/:exercise_id`, que no filtra por `rastrea_e1rm` y
+  funciona con cualquier ejercicio de la library, no solo los 3 básicos.
 - `progresion_basicos` no trae una fila por serie: agrupa por `(nombre, fecha, peso_kg, reps)`.
   Un día con top set + back-off (dos cargas distintas) te da dos filas, cada una con su propio
   `e1rm`. No promedies el RPE entre filas de un mismo día para "reconstruir la sesión" — usá

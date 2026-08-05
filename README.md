@@ -137,6 +137,8 @@ El coach es una caja negra que solo habla HTTP. El ciclo típico:
 
    **Adherencia por posición en el día** (`GET /api/coach/adherencia?dias=90`, endpoint aparte): responde si los ejercicios que van más tarde en el orden del día se completan menos, sin importar cuál sea. Devuelve tres agregaciones sobre la misma base — `por_posicion` (pct de series completadas por posición 1, 2, 3...), `por_largo_de_dia` (lo mismo cruzado con la cantidad de ejercicios del día, para separar "es la posición" de "son los días largos los que fallan") y `por_ejercicio` (pct por nombre de ejercicio, con su posición promedio, para el efecto opuesto: un ejercicio puntual que se cae siempre). Cada fila trae `dias` (cuántos días distintos la sostienen) para no sacar conclusiones de una sola muestra. Solo entran días efectivamente entrenados (`fecha` no nula) — un día programado y nunca empezado no es una señal sobre el orden de ejercicios, es otra pregunta (adherencia global).
 
+   **Progresión de un ejercicio puntual** (`GET /api/coach/progresion/:exercise_id?dias=180`, endpoint aparte): la historia completa de UN ejercicio de la library — sus sesiones en orden cronológico ascendente, cada una con sus series reales y su `mejor_e1rm`, `mejor_tonelaje` y `tonelaje_total`. A diferencia de `progresion_basicos` (bloque de `/analisis`), **funciona con cualquier ejercicio, no solo con los 3 movimientos de competencia** — que es justo donde la progresión se estanca sin que nadie lo note: un accesorio cinco semanas clavado en el mismo peso. Devuelve `404` si el `exercise_id` no está en la library y `400` si no es numérico; un ejercicio que existe pero no se entrenó en la ventana devuelve `200` con `sesiones: []` y la metadata del ejercicio igual. Ignora series no completadas y series sin peso o sin reps, y fusiona en una sola sesión el mismo ejercicio prescrito dos veces en un mismo día (`day_ids` muestra de qué días vino). Ventana default 180 días (~26 semanas), mucho más larga que la de `/analisis`: seis semanas de un accesorio son unas pocas sesiones, no una progresión legible. **Ojo:** `mejor_e1rm` y `mejor_tonelaje` son máximos independientes y pueden salir de series distintas — no son "los valores de la mejor serie".
+
 2. **Prescribir la semana siguiente:**
 
    ```bash
@@ -239,4 +241,5 @@ Todas las rutas (salvo las públicas) requieren cookie de sesión o header `X-Co
 | PATCH | `/api/program/sets/:id/target` | corregir la prescripción de una serie |
 | GET | `/api/coach/analisis?dias=42` | análisis agregado para el coach |
 | GET | `/api/coach/adherencia?dias=90` | adherencia por posición en el día |
+| GET | `/api/coach/progresion/:exercise_id?dias=180` | historia de un ejercicio: sesiones, series y mejor e1RM/tonelaje |
 | GET | `/api/coach/docs?seccion=` | doc operativa del coach (fuente de verdad, se deploya con el código) |

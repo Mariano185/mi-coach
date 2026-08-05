@@ -114,6 +114,57 @@ no adherencia global).
 Ventana default 90 días (no 42): hacen falta varias semanas para que un patrón de posición
 sea confiable, no ruido de una sola sesión mala.
 
+### Progresión de un ejercicio puntual
+
+Endpoint separado (no viene en `/analisis`):
+
+```bash
+curl -s -H "X-Coach-Key: $COACH_API_KEY" \
+  "http://192.168.0.110:3001/api/coach/progresion/19?dias=180" | jq .
+```
+
+El `exercise_id` sale del bloque `ejercicios` opt-in de `/analisis` (`?incluir=ejercicios`) o de
+`GET /api/exercises`.
+
+**Por qué existe, y en qué se diferencia de lo que ya hay:** `/adherencia` dice si un ejercicio
+*se completa*; `progresion_basicos` (bloque de `/analisis`) dice si un *básico* (Squat, Bench,
+Deadlift) progresa. **Ninguna de las dos dice si un accesorio progresa** — un accesorio con 100%
+de adherencia y cinco semanas clavado en el mismo peso es invisible en ambas. Este endpoint es
+el único que lo muestra, porque **no filtra por `rastrea_e1rm`**: funciona con cualquier
+ejercicio de la library.
+
+Devuelve `sesiones` en orden cronológico **ascendente** — cada elemento es un día calendario
+distinto, con sus series reales y tres señales agregadas:
+- `mejor_e1rm` — el mejor e1RM de la sesión (Epley, de `v_program_sets_e1rm`).
+- `mejor_tonelaje` / `tonelaje_total` — el mejor tonelaje de una sola serie y la suma de todas.
+- `rpe_min` / `rpe_max` — el rango de esfuerzo dentro de la sesión.
+
+**Cómo leerlo:**
+- `mejor_e1rm` plano sesión tras sesión = estancamiento.
+- `mejor_e1rm` plano con `rpe_max` que sube = **regresión disfrazada de meseta**: mismo peso,
+  cada vez más esfuerzo.
+- `tonelaje_total` cayendo con `mejor_e1rm` estable = se sostiene el top set pero se caen las
+  series de atrás — el volumen real de la sesión está bajando aunque el número "estrella" no lo
+  muestre.
+
+**Advertencia:** `mejor_e1rm` y `mejor_tonelaje` son máximos **independientes** — pueden salir de
+series distintas de la misma sesión (ej. el mejor e1RM de la primera serie, el mejor tonelaje de
+la segunda). No son "los valores de la mejor serie"; para ver la sesión real, mirá `series`.
+
+Ignora series no completadas y series sin peso o sin reps. Si el mismo ejercicio aparece dos
+veces en un mismo día (dos `program_days` del mismo día calendario, o dos `program_exercises`
+del mismo día), se fusiona en una sola sesión — `day_ids` muestra de qué días vino, útil para
+verificar la fusión o ir al día concreto.
+
+**Ventana default 180 días** (no 90 ni 42): un accesorio se entrena ~1x/semana, así que 42 días
+son apenas 6 sesiones — insuficiente para leer una tendencia. **`sesiones: []` con la ventana
+default significa "no se entrenó en 180 días", no "nunca se entrenó"** — si esa distinción
+importa, subí `?dias`.
+
+Los ejercicios con `nombre_libre` (sin `exercise_id` fijo, "a elección") quedan fuera por
+diseño: sin id de library no hay progresión que seguir. `404` si el `exercise_id` no existe en
+la library; `200` con `sesiones: []` y la metadata del ejercicio si existe pero no se entrenó.
+
 ---
 
 ## Paso 4 — Construir la semana

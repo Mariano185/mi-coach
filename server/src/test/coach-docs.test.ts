@@ -67,6 +67,7 @@ describe("GET /api/coach/docs", () => {
     );
     expect(rutas).toContain("GET /api/coach/analisis");
     expect(rutas).toContain("GET /api/coach/adherencia");
+    expect(rutas).toContain("GET /api/coach/progresion/:exercise_id");
     expect(rutas).toContain("GET /api/coach/docs");
     expect(rutas).toContain("POST /api/program/weeks");
   });

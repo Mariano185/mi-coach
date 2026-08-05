@@ -13,6 +13,9 @@ import type {
   CoachDocsSeccion,
   DiaProgramado,
   ProgresionBasico,
+  ProgresionEjercicio,
+  ProgresionEjercicioSerie,
+  ProgresionEjercicioSesion,
 } from "../types.js";
 
 export const coachRouter = Router();
@@ -392,6 +395,139 @@ coachRouter.get("/adherencia", (req, res) => {
     por_largo_de_dia,
     por_ejercicio,
   });
+});
+
+// GET /api/coach/progresion/:exercise_id — la historia de UN ejercicio: sus sesiones
+// en orden cronológico ascendente, con las series reales de cada una y sus máximos.
+//
+// Existe como endpoint aparte y NO como bloque de /analisis por dos razones: es una
+// consulta de diagnóstico puntual (el coach ya sospecha de un ejercicio y quiere la
+// evidencia), y necesita una ventana propia mucho más larga que la de /analisis.
+//
+// Deliberadamente NO usa RASTREA_E1RM: ese filtro es justo lo que este endpoint existe
+// para evitar. La progresión de los 3 básicos ya está en progresion_basicos; donde no
+// se veía nada era en los accesorios — que son los que se quedan cinco semanas en el
+// mismo peso sin que nadie lo note.
+//
+// Los ejercicios con nombre_libre (exercise_id NULL en program_exercises) quedan fuera
+// por diseño: no tienen id de library al que apuntar, y sin identidad estable no hay
+// progresión que seguir.
+//   ?dias=180  ventana (default 180 = ~26 semanas). Un accesorio se entrena ~1x/semana:
+//              42 días son ~6 sesiones, muy poco para leer una tendencia.
+coachRouter.get("/progresion/:exercise_id", (req, res) => {
+  const exercise_id = Number(req.params.exercise_id);
+  if (!Number.isInteger(exercise_id)) {
+    return res.status(400).json({ error: "exercise_id inválido" });
+  }
+
+  // 404 antes de cualquier otra query: si el ejercicio no está en la library, no hay
+  // recurso del que hablar. Distinto de "existe pero nunca se entrenó" (200 + [], abajo).
+  const ejercicio = db
+    .prepare(
+      `SELECT e.id, e.nombre, e.categoria, e.mecanica, e.implemento,
+              p.nombre AS patron,
+              COALESCE(e.es_basico, 0) AS es_basico,
+              COALESCE(e.rastrea_e1rm, e.es_basico) AS rastrea_e1rm
+       FROM exercises e
+       LEFT JOIN patrones p ON p.id = e.patron_id
+       WHERE e.id = ?`
+    )
+    .get(exercise_id) as ProgresionEjercicio["ejercicio"] | undefined;
+  if (!ejercicio) return res.status(404).json({ error: "ejercicio no encontrado" });
+
+  const dias = Number(req.query.dias) || 180;
+  const desde = `-${dias} days`;
+
+  // Filtro de series compartido por las dos queries de abajo — tienen que ver
+  // exactamente el mismo conjunto de filas o los agregados no cuadran con el detalle.
+  //
+  // El triple filtro es redundante SOLO en apariencia: hecha=1 no implica peso+reps.
+  // PATCH /program/sets/:id acepta `hecha` explícito en el body, que cortocircuita la
+  // derivación automática (ver program.ts) — así queda una serie hecha=1 sin valores,
+  // que sumaría a n_series sin aportar e1RM ni tonelaje. Mismo criterio que history.ts.
+  //
+  // pd.fecha IS NOT NULL: en el flujo de la API una serie completada siempre autosetea
+  // la fecha del día, pero una inserción directa (seed, migración, fixture) puede dejar
+  // hecha=1 con fecha NULL. Una fila así se agruparía como una "sesión" con fecha null
+  // en medio de un array que existe para leerse en orden temporal.
+  const FILTRO_SERIES = `
+    JOIN program_exercises pe ON pe.id = v.program_exercise_id
+    JOIN program_days pd      ON pd.id = pe.day_id
+    WHERE pe.exercise_id = ?
+      AND v.hecha = 1
+      AND v.real_peso IS NOT NULL
+      AND v.real_reps IS NOT NULL
+      AND pd.fecha IS NOT NULL
+      AND pd.fecha >= date('now', ?)`;
+
+  // Una fila por FECHA, no por program_day ni por program_exercise: el mismo ejercicio
+  // prescrito dos veces en el mismo día (top set a la mañana + back-off a la tarde, o
+  // simplemente duplicado en el orden) es UNA sesión de ese ejercicio, no dos.
+  //
+  // mejor_e1rm y mejor_tonelaje son máximos INDEPENDIENTES, no "los valores de la mejor
+  // serie": en datos reales (Prensa inclinada, 130×9 / 120×10 / 120×8) el mejor e1RM sale
+  // de la serie 1 y el mejor tonelaje de la serie 2. Cualquier lectura de "la mejor serie"
+  // de esta respuesta es incorrecta — para eso está `series`.
+  //
+  // tonelaje_total (además de mejor_tonelaje) es el volumen real de la sesión: un
+  // accesorio puede sostener su top set y perder dos series de back-off — eso es
+  // regresión, y mejor_tonelaje sola no la muestra.
+  const sesiones = db
+    .prepare(
+      `SELECT pd.fecha,
+              COUNT(*)          AS n_series,
+              MAX(v.e1rm)       AS mejor_e1rm,
+              MAX(v.tonelaje)   AS mejor_tonelaje,
+              ROUND(SUM(v.tonelaje), 1) AS tonelaje_total,
+              MIN(v.real_rpe)   AS rpe_min,
+              MAX(v.real_rpe)   AS rpe_max,
+              GROUP_CONCAT(DISTINCT pd.id) AS day_ids_csv
+       FROM v_program_sets_e1rm v
+       ${FILTRO_SERIES}
+       GROUP BY pd.fecha
+       ORDER BY pd.fecha ASC`
+    )
+    .all(exercise_id, desde) as Array<
+    Omit<ProgresionEjercicioSesion, "day_ids" | "series"> & { day_ids_csv: string }
+  >;
+
+  // Segunda query en vez de agrupar filas planas en JS: así los máximos y las sumas los
+  // calcula SQLite sobre v_program_sets_e1rm y el JS solo reasocia por fecha, sin hacer
+  // aritmética de e1RM/tonelaje a mano (convención del proyecto). Mismo patrón de dos
+  // queries + composición que GET /api/history/:dayId.
+  const series = db
+    .prepare(
+      `SELECT pd.fecha, pd.id AS day_id, v.n_serie,
+              v.real_peso AS peso_kg, v.real_reps AS reps, v.real_rpe AS rpe,
+              v.rir, v.e1rm, v.tonelaje
+       FROM v_program_sets_e1rm v
+       ${FILTRO_SERIES}
+       ORDER BY pd.fecha ASC, pe.orden, pe.id, v.n_serie`
+    )
+    .all(exercise_id, desde) as Array<ProgresionEjercicioSerie & { fecha: string }>;
+
+  const seriesPorFecha = new Map<string, ProgresionEjercicioSerie[]>();
+  for (const { fecha, ...serie } of series) {
+    const acc = seriesPorFecha.get(fecha);
+    if (acc) acc.push(serie);
+    else seriesPorFecha.set(fecha, [serie]);
+  }
+
+  const respuesta: ProgresionEjercicio = {
+    ventana_dias: dias,
+    ejercicio,
+    n_sesiones: sesiones.length,
+    sesiones: sesiones.map(({ day_ids_csv, ...s }) => ({
+      ...s,
+      // GROUP_CONCAT devuelve "12" o "12,19" — más de un id significa que dos
+      // program_days del mismo día calendario se fusionaron en esta sesión. No
+      // garantiza orden (verificado), de ahí el sort numérico explícito.
+      day_ids: day_ids_csv.split(",").map(Number).sort((a, b) => a - b),
+      series: seriesPorFecha.get(s.fecha) ?? [],
+    })),
+  };
+
+  res.json(respuesta);
 });
 
 // GET /api/coach/docs — la doc operativa del coach, servida desde el repo para que
