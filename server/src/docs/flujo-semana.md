@@ -42,8 +42,11 @@ Usá `?dias=56` si querés más historial. El JSON incluye:
   `n_semanas` y `max_semana` (la semana más alta **dentro de ese mesociclo**). La numeración de
   semanas se reinicia por mesociclo: para numerar la próxima semana de un mesociclo dado, usá
   `max_semana + 1` de ESE mesociclo, no un contador global. Ver sección **Mesociclos** más abajo.
-- `ultima_semana.max_semana` — deprecado, es el máximo global histórico (de cuando no existían
-  mesociclos). No lo uses para numerar semanas nuevas.
+  **Si `mesociclos` viene vacío** (semanas viejas creadas antes de que existieran los mesociclos,
+  todavía sin `mesociclo_id` asignado): no hay `max_semana` de dónde partir en este bloque. Usá
+  el `semana` más alto que veas en `dias_programados` como referencia, y creá la semana nueva ya
+  con un `mesociclo_id` (ver **Semanas sin mesociclo** más abajo si preferís asignar las viejas
+  primero).
 - `sesiones_realizadas` — días con al menos una serie real completada en la ventana, ordenados
   por fecha. Por día: `semana`, `dia`, `tipo`, `fecha`, `hora_inicio`, `hora_fin`, `duracion_min`,
   `series_hechas`. La `fecha` y `hora_inicio` se autosetean solas en cuanto el atleta carga la

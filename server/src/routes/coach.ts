@@ -142,14 +142,7 @@ function buildAnalisis(dias: number, incluir: Set<BloqueOptIn> = new Set()): Rec
         .all()
     : undefined;
 
-  // 8) Última semana programada (para numerar la próxima = max + 1).
-  // Deprecado desde que existen mesociclos: la numeración ahora se reinicia por
-  // mesociclo, ver el bloque `mesociclos` más abajo (max_semana es por mesociclo).
-  const ultima_semana = db
-    .prepare("SELECT MAX(semana) AS max_semana FROM program_weeks")
-    .get();
-
-  // 8b) Mesociclos con su semana máxima (para numerar la próxima semana de cada uno = max + 1).
+  // 8) Mesociclos con su semana máxima (para numerar la próxima semana de cada uno = max + 1).
   const mesociclos = db
     .prepare(
       `SELECT m.id, m.nombre, m.objetivo,
@@ -279,7 +272,6 @@ function buildAnalisis(dias: number, incluir: Set<BloqueOptIn> = new Set()): Rec
     // objeto (no "ejercicios": null) — así Object.keys() la refleja bien tanto en
     // /analisis como en generado.analisis_bloques de /coach/docs.
     ...(ejercicios !== undefined ? { ejercicios } : {}),
-    ultima_semana,
     mesociclos,
     sesiones_realizadas,
     trac_reciente,
