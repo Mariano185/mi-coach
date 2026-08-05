@@ -7,7 +7,7 @@
 // del viejo seedExercises). Las DBs ya desplegadas tienen filas con historial de
 // entrenamiento colgando de sus ids, así que el seed hace UPSERT POR NOMBRE:
 //   - si el nombre ya existe  -> UPDATE de las columnas de la enciclopedia,
-//                                conservando id, categoria y es_basico
+//                                conservando id y categoria
 //   - si no existe            -> INSERT
 // Nunca borra ejercicios. Un ejercicio que el usuario agregó a mano y que no
 // está en el catálogo simplemente se deja intacto.
@@ -85,14 +85,13 @@ function seedPatrones(db: Database): Map<string, number> {
 // --- Ejercicios ---
 
 /**
- * Columnas de la enciclopedia. `categoria` y `es_basico` quedan fuera del UPDATE
- * a propósito: son las columnas legacy que se retiran en el cutover, y pisarlas
- * acá cambiaría el comportamiento de stats/coach antes de tiempo.
+ * Columnas de la enciclopedia. `categoria` queda fuera del UPDATE a propósito
+ * (columna legacy que no se toca desde el seed).
  */
 function seedEjercicios(db: Database, patronIds: Map<string, number>): Map<string, number> {
   const insert = db.prepare(
     `INSERT INTO exercises (
-       nombre, categoria, es_basico,
+       nombre, categoria,
        patron_id, tipo_variante, transferencia, proposito,
        implemento, angulo_grados, agarre, postura, unilateral,
        mecanica, fuerza, sesgo_longitud, perfil_resistencia, cadena, carga_axial,
@@ -100,7 +99,7 @@ function seedEjercicios(db: Database, patronIds: Map<string, number>): Map<strin
        rastrea_e1rm, es_competitivo,
        notas_tecnicas, contraindicaciones, cues
      ) VALUES (
-       @nombre, @categoria, @es_basico,
+       @nombre, @categoria,
        @patron_id, @tipo_variante, @transferencia, @proposito,
        @implemento, @angulo_grados, @agarre, @postura, @unilateral,
        @mecanica, @fuerza, @sesgo_longitud, @perfil_resistencia, @cadena, @carga_axial,
@@ -147,10 +146,6 @@ function paramsDe(ej: SeedEjercicio, patronIds: Map<string, number>) {
   return {
     nombre: ej.nombre,
     categoria: ej.categoria,
-    // Solo relevante en INSERT (una fila nueva): en UPDATE no se toca.
-    // Se deriva de rastrea_e1rm para que una DB nueva nazca coherente con la
-    // semántica vieja de es_basico (= los 3 movimientos con seguimiento de e1RM).
-    es_basico: bool(ej.rastrea_e1rm, DEFAULTS_EJERCICIO.rastrea_e1rm),
     patron_id: patronIds.get(ej.patron) ?? null,
     tipo_variante: ej.tipo_variante ?? null,
     transferencia: ej.transferencia ?? null,

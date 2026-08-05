@@ -28,10 +28,8 @@ export function setEndpointsCoach(endpoints: CoachDocsEndpoint[]): void {
   ENDPOINTS_COACH = endpoints;
 }
 
-// "Se le sigue el e1RM": los movimientos de competencia. rastrea_e1rm reemplaza a
-// es_basico; COALESCE mantiene el comportamiento en una DB que todavía no corrió
-// el seed de la enciclopedia (rastrea_e1rm en NULL). Ver docs/adr/0001.
-const RASTREA_E1RM = "COALESCE(e.rastrea_e1rm, e.es_basico) = 1";
+// "Se le sigue el e1RM": los movimientos de competencia. Ver docs/adr/0001.
+const RASTREA_E1RM = "e.rastrea_e1rm = 1";
 
 // Bloques que NO viajan por defecto: hay que pedirlos con ?incluir=bloque1,bloque2.
 // Hoy solo `ejercicios` (148 filas, ~55% del payload de /analisis, cuando el coach usa
@@ -143,7 +141,7 @@ function buildAnalisis(dias: number, incluir: Set<BloqueOptIn> = new Set()): Rec
           `SELECT e.id, e.nombre, p.nombre AS patron, e.implemento, e.mecanica,
                   e.ejercicio_padre_id, e.tipo_variante, e.proposito,
                   e.costo_fatiga, e.sesgo_longitud,
-                  COALESCE(e.rastrea_e1rm, e.es_basico) AS rastrea_e1rm
+                  e.rastrea_e1rm
            FROM exercises e
            LEFT JOIN patrones p ON p.id = e.patron_id
            ORDER BY e.id`
@@ -426,8 +424,7 @@ coachRouter.get("/progresion/:exercise_id", (req, res) => {
     .prepare(
       `SELECT e.id, e.nombre, e.categoria, e.mecanica, e.implemento,
               p.nombre AS patron,
-              COALESCE(e.es_basico, 0) AS es_basico,
-              COALESCE(e.rastrea_e1rm, e.es_basico) AS rastrea_e1rm
+              e.rastrea_e1rm
        FROM exercises e
        LEFT JOIN patrones p ON p.id = e.patron_id
        WHERE e.id = ?`

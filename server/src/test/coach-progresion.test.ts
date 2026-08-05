@@ -25,12 +25,12 @@ function diasAtras(n: number): string {
 
 // Idempotente: exercises no se limpia entre tests, así que un INSERT literal
 // colisiona con UNIQUE(nombre).
-function seedEjercicio(nombre: string, opts: { esBasico?: number; rastreaE1rm?: number } = {}): number {
+function seedEjercicio(nombre: string, opts: { rastreaE1rm?: number } = {}): number {
   db.prepare(
-    `INSERT INTO exercises (nombre, categoria, es_basico, rastrea_e1rm)
-     SELECT ?, 'Accesorio', ?, ?
+    `INSERT INTO exercises (nombre, categoria, rastrea_e1rm)
+     SELECT ?, 'Accesorio', ?
      WHERE NOT EXISTS (SELECT 1 FROM exercises WHERE nombre = ?)`
-  ).run(nombre, opts.esBasico ?? 0, opts.rastreaE1rm ?? 0, nombre);
+  ).run(nombre, opts.rastreaE1rm ?? 0, nombre);
   return (db.prepare("SELECT id FROM exercises WHERE nombre = ?").get(nombre) as { id: number }).id;
 }
 

@@ -36,7 +36,7 @@ exercisesRouter.get("/", (req, res) => {
 
     const rows = db
       .prepare(
-        `SELECT e.id, e.nombre, e.categoria, e.es_basico,
+        `SELECT e.id, e.nombre, e.categoria, e.rastrea_e1rm,
                 em.rol, em.orden, em.fraccion_volumen
          FROM exercises e
          JOIN ejercicio_musculos em ON em.exercise_id = e.id
@@ -51,7 +51,7 @@ exercisesRouter.get("/", (req, res) => {
 
   if (req.query.detalle !== "full") {
     const rows = db
-      .prepare("SELECT id, nombre, categoria, es_basico FROM exercises ORDER BY es_basico DESC, categoria, nombre")
+      .prepare("SELECT id, nombre, categoria, rastrea_e1rm FROM exercises ORDER BY rastrea_e1rm DESC, categoria, nombre")
       .all() as Exercise[];
     return res.json(rows);
   }
@@ -62,7 +62,7 @@ exercisesRouter.get("/", (req, res) => {
        FROM exercises e
        LEFT JOIN patrones p ON p.id = e.patron_id
        LEFT JOIN exercises padre ON padre.id = e.ejercicio_padre_id
-       ORDER BY e.es_basico DESC, e.categoria, e.nombre`
+       ORDER BY e.rastrea_e1rm DESC, e.categoria, e.nombre`
     )
     .all() as Array<Omit<ExerciseDetalle, "variantes" | "musculos">>;
 
@@ -225,7 +225,7 @@ exercisesRouter.post("/", (req, res) => {
 
   const insEx = db.prepare(
     `INSERT INTO exercises (
-       nombre, categoria, es_basico,
+       nombre, categoria,
        patron_id, ejercicio_padre_id, tipo_variante, transferencia, proposito,
        implemento, angulo_grados, agarre, postura, unilateral,
        mecanica, fuerza, sesgo_longitud, perfil_resistencia, cadena, carga_axial,
@@ -233,7 +233,7 @@ exercisesRouter.post("/", (req, res) => {
        rastrea_e1rm, es_competitivo,
        notas_tecnicas, contraindicaciones, cues
      ) VALUES (
-       @nombre, @categoria, 0,
+       @nombre, @categoria,
        @patron_id, @ejercicio_padre_id, @tipo_variante, @transferencia, @proposito,
        @implemento, @angulo_grados, @agarre, @postura, @unilateral,
        @mecanica, @fuerza, @sesgo_longitud, @perfil_resistencia, @cadena, @carga_axial,

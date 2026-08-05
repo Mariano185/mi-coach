@@ -10,11 +10,8 @@ export const statsRouter = Router();
 // el valor hacia abajo (siempre pierde contra el día pesado dentro de esas 3 sesiones).
 const SESIONES_ACTUAL = 3;
 
-// "Se le sigue el e1RM": los movimientos de competencia. rastrea_e1rm reemplaza a
-// es_basico (mismo significado, nombre honesto — es_basico sugería "compuesto", que
-// no era). COALESCE mantiene el comportamiento en una DB que todavía no corrió el
-// seed de la enciclopedia, donde rastrea_e1rm está en NULL.
-const RASTREA_E1RM = "COALESCE(e.rastrea_e1rm, e.es_basico) = 1";
+// "Se le sigue el e1RM": los movimientos de competencia. Ver docs/adr/0001.
+const RASTREA_E1RM = "e.rastrea_e1rm = 1";
 
 // GET /api/stats — e1RM por básico (histórico + actual), tendencia de peso (PM 7d), volumen semanal.
 statsRouter.get("/", (_req, res) => {

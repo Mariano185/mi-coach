@@ -76,7 +76,7 @@ describe("GET /api/coach/adherencia", () => {
   // colisiona con UNIQUE(nombre) entre tests.
   function seedEjercicio(nombre: string): number {
     db.prepare(
-      `INSERT INTO exercises (nombre, categoria, es_basico)
+      `INSERT INTO exercises (nombre, categoria, rastrea_e1rm)
        SELECT ?, 'Accesorio', 0
        WHERE NOT EXISTS (SELECT 1 FROM exercises WHERE nombre = ?)`
     ).run(nombre, nombre);
@@ -279,7 +279,7 @@ describe("GET /api/coach/analisis — dias_programados", () => {
   // Idempotente: exercises no se limpia en beforeEach.
   function seedEjercicio(nombre: string): number {
     db.prepare(
-      `INSERT INTO exercises (nombre, categoria, es_basico)
+      `INSERT INTO exercises (nombre, categoria, rastrea_e1rm)
        SELECT ?, 'Accesorio', 0
        WHERE NOT EXISTS (SELECT 1 FROM exercises WHERE nombre = ?)`
     ).run(nombre, nombre);

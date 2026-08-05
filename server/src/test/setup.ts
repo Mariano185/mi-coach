@@ -15,7 +15,6 @@ export function createTestDb() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       nombre TEXT NOT NULL UNIQUE,
       categoria TEXT NOT NULL,
-      es_basico INTEGER NOT NULL DEFAULT 0,
       patron_id INTEGER REFERENCES patrones(id),
       ejercicio_padre_id INTEGER REFERENCES exercises(id),
       tipo_variante TEXT,
@@ -186,13 +185,13 @@ export function createTestDb() {
   `);
 
   // Ejercicios básicos mínimos para los tests
-  db.prepare("INSERT INTO exercises (nombre, categoria, es_basico) VALUES (?, ?, ?)").run(
+  db.prepare("INSERT INTO exercises (nombre, categoria, rastrea_e1rm) VALUES (?, ?, ?)").run(
     "Mid/High Bar Back Squat", "Básico", 1
   );
-  db.prepare("INSERT INTO exercises (nombre, categoria, es_basico) VALUES (?, ?, ?)").run(
+  db.prepare("INSERT INTO exercises (nombre, categoria, rastrea_e1rm) VALUES (?, ?, ?)").run(
     "Flat Bench Press (barra)", "Básico", 1
   );
-  db.prepare("INSERT INTO exercises (nombre, categoria, es_basico) VALUES (?, ?, ?)").run(
+  db.prepare("INSERT INTO exercises (nombre, categoria, rastrea_e1rm) VALUES (?, ?, ?)").run(
     "Conventional Deadlift", "Básico", 1
   );
 

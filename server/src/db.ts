@@ -20,8 +20,7 @@ function migrate(): void {
     CREATE TABLE IF NOT EXISTS exercises (
       id        INTEGER PRIMARY KEY AUTOINCREMENT,
       nombre    TEXT NOT NULL UNIQUE,
-      categoria TEXT NOT NULL,
-      es_basico INTEGER NOT NULL DEFAULT 0
+      categoria TEXT NOT NULL
     );
 
     -- Catálogo canónico de músculos (sección "enciclopedia de ejercicios", ver
@@ -204,6 +203,10 @@ function migrate(): void {
     try { db.exec(col); } catch { /* columna ya existe */ }
   }
 
+  // es_basico duplicaba rastrea_e1rm (verificado en producción: 0 divergencias en
+  // 148 ejercicios, issue #11). Idempotente: solo corre si la columna sigue presente.
+  dropEsBasico();
+
   // tipo A/B → texto libre opcional en program_days. SQLite no soporta ALTER COLUMN/DROP
   // CONSTRAINT, así que hay que recrear la tabla para sacar el CHECK viejo. Idempotente: solo
   // corre si el CHECK sigue presente en el DDL guardado.
@@ -317,6 +320,13 @@ function migrate(): void {
       -- en ASC, así que una semana programada-no-entrenada saldría arriba de todo.
       ORDER BY semana_creada, week_id, m.grupo, m.nombre;
   `);
+}
+
+function dropEsBasico(): void {
+  const cols = db.prepare("PRAGMA table_info(exercises)").all() as Array<{ name: string }>;
+  if (!cols.some((c) => c.name === "es_basico")) return; // ya migrada
+
+  db.exec("ALTER TABLE exercises DROP COLUMN es_basico");
 }
 
 function backfillFechaRealDesdeSessions(): void {

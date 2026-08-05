@@ -4,7 +4,7 @@ export interface Exercise {
   id: number;
   nombre: string;
   categoria: string;
-  es_basico: 0 | 1;
+  rastrea_e1rm: 0 | 1 | null; // NULL en ejercicios que no corrieron el seed de la enciclopedia
 }
 
 // === Enciclopedia de ejercicios (ver docs/adr/0001) ===
@@ -287,7 +287,7 @@ export interface ProgramWeekDetail extends ProgramWeek {
 
 export interface ProgramExerciseCard extends ProgramExercise {
   nombre: string;     // exercise.nombre o nombre_libre
-  es_basico: 0 | 1;
+  rastrea_e1rm: 0 | 1;
   n_series: number;
   n_series_hechas: number;
 }
@@ -300,7 +300,7 @@ export interface ProgramDayDetail extends ProgramDay {
 
 export interface ProgramExerciseDetail extends ProgramExercise {
   nombre: string;
-  es_basico: 0 | 1;
+  rastrea_e1rm: 0 | 1;
   dia: number;
   tipo: string | null;
   sets: Array<ProgramSet & { e1rm: number | null; tonelaje: number | null }>;
@@ -524,7 +524,6 @@ export interface ProgresionEjercicio {
     mecanica: string | null;
     implemento: string | null;
     patron: string | null;
-    es_basico: 0 | 1;
     /** 1 = movimiento de competencia; su progresión YA está en progresion_basicos
      *  de /analisis. 0 = accesorio, que es el caso para el que existe este endpoint. */
     rastrea_e1rm: 0 | 1;

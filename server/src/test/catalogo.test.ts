@@ -137,9 +137,9 @@ describe("GET /api/exercises — no regresión de la forma compacta", () => {
     app = await createTestApp(db);
   });
 
-  it("sin query params sigue devolviendo solo id/nombre/categoria/es_basico", async () => {
+  it("sin query params sigue devolviendo solo id/nombre/categoria/rastrea_e1rm", async () => {
     const res = await request(app).get("/api/exercises").set(AUTH);
     expect(res.status).toBe(200);
-    expect(Object.keys(res.body[0]).sort()).toEqual(["categoria", "es_basico", "id", "nombre"]);
+    expect(Object.keys(res.body[0]).sort()).toEqual(["categoria", "id", "nombre", "rastrea_e1rm"]);
   });
 });

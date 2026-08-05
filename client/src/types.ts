@@ -4,7 +4,7 @@ export interface Exercise {
   id: number;
   nombre: string;
   categoria: string;
-  es_basico: 0 | 1;
+  rastrea_e1rm: 0 | 1 | null; // NULL en ejercicios que no corrieron el seed de la enciclopedia
 }
 
 // === Enciclopedia de ejercicios (ver docs/adr/0001) ===
@@ -252,7 +252,7 @@ export interface ProgramExerciseCard {
   notas: string | null;
   orden: number;
   nombre: string;
-  es_basico: 0 | 1;
+  rastrea_e1rm: 0 | 1;
   n_series: number;
   n_series_hechas: number;
 }
@@ -310,7 +310,7 @@ export interface ProgramExerciseDetail {
   notas: string | null;
   orden: number;
   nombre: string;
-  es_basico: 0 | 1;
+  rastrea_e1rm: 0 | 1;
   dia: number;
   tipo: string | null;
   sets: ProgramSet[];

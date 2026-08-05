@@ -25,7 +25,7 @@ const EXERCISES_DEL_DIA_SQL = `
   SELECT
     pe.*,
     ${EX_NAME_SQL} AS nombre,
-    COALESCE(e.es_basico, 0) AS es_basico,
+    COALESCE(e.rastrea_e1rm, 0) AS rastrea_e1rm,
     (SELECT COUNT(*) FROM program_sets ps WHERE ps.program_exercise_id = pe.id) AS n_series,
     (SELECT COUNT(*) FROM program_sets ps WHERE ps.program_exercise_id = pe.id AND ps.hecha = 1) AS n_series_hechas
   FROM program_exercises pe
@@ -233,7 +233,7 @@ programRouter.get("/exercises/:id", (req, res) => {
 
   const ex = db
     .prepare(
-      `SELECT pe.*, ${EX_NAME_SQL} AS nombre, COALESCE(e.es_basico,0) AS es_basico,
+      `SELECT pe.*, ${EX_NAME_SQL} AS nombre, COALESCE(e.rastrea_e1rm,0) AS rastrea_e1rm,
               pd.dia, pd.tipo
        FROM program_exercises pe
        LEFT JOIN exercises e ON e.id = pe.exercise_id
@@ -241,7 +241,7 @@ programRouter.get("/exercises/:id", (req, res) => {
        WHERE pe.id = ?`
     )
     .get(id) as
-    | (ProgramExercise & { nombre: string; es_basico: 0 | 1; dia: number; tipo: string | null })
+    | (ProgramExercise & { nombre: string; rastrea_e1rm: 0 | 1; dia: number; tipo: string | null })
     | undefined;
   if (!ex) return res.status(404).json({ error: "ejercicio no encontrado" });
 
@@ -254,7 +254,7 @@ programRouter.get("/exercises/:id", (req, res) => {
   const detail: ProgramExerciseDetail = {
     ...(ex as ProgramExercise),
     nombre: ex.nombre,
-    es_basico: ex.es_basico,
+    rastrea_e1rm: ex.rastrea_e1rm,
     dia: ex.dia,
     tipo: ex.tipo,
     sets: sets as ProgramExerciseDetail["sets"],
@@ -314,7 +314,7 @@ programRouter.patch("/exercises/:id", (req, res) => {
 
   const updated = db
     .prepare(
-      `SELECT pe.*, ${EX_NAME_SQL} AS nombre, COALESCE(e.es_basico,0) AS es_basico
+      `SELECT pe.*, ${EX_NAME_SQL} AS nombre, COALESCE(e.rastrea_e1rm,0) AS rastrea_e1rm
        FROM program_exercises pe
        LEFT JOIN exercises e ON e.id = pe.exercise_id
        WHERE pe.id = ?`
@@ -396,7 +396,7 @@ programRouter.post("/days/:id/exercises", (req, res) => {
   })();
 
   const created = db.prepare(
-    `SELECT pe.*, ${EX_NAME_SQL} AS nombre, COALESCE(e.es_basico,0) AS es_basico
+    `SELECT pe.*, ${EX_NAME_SQL} AS nombre, COALESCE(e.rastrea_e1rm,0) AS rastrea_e1rm
      FROM program_exercises pe LEFT JOIN exercises e ON e.id = pe.exercise_id WHERE pe.id = ?`
   ).get(exId);
   res.status(201).json(created);

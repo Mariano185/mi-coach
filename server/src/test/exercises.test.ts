@@ -24,11 +24,11 @@ describe("GET /api/exercises", () => {
     app = await createTestApp(db);
   });
 
-  it("forma compacta por default: solo id/nombre/categoria/es_basico", async () => {
+  it("forma compacta por default: solo id/nombre/categoria/rastrea_e1rm", async () => {
     const res = await request(app).get("/api/exercises").set(AUTH);
     expect(res.status).toBe(200);
     expect(res.body.length).toBeGreaterThan(0);
-    expect(Object.keys(res.body[0]).sort()).toEqual(["categoria", "es_basico", "id", "nombre"]);
+    expect(Object.keys(res.body[0]).sort()).toEqual(["categoria", "id", "nombre", "rastrea_e1rm"]);
   });
 
   it("?detalle=full trae las columnas de la enciclopedia, en NULL antes del seed", async () => {
@@ -38,7 +38,10 @@ describe("GET /api/exercises", () => {
     expect(squat).toBeDefined();
     expect(squat.patron_id).toBeNull();
     expect(squat.sesgo_longitud).toBeNull();
-    expect(squat.rastrea_e1rm).toBeNull();
+    // rastrea_e1rm SÍ está seteado por el fixture mínimo de setup.ts (es lo que lo
+    // marca como básico para los tests de e1RM) — no es una columna "en NULL antes
+    // del seed" como el resto de la enciclopedia.
+    expect(squat.rastrea_e1rm).toBe(1);
     expect(squat.variantes).toEqual([]);
     expect(squat.musculos).toEqual([]);
   });
