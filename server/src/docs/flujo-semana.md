@@ -8,23 +8,36 @@ curl -s -H "X-Coach-Key: $COACH_API_KEY" \
 ```
 
 Usá `?dias=56` si querés más historial. El JSON incluye:
-- `progresion_basicos` — serie temporal de e1RM y RPE por básico
+- `progresion_basicos` — una fila por combinación de carga `(nombre, fecha, peso_kg, reps)`
+  entrenada, no una fila por serie ni una por sesión. Trae `e1rm`, `rpe_min`, `rpe_max` y
+  `n_series` de esa carga puntual. **Por qué esta forma:** un día de top set + back-off (ej.
+  Bench 80×4 y después 75×4) produce **dos filas**, cada una con su propio `e1rm` — agrupar
+  solo por `(nombre, fecha)` mezclaría las dos cargas en una sola fila sin un `peso_kg` que la
+  represente. `rpe_min`/`rpe_max` conservan la fatiga que sube dentro de una misma carga (ej.
+  RPE 7→8→8→8.5 en la misma serie repetida) — no la promedies vos, esa es la señal para decidir
+  si el peso está bien puesto. El promedio de RPE por sesión, si lo necesitás aparte, ya está en
+  `rpe_basicos`.
 - `rpe_basicos` — RPE promedio por sesión (señal de fatiga)
 - `mejor_e1rm_basicos` — mejor e1RM histórico por básico
 - `peso_corporal` — tendencia con PM 7d
 - `volumen_por_musculo` — series por semana y músculo, fraccionado por rol (agonista suma 1.0,
   sinergista 0.5, estabilizador no suma). No es directamente comparable con volumen viejo por
   categoría: una serie de remo ahora aporta 1.0 a dorsal Y 0.5 a bíceps, no "1 serie de espalda".
-- `ejercicios` — library completa con `id`, `patron`, `implemento`, `mecanica`,
-  `ejercicio_padre_id`, `tipo_variante`, `proposito`, `costo_fatiga`, `sesgo_longitud`,
-  `rastrea_e1rm` (usá `id` al armar la semana). **Regla:** preferí el ejercicio canónico
-  (`ejercicio_padre_id: null`) por defecto; usá una variante solo cuando su `proposito` responde
-  a una necesidad real de la atleta (punto débil, meseta, bloque de fuerza específico) — nunca
-  por variedad sola. Detalle completo de cuándo usar cada variante en `Variantes_y_ejercicios.md`
-  (material de coach, fuera de esta API). Para ver la grilla muscular completa de un ejercicio
-  (todos los músculos, ranking, rol), pedí `GET /api/exercises/:id` o
-  `GET /api/exercises?detalle=full`. Qué significa cada campo biomecánico y cuánto peso darle →
-  sección `enciclopedia` de esta doc.
+- `ejercicios` — **opt-in, no viene por defecto.** Pedilo con `?incluir=ejercicios` (agregado a
+  `?dias=`, ej. `?dias=42&incluir=ejercicios`; admite lista separada por comas si en el futuro
+  hay más bloques opt-in). Es el catálogo completo (148 ejercicios) y pesa ~55% del payload —
+  pedilo solo cuando vayas a elegir o dar de alta un ejercicio, no en cada `/analisis` de
+  rutina. Trae `id`, `patron`, `implemento`, `mecanica`, `ejercicio_padre_id`, `tipo_variante`,
+  `proposito`, `costo_fatiga`, `sesgo_longitud`, `rastrea_e1rm` (usá `id` al armar la semana).
+  **Regla:** preferí el ejercicio canónico (`ejercicio_padre_id: null`) por defecto; usá una
+  variante solo cuando su `proposito` responde a una necesidad real de la atleta (punto débil,
+  meseta, bloque de fuerza específico) — nunca por variedad sola. Detalle completo de cuándo usar
+  cada variante en `Variantes_y_ejercicios.md` (material de coach, fuera de esta API). Para ver
+  la grilla muscular completa de un ejercicio (todos los músculos, ranking, rol), pedí
+  `GET /api/exercises/:id` o `GET /api/exercises?detalle=full` — no hace falta `?incluir=` de
+  `/analisis` para eso. Qué significa cada campo biomecánico y cuánto peso darle → sección
+  `enciclopedia` de esta doc. `generado.analisis_bloques` de esta misma respuesta de `/coach/docs`
+  marca qué bloques son opt-in (`opt_in: true`), por si necesitás confirmar qué existe.
 - `mesociclos` — lista de mesociclos existentes, cada uno con `id`, `nombre`, `objetivo`,
   `n_semanas` y `max_semana` (la semana más alta **dentro de ese mesociclo**). La numeración de
   semanas se reinicia por mesociclo: para numerar la próxima semana de un mesociclo dado, usá

@@ -501,3 +501,109 @@ describe("GET /api/coach/analisis — dias_programados", () => {
     expect(res.body.dias_programados).toEqual([]);
   });
 });
+
+describe("GET /api/coach/analisis — ejercicios opt-in y progresion_basicos agrupado", () => {
+  let app: Awaited<ReturnType<typeof createTestApp>>;
+
+  beforeEach(async () => {
+    db.exec("DELETE FROM program_weeks;");
+    app = await createTestApp(db);
+  });
+
+  function diasAtras(n: number): string {
+    const d = new Date();
+    d.setDate(d.getDate() - n);
+    return d.toISOString().slice(0, 10);
+  }
+
+  // Registra n series reales de un básico, todas con la misma carga y una lista de RPE
+  // (una entrada por serie). Simula el caso real: top set + back-off como dos llamadas
+  // con pesos distintos el mismo día.
+  function registrarBasico(opts: { nombre: string; fecha: string; peso: number; reps: number; rpes: number[] }): void {
+    const exId = (db.prepare("SELECT id FROM exercises WHERE nombre = ?").get(opts.nombre) as { id: number }).id;
+    const weekId = db
+      .prepare(
+        "INSERT INTO program_weeks (semana, nombre, fecha_creada, activa) VALUES ((SELECT COALESCE(MAX(semana),0)+1 FROM program_weeks), 'Test', '2024-01-01', 1)"
+      )
+      .run().lastInsertRowid as number;
+    const dayId = db
+      .prepare("INSERT INTO program_days (week_id, dia, tipo, fecha, orden) VALUES (?, 1, 'A', ?, 0)")
+      .run(weekId, opts.fecha).lastInsertRowid as number;
+    const peId = db
+      .prepare("INSERT INTO program_exercises (day_id, exercise_id, seccion, orden) VALUES (?, ?, 'main', 0)")
+      .run(dayId, exId).lastInsertRowid as number;
+
+    opts.rpes.forEach((rpe, i) => {
+      db.prepare(
+        "INSERT INTO program_sets (program_exercise_id, n_serie, target_reps, real_peso, real_reps, real_rpe, hecha) VALUES (?, ?, ?, ?, ?, ?, 1)"
+      ).run(peId, i + 1, opts.reps, opts.peso, opts.reps, rpe);
+    });
+  }
+
+  it("por defecto no incluye el bloque ejercicios", async () => {
+    const res = await request(app).get("/api/coach/analisis").set(AUTH);
+    expect(res.status).toBe(200);
+    expect(res.body).not.toHaveProperty("ejercicios");
+  });
+
+  it("?incluir=ejercicios devuelve el bloque completo", async () => {
+    const res = await request(app).get("/api/coach/analisis?incluir=ejercicios").set(AUTH);
+    expect(res.body.ejercicios.length).toBeGreaterThan(0);
+  });
+
+  it("?incluir=loquesea (bloque inexistente) no rompe y no agrega nada", async () => {
+    const res = await request(app).get("/api/coach/analisis?incluir=loquesea").set(AUTH);
+    expect(res.status).toBe(200);
+    expect(res.body).not.toHaveProperty("ejercicios");
+  });
+
+  it("?incluir=ejercicios,loquesea igual trae ejercicios (lista separada por comas)", async () => {
+    const res = await request(app).get("/api/coach/analisis?incluir=ejercicios,loquesea").set(AUTH);
+    expect(res.body.ejercicios.length).toBeGreaterThan(0);
+  });
+
+  it("top set + back-off producen dos filas separadas con e1RM distintos (caso real 01/08)", async () => {
+    const fecha = diasAtras(1);
+    registrarBasico({ nombre: "Flat Bench Press (barra)", fecha, peso: 80, reps: 4, rpes: [8] });
+    registrarBasico({ nombre: "Flat Bench Press (barra)", fecha, peso: 75, reps: 4, rpes: [7] });
+
+    const res = await request(app).get("/api/coach/analisis?dias=42").set(AUTH);
+    const filas = res.body.progresion_basicos as Array<{
+      peso_kg: number;
+      reps: number;
+      e1rm: number;
+      n_series: number;
+    }>;
+
+    expect(filas).toHaveLength(2);
+    const topSet = filas.find((f) => f.peso_kg === 80)!;
+    const backOff = filas.find((f) => f.peso_kg === 75)!;
+    expect(topSet.e1rm).toBeCloseTo(80 * (1 + 4 / 30), 1);
+    expect(backOff.e1rm).toBeCloseTo(75 * (1 + 4 / 30), 1);
+    expect(topSet.n_series).toBe(1);
+    expect(backOff.n_series).toBe(1);
+  });
+
+  it("varias series a la misma carga se agrupan en una fila con rpe_min/rpe_max/n_series", async () => {
+    registrarBasico({
+      nombre: "Flat Bench Press (barra)",
+      fecha: diasAtras(1),
+      peso: 100,
+      reps: 3,
+      rpes: [7, 8, 8, 8.5],
+    });
+
+    const res = await request(app).get("/api/coach/analisis?dias=42").set(AUTH);
+    const filas = res.body.progresion_basicos as Array<{
+      peso_kg: number;
+      rpe_min: number;
+      rpe_max: number;
+      n_series: number;
+    }>;
+
+    expect(filas).toHaveLength(1);
+    expect(filas[0].n_series).toBe(4);
+    expect(filas[0].rpe_min).toBe(7);
+    expect(filas[0].rpe_max).toBe(8.5);
+  });
+});

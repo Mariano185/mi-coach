@@ -7,10 +7,12 @@ import type {
   AdherenciaPorEjercicio,
   AdherenciaPorLargo,
   AdherenciaPorPosicion,
+  CoachDocsAnalisisBloque,
   CoachDocsEndpoint,
   CoachDocsResponse,
   CoachDocsSeccion,
   DiaProgramado,
+  ProgresionBasico,
 } from "../types.js";
 
 export const coachRouter = Router();
@@ -28,10 +30,17 @@ export function setEndpointsCoach(endpoints: CoachDocsEndpoint[]): void {
 // el seed de la enciclopedia (rastrea_e1rm en NULL). Ver docs/adr/0001.
 const RASTREA_E1RM = "COALESCE(e.rastrea_e1rm, e.es_basico) = 1";
 
+// Bloques que NO viajan por defecto: hay que pedirlos con ?incluir=bloque1,bloque2.
+// Hoy solo `ejercicios` (148 filas, ~55% del payload de /analisis, cuando el coach usa
+// 6-7 por semana) — ya existe GET /api/exercises para pedir el catálogo completo aparte.
+const BLOQUES_OPT_IN = ["ejercicios"] as const;
+type BloqueOptIn = (typeof BLOQUES_OPT_IN)[number];
+
 // Arma el objeto de /analisis. Extraído a función para que GET /docs pueda pedir
 // Object.keys() de una respuesta real como generado.analisis_bloques, en vez de
 // mantener la lista de bloques a mano en otro lugar (eso es lo que se desincroniza).
-function buildAnalisis(dias: number): Record<string, unknown> {
+// `incluir` son los bloques opt-in a sumar además del default.
+function buildAnalisis(dias: number, incluir: Set<BloqueOptIn> = new Set()): Record<string, unknown> {
   const desde = `-${dias} days`;
 
   // 1) Mejor e1RM histórico por básico.
@@ -46,20 +55,29 @@ function buildAnalisis(dias: number): Record<string, unknown> {
     )
     .all();
 
-  // 2) Progresión e1RM por básico en la ventana (serie temporal por día entrenado).
+  // 2) Progresión e1RM por básico en la ventana. Agrupada por (nombre, fecha, peso_kg,
+  //    reps) — no por serie ni por sesión. El e1RM es función de peso×reps, así que
+  //    repetirlo por serie no aporta nada; pero agrupar solo por (nombre, fecha) SÍ
+  //    pierde información: top set + back-off del mismo día (11 de 34 sesiones reales,
+  //    ej. Bench 80×4 + 75×4) tienen dos pesos distintos y un e1RM cada uno — agruparlos
+  //    dejaría un peso_kg ambiguo. rpe_min/rpe_max conservan la fatiga intra-sesión
+  //    (ej. RPE 7→8→8→8.5 en la misma carga) que un promedio (ya cubierto por
+  //    rpe_basicos) borraría.
   const progresion_basicos = db
     .prepare(
       `SELECT e.nombre, pd.fecha, ps.real_peso AS peso_kg, ps.real_reps AS reps,
-              ps.real_rpe AS rpe, v.e1rm
+              v.e1rm, MIN(ps.real_rpe) AS rpe_min, MAX(ps.real_rpe) AS rpe_max,
+              COUNT(*) AS n_series
        FROM v_program_sets_e1rm v
        JOIN program_sets ps ON ps.id = v.id
        JOIN program_exercises pe ON pe.id = ps.program_exercise_id
        JOIN program_days pd ON pd.id = pe.day_id
        JOIN exercises e ON e.id = pe.exercise_id
        WHERE ${RASTREA_E1RM} AND v.e1rm IS NOT NULL AND pd.fecha >= date('now', ?)
-       ORDER BY e.nombre, pd.fecha, ps.n_serie`
+       GROUP BY e.nombre, pd.fecha, ps.real_peso, ps.real_reps
+       ORDER BY e.nombre, pd.fecha, ps.real_peso DESC`
     )
-    .all(desde);
+    .all(desde) as ProgresionBasico[];
 
   // 3) RPE promedio por básico por día entrenado (señal de fatiga).
   const rpe_basicos = db
@@ -90,6 +108,8 @@ function buildAnalisis(dias: number): Record<string, unknown> {
   // región y rol: "Smith/Multipower: 16 series" no decía nada sobre qué se
   // entrenó realmente. Una serie de remo aporta 1.0 al dorsal y 0.5 al bíceps;
   // los estabilizadores no acumulan volumen. Ver docs/adr/0001.
+  // Ya respeta ?dias= (verificado: dias=42 -> 7 semanas ISO, dias=14 -> 3). El bloque
+  // pesa por ser 7 semanas × ~29 músculos, no por una ventana mal acotada.
   const volumen_por_musculo = db
     .prepare(
       `SELECT semana, musculo, grupo, series
@@ -104,17 +124,23 @@ function buildAnalisis(dias: number): Record<string, unknown> {
   // la necesite para el 90% de las decisiones. El detalle (músculos, sesgo de
   // longitud, contraindicaciones) se pide por GET /api/exercises/:id o
   // GET /api/exercises?detalle=full cuando hace falta elegir entre variantes.
-  const ejercicios = db
-    .prepare(
-      `SELECT e.id, e.nombre, p.nombre AS patron, e.implemento, e.mecanica,
-              e.ejercicio_padre_id, e.tipo_variante, e.proposito,
-              e.costo_fatiga, e.sesgo_longitud,
-              COALESCE(e.rastrea_e1rm, e.es_basico) AS rastrea_e1rm
-       FROM exercises e
-       LEFT JOIN patrones p ON p.id = e.patron_id
-       ORDER BY e.id`
-    )
-    .all();
+  //
+  // OPT-IN (?incluir=ejercicios): son 148 filas (~55% del payload) para elegir 6-7
+  // por semana, y GET /api/exercises ya cubre "traeme el catálogo". No se ejecuta
+  // la query si no fue pedida — no vale pagar el costo para descartar el resultado.
+  const ejercicios = incluir.has("ejercicios")
+    ? db
+        .prepare(
+          `SELECT e.id, e.nombre, p.nombre AS patron, e.implemento, e.mecanica,
+                  e.ejercicio_padre_id, e.tipo_variante, e.proposito,
+                  e.costo_fatiga, e.sesgo_longitud,
+                  COALESCE(e.rastrea_e1rm, e.es_basico) AS rastrea_e1rm
+           FROM exercises e
+           LEFT JOIN patrones p ON p.id = e.patron_id
+           ORDER BY e.id`
+        )
+        .all()
+    : undefined;
 
   // 8) Última semana programada (para numerar la próxima = max + 1).
   // Deprecado desde que existen mesociclos: la numeración ahora se reinicia por
@@ -249,7 +275,10 @@ function buildAnalisis(dias: number): Record<string, unknown> {
     rpe_basicos,
     peso_corporal,
     volumen_por_musculo,
-    ejercicios,
+    // Spread condicional: si `ejercicios` no fue pedido, la clave ni existe en el
+    // objeto (no "ejercicios": null) — así Object.keys() la refleja bien tanto en
+    // /analisis como en generado.analisis_bloques de /coach/docs.
+    ...(ejercicios !== undefined ? { ejercicios } : {}),
     ultima_semana,
     mesociclos,
     sesiones_realizadas,
@@ -260,10 +289,16 @@ function buildAnalisis(dias: number): Record<string, unknown> {
 
 // GET /api/coach/analisis — todo lo que el coach lee para programar la semana nueva,
 // en un solo JSON. El coach es caja negra: pega un curl acá, no toca SQL ni el archivo.
-//   ?dias=42  ventana de análisis (default 42 = ~6 semanas)
+//   ?dias=42     ventana de análisis (default 42 = ~6 semanas)
+//   ?incluir=    bloques opt-in, separados por coma (hoy solo "ejercicios") — no
+//                viajan por defecto, ver BLOQUES_OPT_IN.
 coachRouter.get("/analisis", (req, res) => {
   const dias = Number(req.query.dias) || 42;
-  res.json(buildAnalisis(dias));
+  const incluirRaw = typeof req.query.incluir === "string" ? req.query.incluir.split(",") : [];
+  const incluir = new Set(
+    incluirRaw.filter((b): b is BloqueOptIn => (BLOQUES_OPT_IN as readonly string[]).includes(b))
+  );
+  res.json(buildAnalisis(dias, incluir));
 });
 
 // GET /api/coach/adherencia — adherencia por posición en el día: ¿los ejercicios que van
@@ -399,12 +434,21 @@ function leerSecciones(): CoachDocsSeccion[] {
   return seccionesCache;
 }
 
-// Las claves de /analisis no dependen de los datos ni de `dias` (son literales
-// del objeto), así que alcanza con derivarlas una vez, sin pagar el costo de
-// las queries reales en cada request de /docs.
-let analisisBloquesCache: string[] | null = null;
-function getAnalisisBloques(): string[] {
-  if (!analisisBloquesCache) analisisBloquesCache = Object.keys(buildAnalisis(42));
+// Las claves de /analisis no dependen de los datos ni de `dias` (son literales del
+// objeto), así que alcanza con derivarlas una vez. Se corre buildAnalisis() dos veces
+// (sin y con todos los opt-in) para que la lista marque qué bloques hay que pedir con
+// ?incluir= — si un bloque opt-in no apareciera acá, el coach no tendría forma de
+// enterarse de que existe salvo leyendo la prosa de /coach/docs, que es justo lo que
+// esta capa "generada" existe para no depender de.
+let analisisBloquesCache: CoachDocsAnalisisBloque[] | null = null;
+function getAnalisisBloques(): CoachDocsAnalisisBloque[] {
+  if (analisisBloquesCache) return analisisBloquesCache;
+  const bloquesDefault = new Set(Object.keys(buildAnalisis(42)));
+  const bloquesConTodo = Object.keys(buildAnalisis(42, new Set(BLOQUES_OPT_IN)));
+  analisisBloquesCache = bloquesConTodo.map((bloque) => ({
+    bloque,
+    opt_in: !bloquesDefault.has(bloque),
+  }));
   return analisisBloquesCache;
 }
 

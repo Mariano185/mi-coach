@@ -97,7 +97,7 @@ describe("GET /api/coach/analisis — library de ejercicios", () => {
   });
 
   it("es compacta pero trae lo necesario para elegir variante", async () => {
-    const res = await request(app).get("/api/coach/analisis").set(AUTH);
+    const res = await request(app).get("/api/coach/analisis?incluir=ejercicios").set(AUTH);
     const pausa = (res.body.ejercicios as Array<Record<string, unknown>>).find(
       (e) => e.nombre === "Press banca con pausa 3s en el pecho"
     )!;
@@ -112,7 +112,7 @@ describe("GET /api/coach/analisis — library de ejercicios", () => {
   });
 
   it("marca rastrea_e1rm solo en los 3 movimientos de competencia", async () => {
-    const res = await request(app).get("/api/coach/analisis").set(AUTH);
+    const res = await request(app).get("/api/coach/analisis?incluir=ejercicios").set(AUTH);
     const conE1rm = (res.body.ejercicios as Array<{ nombre: string; rastrea_e1rm: number }>)
       .filter((e) => e.rastrea_e1rm === 1)
       .map((e) => e.nombre)
@@ -126,7 +126,7 @@ describe("GET /api/coach/analisis — library de ejercicios", () => {
   });
 
   it("una variante de banca no rastrea e1RM aunque su padre sí", async () => {
-    const res = await request(app).get("/api/coach/analisis").set(AUTH);
+    const res = await request(app).get("/api/coach/analisis?incluir=ejercicios").set(AUTH);
     const pausa = (res.body.ejercicios as Array<{ nombre: string; rastrea_e1rm: number }>).find(
       (e) => e.nombre === "Press banca con pausa 3s en el pecho"
     )!;

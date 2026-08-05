@@ -459,6 +459,21 @@ export interface AdherenciaResponse {
   por_ejercicio: AdherenciaPorEjercicio[];
 }
 
+// === Coach (progresion_basicos, bloque de /analisis) ===
+// Una fila por combinación de carga (nombre, fecha, peso_kg, reps) — no por serie ni por
+// sesión. Top set + back-off del mismo día quedan como filas separadas, cada una con su
+// e1RM propio; rpe_min/rpe_max conservan la fatiga intra-sesión que un promedio borraría.
+export interface ProgresionBasico {
+  nombre: string;
+  fecha: string;
+  peso_kg: number;
+  reps: number;
+  e1rm: number;
+  rpe_min: number | null;
+  rpe_max: number | null;
+  n_series: number;
+}
+
 // === Coach (dias_programados, bloque de /analisis) ===
 export interface DiaProgramado {
   mesociclo_id: number | null;
@@ -480,9 +495,14 @@ export interface CoachDocsEndpoint {
   ruta: string;
 }
 
+export interface CoachDocsAnalisisBloque {
+  bloque: string;
+  opt_in: boolean;
+}
+
 export interface CoachDocsGenerado {
   endpoints: CoachDocsEndpoint[];
-  analisis_bloques: string[];
+  analisis_bloques: CoachDocsAnalisisBloque[];
   version_deploy: string;
 }
 

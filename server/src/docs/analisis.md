@@ -11,6 +11,7 @@ la sección `flujo-semana`.
 | `GET /coach/analisis` | `?dias=42` (~6 semanas) | Suficiente para ver progresión de bloque sin arrastrar bloques viejos. |
 | `GET /coach/adherencia` | `?dias=90` | Un patrón de posición necesita varias semanas para no ser ruido de una sesión mala. |
 | `dias_programados` (en `/analisis`) | Mismo `?dias=` que `/analisis` | Ventana propia, contada por `fecha_creada` de la semana, no por `pd.fecha` — ver abajo. |
+| `volumen_por_musculo` (en `/analisis`) | Mismo `?dias=` que `/analisis` | Respeta la ventana por semana ISO — `?dias=28` trae ~4 semanas, `?dias=90` trae ~13. Pedí una ventana más chica si solo te interesa la tendencia reciente. |
 
 ## Denominadores que NO son comparables entre sí
 
@@ -64,3 +65,14 @@ entrenados — si armás tu propio análisis cruzando datos de más de un bloque
   recalcules a mano con peso y reps — usá el valor que trae la respuesta.
 - `rastrea_e1rm` marca solo los 3 movimientos de competencia (Squat, Bench, Deadlift). Las
   variantes no contaminan el e1RM del básico — su progresión se mide dentro de la variante.
+- `progresion_basicos` no trae una fila por serie: agrupa por `(nombre, fecha, peso_kg, reps)`.
+  Un día con top set + back-off (dos cargas distintas) te da dos filas, cada una con su propio
+  `e1rm`. No promedies el RPE entre filas de un mismo día para "reconstruir la sesión" — usá
+  `rpe_basicos` si necesitás el promedio por sesión, ya viene calculado.
+
+## Bloques opt-in
+
+`ejercicios` no viaja por defecto (pesa ~55% del payload para un catálogo que rara vez cambia
+entre semanas). Pedilo con `?incluir=ejercicios`. `generado.analisis_bloques` de `/coach/docs`
+marca `opt_in: true` en los bloques que hay que pedir explícitamente — no asumas que un bloque
+no listado en una respuesta de `/analisis` no existe, puede ser opt-in.

@@ -71,14 +71,31 @@ describe("GET /api/coach/docs", () => {
     expect(rutas).toContain("POST /api/program/weeks");
   });
 
-  it("generado.analisis_bloques coincide con las claves reales de /analisis", async () => {
+  it("generado.analisis_bloques (los no opt-in) coincide con las claves reales del default de /analisis", async () => {
     const [docs, analisis] = await Promise.all([
       request(app).get("/api/coach/docs").set(AUTH),
       request(app).get("/api/coach/analisis").set(AUTH),
     ]);
-    const bloques = (docs.body.generado.analisis_bloques as string[]).sort();
+    const bloquesDefault = (
+      docs.body.generado.analisis_bloques as Array<{ bloque: string; opt_in: boolean }>
+    )
+      .filter((b) => !b.opt_in)
+      .map((b) => b.bloque)
+      .sort();
     const clavesReales = Object.keys(analisis.body).sort();
-    expect(bloques).toEqual(clavesReales);
+    expect(bloquesDefault).toEqual(clavesReales);
+  });
+
+  it("generado.analisis_bloques marca ejercicios como opt_in, aunque no venga en el default", async () => {
+    const [docs, analisis] = await Promise.all([
+      request(app).get("/api/coach/docs").set(AUTH),
+      request(app).get("/api/coach/analisis").set(AUTH),
+    ]);
+    expect(analisis.body).not.toHaveProperty("ejercicios");
+
+    const bloques = docs.body.generado.analisis_bloques as Array<{ bloque: string; opt_in: boolean }>;
+    const ejercicios = bloques.find((b) => b.bloque === "ejercicios");
+    expect(ejercicios).toEqual({ bloque: "ejercicios", opt_in: true });
   });
 
   it("generado.version_deploy es un string no vacío", async () => {
