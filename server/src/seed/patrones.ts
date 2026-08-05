@@ -163,6 +163,20 @@ export const PATRONES: SeedPatron[] = [
     plano: "frontal",
     descripcion: "Aislamiento de trapecio superior elevando la cintura escapular.",
   },
+  {
+    slug: "rotacion-hombro",
+    nombre: "Rotación de hombro",
+    plano: "transversal",
+    descripcion:
+      "Rotación interna o externa del húmero con el codo fijo. Es el patrón del manguito rotador: no sustituye a ningún empuje ni tracción, complementa su volumen por salud glenohumeral. Face Pulls no cuelga de acá porque su agonista es el deltoides posterior (la rotación externa es un componente, no la acción dominante).",
+  },
+  {
+    slug: "dorsiflexion",
+    nombre: "Dorsiflexión de tobillo",
+    plano: "sagital",
+    descripcion:
+      "Flexión dorsal del tobillo: la acción opuesta a la flexión plantar. Aislamiento del tibial anterior, cuyo lugar es el balance agonista/antagonista de la pantorrilla.",
+  },
 
   // --- Core, definido por la fuerza que RESISTE, no por la que produce ---
   {

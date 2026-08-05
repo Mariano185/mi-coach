@@ -1058,4 +1058,65 @@ export const PECHO_HOMBRO: SeedEjercicio[] = [
       ["biceps-larga", "S", 0.25],
     ],
   },
+
+  // ======================= MANGUITO ROTADOR =======================
+  // El subescapular no tenía ningún ejercicio en el catálogo: solo el infraespinoso
+  // (rotación externa) aparecía como sinergista en el trabajo de deltoides posterior,
+  // y el subescapular ni siquiera como estabilizador. Es el rotador interno y el
+  // estabilizador anterior de la glenohumeral, y el desbalance rotación interna /
+  // externa importa justamente cuando hay volumen alto de press. No es acumulación
+  // de volumen: son ejercicios de costo mínimo cuyo lugar es la prevención.
+  {
+    nombre: "Rotación interna de hombro en polea",
+    categoria: "Hombro",
+    patron: "rotacion-hombro",
+    implemento: "polea",
+    postura: "de pie, codo al costado",
+    unilateral: true,
+    mecanica: "aislamiento",
+    fuerza: "traccion",
+    sesgo_longitud: "medio",
+    perfil_resistencia: "constante",
+    costo_fatiga: 1,
+    demanda_estabilidad: 2,
+    demanda_tecnica: 2,
+    notas_tecnicas:
+      "Codo pegado al costado y flexionado a 90°: el movimiento es rotación del húmero, no aducción. La polea da tensión constante en todo el arco, que es la ventaja sobre la mancuerna (donde el torque cae a cero al final del recorrido).",
+    cues: "Codo fijo contra la costilla, girá el antebrazo hacia el ombligo. Si el codo se despega, bajá la carga.",
+    musculos: [
+      ["subescapular", "A", 1.0],
+      ["pec-esternal", "S", 0.25],
+      ["dorsal-ancho", "S", 0.25],
+      ["redondo-mayor", "S", 0.25],
+    ],
+  },
+  {
+    nombre: "Rotación interna de hombro con banda",
+    categoria: "Hombro",
+    patron: "rotacion-hombro",
+    padre: "Rotación interna de hombro en polea",
+    tipo_variante: "implemento",
+    transferencia: 0.9,
+    proposito:
+      "Misma rotación interna sin depender de una polea libre: sirve como activación previa al press y como trabajo de manguito fuera del gimnasio. La banda cambia el perfil a ascendente, así que el pico de tensión cae al final del rango en vez de repartirse.",
+    implemento: "banda",
+    postura: "de pie, codo al costado",
+    unilateral: true,
+    mecanica: "aislamiento",
+    fuerza: "traccion",
+    sesgo_longitud: "medio",
+    perfil_resistencia: "ascendente",
+    costo_fatiga: 1,
+    demanda_estabilidad: 2,
+    demanda_tecnica: 2,
+    notas_tecnicas:
+      "Banda anclada a la altura del codo. Perfil ascendente: más tensión cuanto más rota, justo donde la polea afloja. Barata en fatiga, tolera frecuencia alta.",
+    cues: "Alejate del anclaje hasta sentir tensión con el antebrazo ya apuntando afuera; volvé controlando la banda, sin dejar que te lleve.",
+    musculos: [
+      ["subescapular", "A", 1.0],
+      ["pec-esternal", "S", 0.25],
+      ["dorsal-ancho", "S", 0.25],
+      ["redondo-mayor", "S", 0.25],
+    ],
+  },
 ];

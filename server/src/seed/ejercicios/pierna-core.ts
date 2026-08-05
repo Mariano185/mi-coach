@@ -1241,6 +1241,28 @@ export const PIERNA_CORE: SeedEjercicio[] = [
       ["gastrocnemio", "S", 0.25],
     ],
   },
+  // El tibial anterior no tenía ningún ejercicio: la sección entera de pantorrilla
+  // es flexión plantar, que es su acción opuesta. Queda como el único trabajo de
+  // dorsiflexión del catálogo, cerrando el balance agonista/antagonista del tobillo.
+  {
+    nombre: "Dorsiflexión de tobillo con banda",
+    categoria: "Piernas",
+    patron: "dorsiflexion",
+    implemento: "banda",
+    postura: "sentado, pierna extendida",
+    mecanica: "aislamiento",
+    fuerza: "traccion",
+    sesgo_longitud: "alargado",
+    perfil_resistencia: "ascendente",
+    cadena: "abierta",
+    costo_fatiga: 1,
+    demanda_estabilidad: 1,
+    demanda_tecnica: 1,
+    notas_tecnicas:
+      "Banda anclada por delante, rodeando el antepié: se tira la punta del pie hacia la tibia. Es el antagonista directo de todo el trabajo de pantorrilla. Costo de fatiga mínimo; su lugar es el balance del tobillo y la tolerancia al trabajo de pie, no la acumulación de volumen.",
+    cues: "Talón apoyado y quieto; el movimiento es solo del tobillo. Bajá la punta despacio hasta el estiramiento antes de volver a tirar.",
+    musculos: [["tibial-anterior", "A", 1.0]],
+  },
 
   // ======================= ADUCTORES =======================
   // El catálogo no tenía ningún ejercicio con los aductores como agonistas:

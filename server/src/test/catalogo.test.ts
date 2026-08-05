@@ -36,9 +36,21 @@ describe("GET /api/musculos", () => {
     expect(res.body[0].n_ejercicios).toBeTypeOf("number");
   });
 
+  // El músculo se inserta acá adentro y no en el beforeEach a propósito: el test de
+  // arriba compara contra MUSCULOS.length y se rompería si existiera para todos.
+  // Sintético en vez de apuntar a un huérfano real del catálogo, así el test no
+  // vuelve a romperse cada vez que se llena un hueco de cobertura (pasó con
+  // Subescapular al cargarle ejercicios de manguito rotador, issue #12).
   it("un músculo sin ningún ejercicio que lo trabaje devuelve n_ejercicios=0, no se omite", async () => {
+    db.prepare(
+      `INSERT INTO musculos (nombre, nombre_en, grupo, region, biarticular)
+       VALUES ('Músculo sin cobertura (test)', NULL, 'pierna', NULL, 0)`
+    ).run();
+
     const res = await request(app).get("/api/musculos").set(AUTH);
-    const sinCobertura = res.body.find((m: { nombre: string }) => m.nombre === "Subescapular");
+    const sinCobertura = res.body.find(
+      (m: { nombre: string }) => m.nombre === "Músculo sin cobertura (test)"
+    );
     expect(sinCobertura).toBeDefined();
     expect(sinCobertura.n_ejercicios).toBe(0);
   });
