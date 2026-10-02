@@ -11,6 +11,10 @@ WorkingDirectory=/opt/mi-coach
 Environment=NODE_ENV=production
 Environment=PORT=3001
 Environment=COACH_DB_PATH=/var/lib/mi-coach/coach.db
+# Zona horaria del atleta: la fecha/hora del día entrenado se setea con date('now','localtime').
+# Si el host está en UTC y esto falta, la hora queda corrida y una sesión nocturna cae en
+# la fecha del día siguiente. Ajustar a tu zona:
+Environment=TZ=America/Argentina/Buenos_Aires
 # Password de un solo usuario (se hashea con bcrypt al primer boot).
 # Ver docs/deploy/TAILSCALE.md para resetearlo.
 Environment=AUTH_PASSWORD=changeme
