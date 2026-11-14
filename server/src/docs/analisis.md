@@ -87,15 +87,39 @@ entrenados — si armás tu propio análisis cruzando datos de más de un bloque
 
 ## RPE y e1RM
 
-- El e1RM (Epley) viene **siempre precomputado** en los bloques que lo incluyen. No lo
-  recalcules a mano con peso y reps — usá el valor que trae la respuesta.
+- El e1RM viene **siempre precomputado** en los bloques que lo incluyen. No lo recalcules a
+  mano — usá el valor que trae la respuesta.
+- **Método: serie proyectada al fallo + tabla RTS** (Tuchscherer). Reps en reserva = 10 − RPE,
+  sin redondear (RPE 8,5 → 1,5); reps proyectadas = reps hechas + reps en reserva; el %1RM sale
+  de la tabla RTS, interpolando linealmente entre filas; e1RM = peso ÷ %1RM, a 1 decimal.
+
+  | Reps al fallo | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
+  |---|---|---|---|---|---|---|---|---|---|---|
+  | %1RM | 100 | 95,5 | 92,2 | 89,2 | 86,3 | 83,7 | 81,1 | 78,6 | 76,2 | 73,9 |
+
+  Ejemplos: 80×3 @7 → 95,6 · 85×3 @9 → 95,3 · 100×2 @8,5 (3,5 proyectadas, 90,7 %) → 110,3.
+- **Sin e1RM** (`e1rm: null`) cuando: no hay RPE cargado (no se asume RPE 10), el RPE es < 5,
+  o la serie proyecta más de 10 reps al fallo (ej. 75×9 @8 → 11). Por eso la mayoría de los
+  accesorios no tiene e1RM: su progresión se sigue por peso y reps en
+  `GET /coach/progresion/:exercise_id`.
+- **Confianza del e1RM** (`e1rm_confianza`): `"alta"` con RPE ≥ 7; `"baja"` con RPE 5–6,5. Una
+  serie de confianza baja (típicamente técnica) trae su e1RM, pero **no cuenta** para
+  `mejor_e1rm_basicos`, el mejor/actual de `/stats` ni el `mejor_e1rm` de `/coach/progresion`:
+  no es una caída de fuerza, es una serie lejos del fallo. `progresion_basicos` sí trae esas
+  filas, marcadas, para que las veas.
+- **Los e1RM históricos cambiaron** (2026-11, issue #14): antes se calculaban con Epley sobre
+  peso × reps, ignorando el RPE. La vista recalcula todo el historial con el método nuevo, así
+  que **no compares contra números de análisis viejos** (notas, planillas, conversaciones
+  previas): compará siempre contra lo que devuelve la API hoy.
 - `rastrea_e1rm` marca solo los 3 movimientos de competencia (Squat, Bench, Deadlift). Las
   variantes no contaminan el e1RM del básico — su progresión se mide dentro de la variante, y
   para eso está `GET /coach/progresion/:exercise_id`, que no filtra por `rastrea_e1rm` y
   funciona con cualquier ejercicio de la library, no solo los 3 básicos.
-- `progresion_basicos` no trae una fila por serie: agrupa por `(nombre, fecha, peso_kg, reps)`.
-  Un día con top set + back-off (dos cargas distintas) te da dos filas, cada una con su propio
-  `e1rm`. No promedies el RPE entre filas de un mismo día para "reconstruir la sesión" — usá
+- `progresion_basicos` no trae una fila por serie: agrupa por `(nombre, fecha, peso_kg, reps,
+  RPE)`. Un día con top set + back-off (dos cargas distintas) te da dos filas, y la misma carga a
+  RPE distinto también (el e1RM depende del RPE), cada una con su `e1rm` y `e1rm_confianza`.
+  `rpe_min`/`rpe_max` siguen en la respuesta por compatibilidad, pero dentro de una fila son
+  iguales. No promedies el RPE entre filas de un mismo día para "reconstruir la sesión" — usá
   `rpe_basicos` si necesitás el promedio por sesión, ya viene calculado.
 
 ## Bloques opt-in

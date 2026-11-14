@@ -8,17 +8,21 @@ curl -s -H "X-Coach-Key: $COACH_API_KEY" \
 ```
 
 Usá `?dias=56` si querés más historial. El JSON incluye:
-- `progresion_basicos` — una fila por combinación de carga `(nombre, fecha, peso_kg, reps)`
-  entrenada, no una fila por serie ni una por sesión. Trae `e1rm`, `rpe_min`, `rpe_max` y
-  `n_series` de esa carga puntual. **Por qué esta forma:** un día de top set + back-off (ej.
-  Bench 80×4 y después 75×4) produce **dos filas**, cada una con su propio `e1rm` — agrupar
-  solo por `(nombre, fecha)` mezclaría las dos cargas en una sola fila sin un `peso_kg` que la
-  represente. `rpe_min`/`rpe_max` conservan la fatiga que sube dentro de una misma carga (ej.
-  RPE 7→8→8→8.5 en la misma serie repetida) — no la promedies vos, esa es la señal para decidir
-  si el peso está bien puesto. El promedio de RPE por sesión, si lo necesitás aparte, ya está en
-  `rpe_basicos`.
+- `progresion_basicos` — una fila por combinación `(nombre, fecha, peso_kg, reps, RPE)`
+  entrenada, no una fila por serie ni una por sesión. Trae `e1rm`, `e1rm_confianza`, `rpe_min`,
+  `rpe_max` y `n_series`. **Por qué esta forma:** el e1RM sale de peso, reps **y RPE** (serie
+  proyectada al fallo + tabla RTS, ver la sección de análisis). Un día de top set + back-off
+  (ej. Bench 80×4 y después 75×4) produce **dos filas**, y la misma carga a RPE 7→8→8→8.5
+  produce tres (@7, @8 con `n_series: 2`, @8,5): la fatiga que sube dentro de una misma carga
+  se lee en filas consecutivas — esa es la señal para decidir si el peso está bien puesto.
+  `rpe_min`/`rpe_max` quedan por compatibilidad (dentro de una fila son iguales). Las filas de
+  confianza baja (RPE 5–6,5) también vienen, marcadas: no son una caída de fuerza. Las series
+  sin e1RM (sin RPE, RPE < 5, > 10 reps proyectadas) no aparecen. El promedio de RPE por sesión,
+  si lo necesitás aparte, ya está en `rpe_basicos`.
 - `rpe_basicos` — RPE promedio por sesión (señal de fatiga)
-- `mejor_e1rm_basicos` — mejor e1RM histórico por básico
+- `mejor_e1rm_basicos` — mejor e1RM histórico por básico, **solo con confianza alta** (RPE ≥ 7).
+  Ojo: los e1RM históricos cambiaron con el método RTS (2026-11) — no compares contra números
+  de análisis viejos.
 - `peso_corporal` — tendencia con PM 7d
 - `volumen_por_musculo` — series por semana de programa y músculo, fraccionado por rol (agonista
   suma 1.0, sinergista 0.5, estabilizador no suma). Cada fila trae `series_programadas` (todo lo
@@ -152,7 +156,10 @@ ejercicio de la library.
 
 Devuelve `sesiones` en orden cronológico **ascendente** — cada elemento es un día calendario
 distinto, con sus series reales y tres señales agregadas:
-- `mejor_e1rm` — el mejor e1RM de la sesión (Epley, de `v_program_sets_e1rm`).
+- `mejor_e1rm` — el mejor e1RM **de confianza alta** de la sesión (RPE + tabla RTS, de
+  `v_program_sets_e1rm`). `null` si ninguna serie lo tuvo: sin RPE, RPE < 7 o más de 10 reps
+  proyectadas — lo normal en accesorios de reps altas, cuya progresión se lee en peso, reps y
+  tonelaje. Cada serie de `series` trae su `e1rm` (o `null`) y su `e1rm_confianza`.
 - `mejor_tonelaje` / `tonelaje_total` — el mejor tonelaje de una sola serie y la suma de todas.
 - `rpe_min` / `rpe_max` — el rango de esfuerzo dentro de la sesión.
 
