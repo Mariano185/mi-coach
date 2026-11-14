@@ -66,11 +66,15 @@ function usePrecalentarCache(): void {
   }, [status]);
 }
 
-// Recencia legible desde una fecha YYYY-MM-DD. Date.UTC evita que la comparación se corra
-// un día según la zona horaria del navegador (las fechas del server son solo la parte de fecha).
+// Recencia legible desde una fecha YYYY-MM-DD, en días de calendario. Se compara contra la
+// fecha local de hoy (no contra Date.now()): con el instante actual, a partir del mediodía UTC
+// la diferencia se redondeaba a 1 y lo de hoy aparecía como "ayer". Ambas puntas son
+// medianoches UTC, así que la resta da días enteros sin efectos de DST.
 function hace(fecha: string): string {
   const [y, m, d] = fecha.split("-").map(Number);
-  const dias = Math.round((Date.now() - Date.UTC(y, m - 1, d)) / 86_400_000);
+  const hoy = new Date();
+  const hoyUtc = Date.UTC(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+  const dias = Math.round((hoyUtc - Date.UTC(y, m - 1, d)) / 86_400_000);
   if (dias <= 0) return "hoy";
   if (dias === 1) return "ayer";
   return `hace ${dias} días`;
@@ -113,7 +117,9 @@ export function Dashboard() {
                     <div className="big">{b.actual_e1rm} kg</div>
                     <div className="delta muted">
                       {b.actual_e1rm === b.mejor_e1rm
-                        ? `PR actual · ${hace(b.ultima_fecha!)}`
+                        ? // fecha del PR, no de la última sesión: si no, cualquier sesión
+                          // dentro de la ventana del "actual" aparecía como PR de ese día
+                          `PR actual · ${hace(b.mejor_fecha!)}`
                         : `PR ${b.mejor_e1rm} kg · ${hace(b.mejor_fecha!)}`}
                     </div>
                   </>
