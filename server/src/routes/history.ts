@@ -32,7 +32,7 @@ historyRouter.get("/", (_req, res) => {
   res.json(rows);
 });
 
-// GET /api/history/:dayId — el día + sus series reales (con e1rm/tonelaje/rir de la vista).
+// GET /api/history/:dayId — el día + sus series reales (con e1rm/e1rm_confianza/rir de la vista).
 historyRouter.get("/:dayId", (req, res) => {
   const dayId = Number(req.params.dayId);
   if (!Number.isInteger(dayId)) return res.status(400).json({ error: "id inválido" });
@@ -45,7 +45,7 @@ historyRouter.get("/:dayId", (req, res) => {
   const sets = db
     .prepare(
       `SELECT pe.exercise_id, ${EX_NAME_SQL} AS exercise_nombre, v.n_serie, v.real_peso,
-              v.real_reps, v.real_rpe, v.rir, v.e1rm
+              v.real_reps, v.real_rpe, v.rir, v.e1rm, v.e1rm_confianza
        FROM v_program_sets_e1rm v
        JOIN program_exercises pe ON pe.id = v.program_exercise_id
        LEFT JOIN exercises e ON e.id = pe.exercise_id

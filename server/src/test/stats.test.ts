@@ -52,14 +52,15 @@ describe("GET /api/stats", () => {
     const dayId = insertDay(1, "2026-01-10");
     const exId = insertExercise(dayId, benchId);
 
-    // Dos series: la de 7 reps a 75kg debe ganar sobre la de 4 reps a 80kg (Epley pondera reps).
+    // Dos series: 75×7 @8 (9 reps proyectadas → 98,4) gana sobre 80×4 @7,5 (6,5 → 97,1):
+    // la tabla RTS pondera reps proyectadas, no solo el peso.
     insertSet(exId, 1, 75, 7, 8);
     insertSet(exId, 2, 80, 4, 7.5);
 
     const res = await request(app).get("/api/stats").set(AUTH);
     expect(res.status).toBe(200);
     const bench_stat = res.body.basicos.find((b: { nombre: string }) => b.nombre === "Flat Bench Press (barra)");
-    expect(bench_stat.mejor_e1rm).toBeCloseTo(75 * (1 + 7 / 30), 1);
+    expect(bench_stat.mejor_e1rm).toBe(98.4);
     expect(bench_stat.mejor_fecha).toBe("2026-01-10");
     expect(bench_stat.ultima_fecha).toBe("2026-01-10");
   });
@@ -77,58 +78,58 @@ describe("GET /api/stats", () => {
 
   it("actual_e1rm ignora un pico viejo: el bench se estanca en un PR de hace semanas mientras las sesiones recientes rinden menos", async () => {
     const d1 = insertExercise(insertDay(1, "2026-06-29"), benchId);
-    insertSet(d1, 1, 80, 4); // e1rm 90.7 -> PR
+    insertSet(d1, 1, 80, 4, 9); // e1rm 92.7 -> PR
 
     const d2 = insertExercise(insertDay(2, "2026-07-06"), benchId);
-    insertSet(d2, 1, 70, 6); // e1rm 84
+    insertSet(d2, 1, 70, 6, 8); // e1rm 89.1
 
     const d3 = insertExercise(insertDay(3, "2026-07-13"), benchId);
-    insertSet(d3, 1, 70, 6); // e1rm 84
+    insertSet(d3, 1, 70, 6, 8); // e1rm 89.1
 
     const d4 = insertExercise(insertDay(4, "2026-07-20"), benchId);
-    insertSet(d4, 1, 68, 7); // e1rm ~83.9
+    insertSet(d4, 1, 68, 7, 8); // e1rm 89.2
 
     const res = await request(app).get("/api/stats").set(AUTH);
     const bench = res.body.basicos.find((b: { nombre: string }) => b.nombre === "Flat Bench Press (barra)");
-    expect(bench.mejor_e1rm).toBeCloseTo(80 * (1 + 4 / 30), 1); // sigue siendo el PR viejo
+    expect(bench.mejor_e1rm).toBe(92.7); // sigue siendo el PR viejo
     expect(bench.actual_e1rm).toBeLessThan(bench.mejor_e1rm); // y actual lo refleja, no lo esconde
   });
 
   it("el día de volumen no arrastra actual_e1rm hacia abajo: el día pesado gana dentro de la ventana", async () => {
     const pesado = insertExercise(insertDay(1, "2026-07-23"), benchId);
-    insertSet(pesado, 1, 80, 4, 7.5); // e1rm 90.7
+    insertSet(pesado, 1, 80, 4, 7.5); // e1rm 97.1
 
     const tecnico = insertExercise(insertDay(2, "2026-07-27"), benchId);
-    insertSet(tecnico, 1, 75, 5, 7); // e1rm 87.5
+    insertSet(tecnico, 1, 75, 5, 7); // e1rm 95.4
 
     const volumen = insertExercise(insertDay(3, "2026-07-30"), benchId);
-    insertSet(volumen, 1, 70, 6, 7); // e1rm 84 - el último entrenado, el más bajo
+    insertSet(volumen, 1, 70, 6, 7); // e1rm 91.9 - el último entrenado, el más bajo
 
     const res = await request(app).get("/api/stats").set(AUTH);
     const bench = res.body.basicos.find((b: { nombre: string }) => b.nombre === "Flat Bench Press (barra)");
-    expect(bench.actual_e1rm).toBeCloseTo(80 * (1 + 4 / 30), 1); // el día pesado, no el último
+    expect(bench.actual_e1rm).toBe(97.1); // el día pesado, no el último
     expect(bench.ultima_fecha).toBe("2026-07-30"); // pero la fecha sí es la más reciente
   });
 
   it("la ventana es por sesiones, no por calendario: sesiones de hace meses igual cuentan", async () => {
     const d1 = insertExercise(insertDay(1, "2025-01-05"), benchId);
-    insertSet(d1, 1, 70, 5);
+    insertSet(d1, 1, 70, 5, 8);
     const d2 = insertExercise(insertDay(2, "2025-01-12"), benchId);
-    insertSet(d2, 1, 72, 5);
+    insertSet(d2, 1, 72, 5, 8);
     const d3 = insertExercise(insertDay(3, "2025-01-19"), benchId);
-    insertSet(d3, 1, 75, 5);
+    insertSet(d3, 1, 75, 5, 8);
 
     const res = await request(app).get("/api/stats").set(AUTH);
     const bench = res.body.basicos.find((b: { nombre: string }) => b.nombre === "Flat Bench Press (barra)");
     expect(bench.actual_e1rm).not.toBeNull();
-    expect(bench.actual_e1rm).toBeCloseTo(75 * (1 + 5 / 30), 1);
+    expect(bench.actual_e1rm).toBe(92.5);
   });
 
   it("actual_e1rm === mejor_e1rm cuando el PR es la sesión más reciente", async () => {
     const d1 = insertExercise(insertDay(1, "2026-06-01"), benchId);
-    insertSet(d1, 1, 70, 5);
+    insertSet(d1, 1, 70, 5, 8); // e1rm 86.3
     const d2 = insertExercise(insertDay(2, "2026-07-11"), benchId);
-    insertSet(d2, 1, 85, 3); // nuevo PR, el más reciente
+    insertSet(d2, 1, 85, 3, 8); // e1rm 98.5: nuevo PR, el más reciente
 
     const res = await request(app).get("/api/stats").set(AUTH);
     const bench = res.body.basicos.find((b: { nombre: string }) => b.nombre === "Flat Bench Press (barra)");
@@ -138,12 +139,13 @@ describe("GET /api/stats", () => {
 
   it("con una sola sesión entrenada, actual_e1rm === mejor_e1rm sin crashear", async () => {
     const d1 = insertExercise(insertDay(1, "2026-07-11"), benchId);
-    insertSet(d1, 1, 80, 5);
+    insertSet(d1, 1, 80, 5, 8);
 
     const res = await request(app).get("/api/stats").set(AUTH);
     expect(res.status).toBe(200);
     const bench = res.body.basicos.find((b: { nombre: string }) => b.nombre === "Flat Bench Press (barra)");
     expect(bench.actual_e1rm).toBe(bench.mejor_e1rm);
+    expect(bench.mejor_e1rm).toBe(98.6);
   });
 
   it("series incompletas (peso sin reps) no generan e1RM", async () => {

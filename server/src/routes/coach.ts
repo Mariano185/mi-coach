@@ -44,30 +44,31 @@ type BloqueOptIn = (typeof BLOQUES_OPT_IN)[number];
 function buildAnalisis(dias: number, incluir: Set<BloqueOptIn> = new Set()): Record<string, unknown> {
   const desde = `-${dias} days`;
 
-  // 1) Mejor e1RM histórico por básico.
+  // 1) Mejor e1RM histórico por básico. Solo confianza alta (RPE ≥ 7, ADR 0002).
   const mejor_e1rm_basicos = db
     .prepare(
       `SELECT e.nombre, MAX(v.e1rm) AS mejor_e1rm
        FROM exercises e
        JOIN program_exercises pe ON pe.exercise_id = e.id
        JOIN v_program_sets_e1rm v ON v.program_exercise_id = pe.id
-       WHERE ${RASTREA_E1RM} AND v.e1rm IS NOT NULL
+       WHERE ${RASTREA_E1RM} AND v.e1rm_confianza = 'alta'
        GROUP BY e.id, e.nombre`
     )
     .all();
 
   // 2) Progresión e1RM por básico en la ventana. Agrupada por (nombre, fecha, peso_kg,
-  //    reps) — no por serie ni por sesión. El e1RM es función de peso×reps, así que
-  //    repetirlo por serie no aporta nada; pero agrupar solo por (nombre, fecha) SÍ
-  //    pierde información: top set + back-off del mismo día (11 de 34 sesiones reales,
-  //    ej. Bench 80×4 + 75×4) tienen dos pesos distintos y un e1RM cada uno — agruparlos
-  //    dejaría un peso_kg ambiguo. rpe_min/rpe_max conservan la fatiga intra-sesión
-  //    (ej. RPE 7→8→8→8.5 en la misma carga) que un promedio (ya cubierto por
-  //    rpe_basicos) borraría.
+  //    reps, RPE) — no por serie ni por sesión. El e1RM es función de peso×reps×RPE
+  //    (ADR 0002), así que repetirlo por serie no aporta nada; pero agrupar más grueso SÍ
+  //    pierde información: top set + back-off del mismo día (ej. Bench 80×4 + 75×4)
+  //    tienen dos pesos y un e1RM cada uno, y la misma carga a RPE 7 y a 8,5 también da
+  //    dos e1RM distintos. La deriva de RPE en la misma carga (7→8→8→8.5) queda como
+  //    filas consecutivas. rpe_min/rpe_max se conservan por compatibilidad (dentro de una
+  //    fila son iguales). Trae también las filas de confianza baja, marcadas en
+  //    e1rm_confianza, para que el coach vea las series técnicas.
   const progresion_basicos = db
     .prepare(
       `SELECT e.nombre, pd.fecha, ps.real_peso AS peso_kg, ps.real_reps AS reps,
-              v.e1rm, MIN(ps.real_rpe) AS rpe_min, MAX(ps.real_rpe) AS rpe_max,
+              v.e1rm, v.e1rm_confianza, MIN(ps.real_rpe) AS rpe_min, MAX(ps.real_rpe) AS rpe_max,
               COUNT(*) AS n_series
        FROM v_program_sets_e1rm v
        JOIN program_sets ps ON ps.id = v.id
@@ -75,8 +76,8 @@ function buildAnalisis(dias: number, incluir: Set<BloqueOptIn> = new Set()): Rec
        JOIN program_days pd ON pd.id = pe.day_id
        JOIN exercises e ON e.id = pe.exercise_id
        WHERE ${RASTREA_E1RM} AND v.e1rm IS NOT NULL AND pd.fecha >= date('now', ?)
-       GROUP BY e.nombre, pd.fecha, ps.real_peso, ps.real_reps
-       ORDER BY e.nombre, pd.fecha, ps.real_peso DESC`
+       GROUP BY e.nombre, pd.fecha, ps.real_peso, ps.real_reps, ps.real_rpe
+       ORDER BY e.nombre, pd.fecha, ps.real_peso DESC, ps.real_rpe`
     )
     .all(desde) as ProgresionBasico[];
 
@@ -466,6 +467,11 @@ coachRouter.get("/progresion/:exercise_id", (req, res) => {
   // de la serie 1 y el mejor tonelaje de la serie 2. Cualquier lectura de "la mejor serie"
   // de esta respuesta es incorrecta — para eso está `series`.
   //
+  // mejor_e1rm solo cuenta series de confianza alta (RPE ≥ 7, ADR 0002); null si la
+  // sesión no tuvo ninguna. Las series sin e1RM (sin RPE, RPE < 5, > 10 reps
+  // proyectadas — la mayoría de los accesorios) siguen sumando a n_series y tonelaje:
+  // su progresión se lee por peso y reps.
+  //
   // tonelaje_total (además de mejor_tonelaje) es el volumen real de la sesión: un
   // accesorio puede sostener su top set y perder dos series de back-off — eso es
   // regresión, y mejor_tonelaje sola no la muestra.
@@ -473,7 +479,7 @@ coachRouter.get("/progresion/:exercise_id", (req, res) => {
     .prepare(
       `SELECT pd.fecha,
               COUNT(*)          AS n_series,
-              MAX(v.e1rm)       AS mejor_e1rm,
+              MAX(CASE WHEN v.e1rm_confianza = 'alta' THEN v.e1rm END) AS mejor_e1rm,
               MAX(v.tonelaje)   AS mejor_tonelaje,
               ROUND(SUM(v.tonelaje), 1) AS tonelaje_total,
               MIN(v.real_rpe)   AS rpe_min,
@@ -496,7 +502,7 @@ coachRouter.get("/progresion/:exercise_id", (req, res) => {
     .prepare(
       `SELECT pd.fecha, pd.id AS day_id, v.n_serie,
               v.real_peso AS peso_kg, v.real_reps AS reps, v.real_rpe AS rpe,
-              v.rir, v.e1rm, v.tonelaje
+              v.rir, v.e1rm, v.e1rm_confianza, v.tonelaje
        FROM v_program_sets_e1rm v
        ${FILTRO_SERIES}
        ORDER BY pd.fecha ASC, pe.orden, pe.id, v.n_serie`

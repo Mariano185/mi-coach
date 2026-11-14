@@ -93,7 +93,8 @@ describe("GET /api/history/:dayId", () => {
     expect(res.body.sets).toHaveLength(1);
     expect(res.body.sets[0].exercise_id).toBe(squat);
     expect(res.body.sets[0].exercise_nombre).toBe("Mid/High Bar Back Squat");
-    expect(res.body.sets[0].e1rm).toBeCloseTo(100 * (1 + 5 / 30), 1);
+    expect(res.body.sets[0].e1rm).toBe(127.2); // 100×5 @7 → 8 reps proyectadas → 78,6 %
+    expect(res.body.sets[0].e1rm_confianza).toBe("alta");
     expect(res.body.sets[0].rir).toBe(3); // MAX(0, ROUND(10 - 7))
   });
 

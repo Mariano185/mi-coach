@@ -62,7 +62,8 @@ describe("PATCH /api/program/sets/:id", () => {
     expect(res.status).toBe(200);
     expect(res.body.hecha).toBe(1);
     expect(res.body.real_peso).toBe(95);
-    expect(res.body.e1rm).toBeCloseTo(95 * (1 + 5 / 30), 1);
+    expect(res.body.e1rm).toBe(120.9); // 95×5 @7 → 8 reps proyectadas → 78,6 %
+    expect(res.body.e1rm_confianza).toBe("alta");
   });
 
   it("baja hecha=0 si se borran peso o reps", async () => {

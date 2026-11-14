@@ -578,13 +578,13 @@ describe("GET /api/coach/analisis — ejercicios opt-in y progresion_basicos agr
     expect(filas).toHaveLength(2);
     const topSet = filas.find((f) => f.peso_kg === 80)!;
     const backOff = filas.find((f) => f.peso_kg === 75)!;
-    expect(topSet.e1rm).toBeCloseTo(80 * (1 + 4 / 30), 1);
-    expect(backOff.e1rm).toBeCloseTo(75 * (1 + 4 / 30), 1);
+    expect(topSet.e1rm).toBe(95.6); // 80×4 @8
+    expect(backOff.e1rm).toBe(92.5); // 75×4 @7
     expect(topSet.n_series).toBe(1);
     expect(backOff.n_series).toBe(1);
   });
 
-  it("varias series a la misma carga se agrupan en una fila con rpe_min/rpe_max/n_series", async () => {
+  it("la misma carga a RPE distinto da filas separadas (el e1RM depende del RPE); el mismo RPE se agrupa", async () => {
     registrarBasico({
       nombre: "Flat Bench Press (barra)",
       fecha: diasAtras(1),
@@ -596,14 +596,17 @@ describe("GET /api/coach/analisis — ejercicios opt-in y progresion_basicos agr
     const res = await request(app).get("/api/coach/analisis?dias=42").set(AUTH);
     const filas = res.body.progresion_basicos as Array<{
       peso_kg: number;
+      e1rm: number;
       rpe_min: number;
       rpe_max: number;
       n_series: number;
     }>;
 
-    expect(filas).toHaveLength(1);
-    expect(filas[0].n_series).toBe(4);
-    expect(filas[0].rpe_min).toBe(7);
-    expect(filas[0].rpe_max).toBe(8.5);
+    // Ordenadas por RPE: la deriva de fatiga en la misma carga queda como filas consecutivas.
+    expect(filas.map((f) => [f.rpe_min, f.rpe_max, f.n_series, f.e1rm])).toEqual([
+      [7, 7, 1, 119.5],
+      [8, 8, 2, 115.9],
+      [8.5, 8.5, 1, 114],
+    ]);
   });
 });
