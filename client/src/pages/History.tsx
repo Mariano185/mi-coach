@@ -3,6 +3,7 @@ import useSWR from "swr";
 import { api } from "../api";
 import type { Exercise, HistoryDay, HistoryDayDetail } from "../types";
 import { swrKeys } from "../swr";
+import { E1rmValor } from "../components/E1rmValor";
 
 export function History() {
   const { data: days = [], error: errDays } = useSWR<HistoryDay[]>(swrKeys.history());
@@ -79,7 +80,7 @@ export function History() {
                           <td>{x.real_reps}</td>
                           <td>{x.real_rpe ?? "—"}</td>
                           <td>{x.rir ?? "—"}</td>
-                          <td>{x.e1rm ?? "—"}</td>
+                          <td><E1rmValor e1rm={x.e1rm} confianza={x.e1rm_confianza} /></td>
                         </tr>
                       ))}
                   </tbody>

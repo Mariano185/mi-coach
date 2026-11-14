@@ -5,6 +5,7 @@ import type { ProgramExerciseDetail, ProgramSet } from "../../types";
 import { IconBack, IconCloudCheck, IconCloudOff, IconCloudSync } from "../../components/icons";
 import { CoachNotes } from "../../components/CoachNotes";
 import { Expandable } from "../../components/Expandable";
+import { E1rmValor } from "../../components/E1rmValor";
 
 type Tab = "objetivo" | "real";
 type SyncState = "synced" | "saving" | "error";
@@ -195,7 +196,9 @@ export function ExerciseView() {
     let e1rm = 0;
     let tonelaje = 0;
     for (const s of data.sets) {
-      if (s.e1rm != null && s.e1rm > e1rm) e1rm = s.e1rm;
+      // Solo confianza alta: una serie técnica (RPE < 7) se ve marcada en la tabla, pero no
+      // es "el mejor" (mismo criterio que /stats y el coach, ADR 0002).
+      if (s.e1rm != null && s.e1rm_confianza === "alta" && s.e1rm > e1rm) e1rm = s.e1rm;
       if (s.tonelaje != null) tonelaje += s.tonelaje;
     }
     return { e1rm: Math.round(e1rm * 10) / 10, tonelaje: Math.round(tonelaje) };
@@ -270,7 +273,7 @@ export function ExerciseView() {
         <div className="ms">
           <div className="k">e1RM (mejor)</div>
           <div className="v">
-            {stats.e1rm || 0} <span className="u">kg</span>
+            {stats.e1rm ? <>{stats.e1rm} <span className="u">kg</span></> : "—"}
           </div>
         </div>
         <div className="ms">
@@ -328,6 +331,7 @@ function RealGrid({
       <div className="sh">Peso</div>
       <div className="sh">Reps</div>
       <div className="sh">RPE</div>
+      <div className="sh">e1RM</div>
       <div className="sh">Obj.</div>
       {data.sets.map((s) => (
         <Row key={s.id}>
@@ -356,6 +360,10 @@ function RealGrid({
             onDirty={onDirty}
             onBlur={onBlurFlush}
           />
+          <div className="e1rm-cell" aria-label={`e1RM serie ${s.n_serie}`}>
+            <span className="e1rm-cell-k">e1RM</span>
+            <E1rmValor e1rm={s.e1rm} confianza={s.e1rm_confianza} />
+          </div>
           <div className="target-cell" title="objetivo">
             {data.reps_text ?? "—"}×@{data.rpe_text ?? "—"}
           </div>
