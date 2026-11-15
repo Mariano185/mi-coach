@@ -243,6 +243,7 @@ Todas las rutas (salvo las públicas) requieren cookie de sesión o header `X-Co
 | PATCH | `/api/program/sets/:id` | completar serie real (autosetea fecha/hora del día) |
 | PATCH | `/api/program/sets/:id/target` | corregir la prescripción de una serie |
 | GET | `/api/coach/analisis?dias=42` | análisis agregado para el coach |
+| GET | `/api/coach/semana/:week_id` | devolución semanal: programa completo y contexto por fecha |
 | GET | `/api/coach/adherencia?dias=90` | adherencia por posición en el día |
 | GET | `/api/coach/progresion/:exercise_id?dias=180` | historia de un ejercicio: sesiones, series y mejor e1RM/tonelaje |
 | GET | `/api/coach/docs?seccion=` | doc operativa del coach (fuente de verdad, se deploya con el código) |

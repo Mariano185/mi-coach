@@ -101,6 +101,13 @@ describe("GET /api/coach/docs", () => {
     expect(rutas).toEqual(expect.arrayContaining(["GET /api/cuerpo/", "PUT /api/cuerpo/"]));
   });
 
+  it("generado.endpoints anuncia la devolución semanal", async () => {
+    const res = await request(app).get("/api/coach/docs").set(AUTH);
+    expect(res.body.generado.endpoints).toContainEqual({
+      metodo: "GET", ruta: "/api/coach/semana/:week_id",
+    });
+  });
+
   it("?seccion=<inexistente> devuelve 404", async () => {
     const res = await request(app).get("/api/coach/docs?seccion=no-existe").set(AUTH);
     expect(res.status).toBe(404);

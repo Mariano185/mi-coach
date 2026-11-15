@@ -4,6 +4,7 @@ import { dirname, resolve, basename } from "node:path";
 import { fileURLToPath } from "node:url";
 import { db } from "../db.js";
 import { calendarioDesdeDb } from "../calendario.js";
+import { leerDevolucionSemanal } from "../coach-semana.js";
 import type {
   AccesorioAnalisis,
   AccesorioSerie,
@@ -25,6 +26,15 @@ import type {
 } from "../types.js";
 
 export const coachRouter = Router();
+
+coachRouter.get("/semana/:week_id", (req, res) => {
+  const weekId = Number(req.params.week_id);
+  if (!Number.isSafeInteger(weekId)) return res.status(400).json({ error: "week_id inválido" });
+
+  const devolucion = leerDevolucionSemanal(db, weekId);
+  if (!devolucion) return res.status(404).json({ error: "semana no encontrada" });
+  res.json(devolucion);
+});
 
 // La lista de endpoints del coach solo la conoce index.ts (es el único lugar
 // que sabe con qué prefijo se montó cada router). Se inyecta una vez al
