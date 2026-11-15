@@ -14,7 +14,7 @@
 
 App single-user, local-first, para registrar y programar entrenamientos de powerbuilding.
 El coach prescribe semanas estructuradas (objetivo); el atleta completa pesos/reps/RPE reales
-en la UI. El historial se deriva solo: un día cuenta como entrenado apenas tiene una serie
+en la UI. Los días entrenados se derivan solos: un día cuenta como entrenado apenas tiene una serie
 real completa (fecha/hora se autosetean). Dashboard/Stats y el análisis del coach leen de ahí.
 
 ## Stack
@@ -27,10 +27,10 @@ real completa (fecha/hora se autosetean). Dashboard/Stats y el análisis del coa
 ```
 mi-coach/
 ├── server/src/   db.ts · index.ts · auth.ts · types.ts
-│                 routes/{exercises,bodyweight,program,history,mesociclos,stats,coach,settings,trac}.ts
+│                 routes/{exercises,bodyweight,program,mesociclos,stats,coach,settings,trac}.ts
 │                 test/   (vitest + supertest, DB en memoria)
 ├── client/src/   App.tsx · api.ts · swr.ts · types.ts · main.tsx · styles.css
-│                 pages/{Dashboard,History,Bodyweight,Programs,Trac,Login}.tsx
+│                 pages/{Dashboard,Bodyweight,Programs,Trac,Login}.tsx
 │                 pages/program/{WeekView,DayView,ExerciseView}.tsx
 │                 components/{BottomNav,Toast,TrendChart,CoachNotes,icons}.tsx
 │                 constants/trac.ts
@@ -102,7 +102,6 @@ Tabla completa de endpoints en el `README.md` (raíz). Resumen de lo no obvio:
   la serie queda hecha, autosetea `fecha`/`hora_inicio` del día (`COALESCE`, no pisa valores).
   Esto **reemplaza** al viejo botón "Registrar día": no existe más `POST /days/:id/complete`.
 - **`PATCH /program/sets/:id/target`** — el coach corrige la prescripción (`target_*`) sin tocar lo real.
-- **`GET /history` / `GET /history/:dayId`** — historial derivado de `program_sets` (reemplaza a `/sessions`).
 - **`GET /coach/analisis?dias=42`** — todo lo que el coach necesita en un JSON: e1RM, progresión,
   RPE, peso corporal, volumen por categoría, sesiones realizadas, Trac reciente, library, mesociclos.
 - **`POST /program/weeks`** — crea la semana completa desde JSON (semana, días, ejercicios, series
@@ -111,7 +110,7 @@ Tabla completa de endpoints en el `README.md` (raíz). Resumen de lo no obvio:
   DELETE con cascade.
 
 **Flujo de registro:** UI edita `program_sets` reales (PATCH con autosave debounced) → el día
-aparece en Historial automáticamente. No hay paso manual de registro.
+cuenta como entrenado automáticamente y se consulta en Programas. No hay paso manual de registro.
 
 ---
 

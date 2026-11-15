@@ -23,8 +23,6 @@ export const swrKeys = {
   programDay: (id: number) => `/api/program/days/${id}`,
   programExercise: (id: number) => `/api/program/exercises/${id}`,
   stats: () => "/api/stats",
-  history: () => "/api/history",
-  historyDay: (dayId: number) => `/api/history/${dayId}`,
   exercises: () => "/api/exercises",
   trac: (fecha: string) => `/api/trac?fecha=${fecha}`,
 } as const;

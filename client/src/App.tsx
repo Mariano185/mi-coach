@@ -9,7 +9,6 @@ import {
   useNavigate,
 } from "react-router-dom";
 import { Bodyweight } from "./pages/Bodyweight";
-import { History } from "./pages/History";
 import { Dashboard } from "./pages/Dashboard";
 import { Login } from "./pages/Login";
 import { ProgramIndexRedirect, Programs } from "./pages/Programs";
@@ -29,7 +28,6 @@ import { hasRecentAuth, setAuthedFlag } from "./authState";
 const NAV: Array<{ to: string; label: string; end?: boolean }> = [
   { to: "/dashboard", label: "Dashboard", end: true },
   { to: "/weight", label: "Peso / Nutrición", end: true },
-  { to: "/history", label: "Historial", end: true },
   { to: "/programs", label: "Programas" },
 ];
 
@@ -163,16 +161,6 @@ export function App() {
             <RequireAuth>
               <RootLayout>
                 <Bodyweight />
-              </RootLayout>
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/history"
-          element={
-            <RequireAuth>
-              <RootLayout>
-                <History />
               </RootLayout>
             </RequireAuth>
           }

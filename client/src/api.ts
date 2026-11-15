@@ -1,8 +1,6 @@
 // Cliente fetch tipado. Una función por endpoint. Rutas relativas (proxy de Vite → :3001).
 import type {
   Exercise,
-  HistoryDay,
-  HistoryDayDetail,
   Mesociclo,
   MesocicloConSemanas,
   NewBodyweightInput,
@@ -78,9 +76,6 @@ export async function req<T>(url: string, options?: RequestInit): Promise<T> {
 
 export const api = {
   getExercises: () => req<Exercise[]>("/api/exercises"),
-
-  getHistory: () => req<HistoryDay[]>("/api/history"),
-  getHistoryDay: (dayId: number) => req<HistoryDayDetail>(`/api/history/${dayId}`),
 
   createBodyweight: (input: NewBodyweightInput) =>
     req<{ id: number }>("/api/bodyweight", { method: "POST", body: JSON.stringify(input) }),
