@@ -29,6 +29,7 @@ export interface RangoSemana {
 export interface Calendario {
   rangoDe(weekId: number): RangoSemana | null;
   semanaDe(fecha: string): number | null;
+  objetivoPautado(weekId: number): ObjetivoNutricional | null;
   objetivoEn(fecha: string): ObjetivoNutricional | null;
 }
 
@@ -81,6 +82,10 @@ export function crearCalendario(semanasEntrada: SemanaCalendario[], hoy: string)
     semanaDe(fecha) {
       const i = indiceDe(fecha);
       return i === -1 ? null : semanas[i].id;
+    },
+    objetivoPautado(weekId) {
+      const objetivo = semanas.find((s) => s.id === weekId)?.objetivo;
+      return objetivo ? { week_id: weekId, ...objetivo } : null;
     },
     objetivoEn(fecha) {
       for (let i = indiceDe(fecha); i >= 0; i--) {

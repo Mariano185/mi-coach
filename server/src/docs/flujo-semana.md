@@ -2,6 +2,32 @@
 
 ## Paso 1 — Obtener datos
 
+**Para dar la devolución de una Semana de programa**, hacé una sola consulta con su
+`week_id` (`id` devuelto por `GET /api/program/weeks`):
+
+```bash
+curl -fsS -H "X-Coach-Key: $COACH_API_KEY" \
+  "$MI_COACH_URL/api/coach/semana/$WEEK_ID" | jq .
+```
+
+- `semana` identifica el programa y `objetivo_nutricional` trae lo pautado en esa semana,
+  con su Nota nutricional. Si el objetivo se heredó, se ve en el contexto de cada fecha.
+- `dias` trae todas las sesiones programadas, incluso las que todavía no empezaron, con
+  `notas_coach`, `notas_atleta`, `exercises` y sus `sets`. Cada serie trae los campos
+  `target_*` y `real_*`, y `hecha` indica si se completó.
+- `contexto` trae una fila por fecha de `rango` (inclusive), también en días de descanso.
+  Incluye `ingesta`, `objetivo` vigente en esa fecha, `pasos`, `registro_corporal` y `trac`.
+  Cada registro ausente aparece como `null`.
+
+El rango empieza el día siguiente a la última sesión previa y termina en la última sesión
+de esa semana, o hoy si está en curso (ADR 0003). Si todavía no hay sesión previa,
+`rango.desde` es `null` (inicio abierto) y las filas de `contexto` empiezan en la primera
+fecha disponible entre los registros, las sesiones de la semana y las fechas de creación
+y de prescripción nutricional. Una Semana de programa intermedia sin sesiones
+tiene `rango: null` y `contexto: []`. Un `week_id` inexistente devuelve 404.
+
+**Para leer tendencias entre semanas**, usá `GET /api/coach/analisis?dias=N`:
+
 ```bash
 curl -s -H "X-Coach-Key: $COACH_API_KEY" \
   "http://192.168.0.110:3001/api/coach/analisis?dias=42" | jq .
