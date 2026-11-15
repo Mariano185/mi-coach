@@ -323,6 +323,8 @@ tbody tr:hover { background: var(--panel-2); }
 .e1rm { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .e1rm--vacio { color: var(--faint); }
 .e1rm--baja { color: var(--muted); }
+/* Sin e1RM con la serie cargada: el motivo ocupa el lugar del número. */
+.e1rm--motivo { color: var(--muted); font-size: 13px; }
 .e1rm-tag {
   display: inline-block;
   margin-left: 4px;

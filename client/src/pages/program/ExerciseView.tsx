@@ -362,7 +362,7 @@ function RealGrid({
           />
           <div className="e1rm-cell" aria-label={`e1RM serie ${s.n_serie}`}>
             <span className="e1rm-cell-k">e1RM</span>
-            <E1rmValor e1rm={s.e1rm} confianza={s.e1rm_confianza} />
+            <E1rmValor e1rm={s.e1rm} confianza={s.e1rm_confianza} serie={s} />
           </div>
           <div className="target-cell" title="objetivo">
             {data.reps_text ?? "—"}×@{data.rpe_text ?? "—"}
