@@ -58,7 +58,7 @@ mesociclo asignado — normal mientras el uso de mesociclos recién empieza).
 
 **Límite conocido:** un día no entrenado y un día entrenado pero cargado más tarde en la app
 (por ejemplo, el atleta carga los datos días después) se ven distintos gracias al autoseteo de
-`fecha` al completar la primera serie — pero un día donde el atleta entrenó de memoria y nunca
+`fecha` al cargar el primer valor de una serie — pero un día donde el atleta entrenó de memoria y nunca
 cargó nada en la app es indistinguible de uno realmente no entrenado (ambos: `fecha: null`,
 `series_completadas: 0`). Distinguir esos dos casos requeriría una columna nueva y está fuera
 de alcance hoy.
@@ -106,8 +106,9 @@ promediar, y no leas un hueco como un día sedentario.
 
 ## `fecha` nullable — el detalle que rompe filtros ingenuos
 
-`program_days.fecha` es nullable y se autosetea recién cuando el atleta completa la primera
-serie de ese día. Una semana programada a futuro **no tiene fecha en ningún día todavía**. Por
+`program_days.fecha` es nullable y se autosetea recién cuando el atleta carga el primer valor
+(peso, reps o RPE) en una serie de ese día. Ojo: tener fecha no significa tener series
+completas — un día empezado y abandonado puede tener fecha y 0 series hechas. Una semana programada a futuro **no tiene fecha en ningún día todavía**. Por
 eso varios bloques de `/analisis` y `/adherencia` filtran explícitamente por días ya
 entrenados — si armás tu propio análisis cruzando datos de más de un bloque, tené en cuenta que
 "sin fecha" no es un error de carga, es "todavía no lo entrenaste".

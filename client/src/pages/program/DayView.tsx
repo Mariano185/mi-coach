@@ -29,23 +29,28 @@ export function DayView() {
   const { data, error, mutate } = useSWR<ProgramDayDetail>(dayKey);
 
   // Campos de sesión editables localmente, sincronizados al blur.
-  // fecha/hora_inicio se autosetean solas en el server al completar la primera serie
-  // (PATCH /program/sets/:id); este input queda para corregir cargas en diferido.
+  // fecha/hora_inicio se autosetean solas en el server al cargar el primer valor de una serie
+  // (PATCH /program/sets/:id); estos inputs quedan para corregir cargas en diferido.
+  // Un día sin fecha muestra el input VACÍO: abrirlo para mirar no lo fecha.
   const [fecha, setFecha] = useState("");
   const [horaInicio, setHoraInicio] = useState("");
   const [horaFin, setHoraFin] = useState("");
   const [notasAtleta, setNotasAtleta] = useState("");
 
-  // Sembrar los inputs locales desde el dato cargado (una vez por día).
+  // Sembrar las notas desde el dato cargado (una vez por día).
   const seededFor = useRef<number | null>(null);
   useEffect(() => {
     if (!data || seededFor.current === dayId) return;
     seededFor.current = dayId;
-    setFecha(data.fecha ?? today());
-    setHoraInicio(data.hora_inicio ?? "");
-    setHoraFin(data.hora_fin ?? "");
     setNotasAtleta(data.notas_atleta ?? "");
   }, [data, dayId]);
+
+  // Fecha y horas siguen al server cada vez que cambian ahí (no solo la primera vez): SWR
+  // puede mostrar primero el día cacheado sin fecha y recién después la que autoseteó el
+  // server al cargar una serie.
+  useEffect(() => setFecha(data?.fecha ?? ""), [data?.fecha]);
+  useEffect(() => setHoraInicio(data?.hora_inicio ?? ""), [data?.hora_inicio]);
+  useEffect(() => setHoraFin(data?.hora_fin ?? ""), [data?.hora_fin]);
 
   const grouped = useMemo(() => {
     const map = new Map<Seccion, ProgramExerciseCard[]>();
@@ -113,7 +118,10 @@ export function DayView() {
               type="date"
               value={fecha}
               onChange={(e) => setFecha(e.target.value)}
-              onBlur={() => patchDay({ fecha: fecha || null })}
+              onBlur={() => {
+                // Solo si cambió: pasar por el campo sin tocarlo no guarda nada.
+                if ((fecha || null) !== data.fecha) patchDay({ fecha: fecha || null });
+              }}
             />
           </label>
           <label className="session-meta-field">
@@ -122,7 +130,9 @@ export function DayView() {
               type="time"
               value={horaInicio}
               onChange={(e) => setHoraInicio(e.target.value)}
-              onBlur={() => patchDay({ hora_inicio: horaInicio || null })}
+              onBlur={() => {
+                if ((horaInicio || null) !== data.hora_inicio) patchDay({ hora_inicio: horaInicio || null });
+              }}
             />
           </label>
           <label className="session-meta-field">
@@ -131,7 +141,9 @@ export function DayView() {
               type="time"
               value={horaFin}
               onChange={(e) => setHoraFin(e.target.value)}
-              onBlur={() => patchDay({ hora_fin: horaFin || null })}
+              onBlur={() => {
+                if ((horaFin || null) !== data.hora_fin) patchDay({ hora_fin: horaFin || null });
+              }}
             />
           </label>
         </div>

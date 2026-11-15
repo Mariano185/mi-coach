@@ -69,7 +69,7 @@ como SPA (static + catch-all fallback). Ver `server/src/index.ts`.
 **Programa estructurado — única fuente de verdad del entrenamiento:**
 - `mesociclos` — `id, nombre, objetivo, notas, fecha_inicio, fecha_fin, orden, fecha_creada`. Agrupa semanas; la numeración de semana se reinicia por mesociclo.
 - `program_weeks` — `id, semana, mesociclo_id→mesociclos, nombre, bloque, notas, fecha_creada, activa`, más el Objetivo nutricional del coach: `objetivo_kcal/proteina_g/carbohidratos_g/grasas_g` (los cuatro juntos o ninguno), `nota_nutricional`, `objetivos_pautados_en` (desde qué fecha rige; ADR 0003, `calendario.ts`). `UNIQUE(mesociclo_id, semana)`.
-- `program_days` — `id, week_id→weeks, dia, tipo(texto libre opcional), titulo, warmup, notas (del coach), notas_atleta, fecha, hora_inicio, hora_fin, orden`. `fecha`/`hora_inicio` se autosetean al completar la primera serie del día; `hora_fin` se corre a la hora de cada serie que pasa a hecha mientras el día sea hoy.
+- `program_days` — `id, week_id→weeks, dia, tipo(texto libre opcional), titulo, warmup, notas (del coach), notas_atleta, fecha, hora_inicio, hora_fin, orden`. `fecha`/`hora_inicio` se autosetean con el primer valor real (peso, reps o RPE) cargado en cualquier serie del día — abrir el día para mirarlo no lo fecha; `hora_fin` se corre a la hora de cada serie que pasa a hecha mientras el día sea hoy.
 - `program_exercises` — `id, day_id→days, exercise_id→exercises, nombre_libre, seccion(main|accesorio|core), reps_text, carga_text, rpe_text, notas, orden`.
 - `program_sets` — `id, program_exercise_id→exercises, n_serie, target_reps, target_rpe, target_peso, real_peso, real_reps, real_rpe, hecha, notas`. `hecha` se deriva de peso+reps presentes.
 
@@ -116,7 +116,9 @@ Cascadas `ON DELETE CASCADE` week→day→exercise→set.
 Tabla completa de endpoints en el `README.md` (raíz). Resumen de lo no obvio:
 
 - **`PATCH /program/sets/:id`** — completa/edita `real_*` de una serie; deriva `hecha` y, si
-  la serie queda hecha, autosetea `fecha`/`hora_inicio` del día (`COALESCE`, no pisa valores).
+  la serie queda con algún valor real (peso, reps o RPE, aunque no esté hecha), autosetea
+  `fecha`/`hora_inicio` del día (`COALESCE`, no pisa valores). El client no precarga la fecha:
+  un día sin fecha muestra el input vacío y DayView solo guarda fecha/horas si cambiaron.
   Si la serie **recién** pasa a hecha y el día es hoy, `hora_fin` = hora actual (= última serie),
   así sale `duracion_min` en `/coach/analisis`; días viejos o editar una serie ya hecha no la tocan.
   "Ahora" sale de `ahoraLocal()` en JS (TZ del proceso) para poder fijarlo en tests con fake timers.
