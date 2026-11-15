@@ -104,6 +104,44 @@ describe("PATCH /api/program/sets/:id", () => {
     expect(after.hora_inicio).not.toBeNull();
   });
 
+  describe("fecha y hora_inicio con el primer valor cargado", () => {
+    const dia = (dayId: number) =>
+      db.prepare("SELECT fecha, hora_inicio, hora_fin FROM program_days WHERE id = ?").get(dayId) as {
+        fecha: string | null;
+        hora_inicio: string | null;
+        hora_fin: string | null;
+      };
+
+    it("cargar solo el peso ya setea fecha y hora_inicio, aunque la serie no quede hecha", async () => {
+      const { dayId, setIds } = seedWeekWithDay(db);
+
+      const res = await request(app).patch(`/api/program/sets/${setIds[0]}`).set(AUTH).send({ real_peso: 95 });
+
+      expect(res.body.hecha).toBe(0);
+      const d = dia(dayId);
+      expect(d.fecha).not.toBeNull();
+      expect(d.hora_inicio).not.toBeNull();
+      expect(d.hora_fin).toBeNull(); // hora_fin sigue atada a completar una serie
+    });
+
+    it("cargar solo el RPE también setea la fecha", async () => {
+      const { dayId, setIds } = seedWeekWithDay(db);
+
+      await request(app).patch(`/api/program/sets/${setIds[0]}`).set(AUTH).send({ real_rpe: 8 });
+
+      expect(dia(dayId).fecha).not.toBeNull();
+    });
+
+    it("un PATCH sin valores reales (solo notas, o borrar en una serie vacía) no setea la fecha", async () => {
+      const { dayId, setIds } = seedWeekWithDay(db);
+
+      await request(app).patch(`/api/program/sets/${setIds[0]}`).set(AUTH).send({ notas: "molestia en el hombro" });
+      await request(app).patch(`/api/program/sets/${setIds[1]}`).set(AUTH).send({ real_peso: null });
+
+      expect(dia(dayId)).toMatchObject({ fecha: null, hora_inicio: null });
+    });
+  });
+
   describe("hora_fin automática", () => {
     function fechaLocal(d: Date): string {
       const p = (n: number) => String(n).padStart(2, "0");

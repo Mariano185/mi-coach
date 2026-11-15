@@ -115,7 +115,8 @@ Usá `?dias=56` si querés más historial. El JSON incluye:
 - `sesiones_realizadas` — días con al menos una serie real completada en la ventana, ordenados
   por fecha. Por día: `semana`, `dia`, `tipo`, `fecha`, `hora_inicio`, `hora_fin`, `duracion_min`,
   `series_hechas`, `notas_coach`, `notas_atleta`. La `fecha` y `hora_inicio` se autosetean solas en
-  cuanto el atleta carga la primera serie de ese día — no hay paso manual de "registrar" (ese
+  cuanto el atleta carga el primer valor (peso, reps o RPE) en una serie de ese día, aunque la
+  serie todavía no esté completa; abrir el día para mirarlo no lo fecha — no hay paso manual de "registrar" (ese
   concepto ya no existe). La `hora_fin` también se completa sola: es la hora de la última serie
   completada ese mismo día (si el atleta carga series de un día viejo, no se toca), así que
   `duracion_min` ≈ primera → última serie, sin contar el warmup previo. **Usalo

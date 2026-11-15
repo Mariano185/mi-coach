@@ -547,13 +547,15 @@ programRouter.patch("/sets/:id", (req, res) => {
          WHERE id=@id`
     ).run({ id, ...next });
 
-    // La fecha/hora del entrenamiento es la del primer dato cargado, no la de un registro
-    // manual posterior (que podía llegar días después). COALESCE = solo escribe si está NULL,
-    // así que respeta cualquier edición manual previa y es idempotente entre series del mismo día.
+    // La fecha/hora del entrenamiento es la del primer dato cargado: basta con cualquier valor
+    // real (peso, reps o RPE), no hace falta que la serie quede hecha. Así abrir un día solo
+    // para mirarlo no lo fecha, pero empezar a cargarlo sí. COALESCE = solo escribe si está
+    // NULL, así que respeta cualquier edición manual previa y es idempotente entre series.
     // hora_fin = hora de la última serie completada, pero solo si el día es hoy y la serie
     // recién pasa a hecha: editar una serie de un día viejo, o el RPE de una ya hecha, no la mueve.
     // (En un UPDATE, `fecha` en el CASE es el valor previo de la fila, de ahí el COALESCE.)
-    if (next.hecha === 1) {
+    const tieneValorReal = next.real_peso != null || next.real_reps != null || next.real_rpe != null;
+    if (tieneValorReal || next.hecha === 1) {
       const ahora = ahoraLocal();
       db.prepare(
         `UPDATE program_days
@@ -565,7 +567,7 @@ programRouter.patch("/sets/:id", (req, res) => {
       ).run({
         hoy: ahora.fecha,
         hora: ahora.hora,
-        recienHecha: set.hecha === 1 ? 0 : 1,
+        recienHecha: next.hecha === 1 && set.hecha !== 1 ? 1 : 0,
         peId: set.program_exercise_id,
       });
     }
