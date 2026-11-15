@@ -370,7 +370,7 @@ export interface TracEntry {
   fatiga_pierna: number | null;
   fatiga_empuje: number | null;
   fatiga_traccion: number | null;
-  descanso_alimentacion: number | null;
+  sueno: number | null; // cómo siente que durmió (1–5). Hasta noviembre de 2026: "descanso/alimentación"
   recuperacion: number | null;
   motivacion: number | null;
   tecnica: number | null;
@@ -383,7 +383,7 @@ export interface UpsertTracInput {
   fatiga_pierna?: number | null;
   fatiga_empuje?: number | null;
   fatiga_traccion?: number | null;
-  descanso_alimentacion?: number | null;
+  sueno?: number | null; // cómo siente que durmió (1–5). Hasta noviembre de 2026: "descanso/alimentación"
   recuperacion?: number | null;
   motivacion?: number | null;
   tecnica?: number | null;

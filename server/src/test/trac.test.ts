@@ -40,7 +40,7 @@ describe("PUT /api/trac", () => {
         fatiga_pierna: 3,
         fatiga_empuje: 4,
         fatiga_traccion: 2,
-        descanso_alimentacion: 5,
+        sueno: 5,
         recuperacion: 4,
         motivacion: 5,
         tecnica: 3,
@@ -50,6 +50,8 @@ describe("PUT /api/trac", () => {
     expect(res.body.fecha).toBe("2026-07-08");
     expect(res.body.fatiga_pierna).toBe(3);
     expect(res.body.tecnica).toBe(3);
+    expect(res.body.sueno).toBe(5);
+    expect(res.body).not.toHaveProperty("descanso_alimentacion");
 
     const row = db.prepare("SELECT * FROM trac WHERE fecha = ?").get("2026-07-08") as { fatiga_empuje: number };
     expect(row.fatiga_empuje).toBe(4);
@@ -77,13 +79,18 @@ describe("PUT /api/trac", () => {
     expect(res.body.tecnica).toBe(2);
     expect(res.body.fatiga_empuje).toBeNull();
     expect(res.body.fatiga_traccion).toBeNull();
-    expect(res.body.descanso_alimentacion).toBeNull();
+    expect(res.body.sueno).toBeNull();
     expect(res.body.recuperacion).toBeNull();
     expect(res.body.motivacion).toBeNull();
   });
 
   it("rechaza valores fuera de rango en fatiga_pierna", async () => {
     const res = await request(app).put("/api/trac").set(AUTH).send({ fecha: "2026-07-08", fatiga_pierna: 6 });
+    expect(res.status).toBe(400);
+  });
+
+  it("rechaza sueno fuera de rango", async () => {
+    const res = await request(app).put("/api/trac").set(AUTH).send({ fecha: "2026-07-08", sueno: 0 });
     expect(res.status).toBe(400);
   });
 
@@ -148,20 +155,22 @@ describe("GET /api/coach/analisis — trac_reciente", () => {
     app = await createTestApp(db);
   });
 
-  it("devuelve 7 días consecutivos con huecos en null y los días sembrados con sus valores", async () => {
+  it("?dias=10 trae una fila por fecha de la ventana (hoy y los 10 anteriores), con huecos en null", async () => {
     const hoy = daysAgo(0);
     const hace3 = daysAgo(3);
 
     await request(app).put("/api/trac").set(AUTH).send({ fecha: hoy, motivacion: 5, tecnica: 4 });
-    await request(app).put("/api/trac").set(AUTH).send({ fecha: hace3, recuperacion: 2 });
+    await request(app).put("/api/trac").set(AUTH).send({ fecha: hace3, recuperacion: 2, sueno: 1 });
+    await request(app).put("/api/trac").set(AUTH).send({ fecha: daysAgo(10), sueno: 4 });
+    await request(app).put("/api/trac").set(AUTH).send({ fecha: daysAgo(11), sueno: 5 }); // fuera de la ventana
 
-    const res = await request(app).get("/api/coach/analisis").set(AUTH);
+    const res = await request(app).get("/api/coach/analisis?dias=10").set(AUTH);
     expect(res.status).toBe(200);
 
     const trac = res.body.trac_reciente as Array<Record<string, unknown>>;
-    expect(trac).toHaveLength(7);
-    expect(trac[6].fecha).toBe(hoy);
-    expect(trac[0].fecha).toBe(daysAgo(6));
+    expect(trac).toHaveLength(11);
+    expect(trac[10].fecha).toBe(hoy);
+    expect(trac[0]).toMatchObject({ fecha: daysAgo(10), sueno: 4 });
 
     // orden ascendente y consecutivo
     for (let i = 1; i < trac.length; i++) {
@@ -176,11 +185,20 @@ describe("GET /api/coach/analisis — trac_reciente", () => {
 
     const hace3Entry = trac.find((t) => t.fecha === hace3)!;
     expect(hace3Entry.recuperacion).toBe(2);
+    expect(hace3Entry.sueno).toBe(1);
 
     // un día sin registro: todos los campos null
     const diaSinRegistro = trac.find((t) => t.fecha !== hoy && t.fecha !== hace3)!;
     expect(diaSinRegistro.fatiga_pierna).toBeNull();
     expect(diaSinRegistro.motivacion).toBeNull();
+  });
+
+  it("sin ?dias usa la ventana default de 42 días, igual que el resto del análisis", async () => {
+    const res = await request(app).get("/api/coach/analisis").set(AUTH);
+    const trac = res.body.trac_reciente as Array<{ fecha: string }>;
+    expect(trac).toHaveLength(43);
+    expect(trac[0].fecha).toBe(daysAgo(42));
+    expect(trac[42].fecha).toBe(daysAgo(0));
   });
 
   it("no rompe el resto del payload de análisis", async () => {

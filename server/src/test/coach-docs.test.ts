@@ -55,6 +55,15 @@ describe("GET /api/coach/docs", () => {
     expect(res.body.secciones[0].id).toBe("enciclopedia");
   });
 
+  it("explica que el Trac trae sueno (antes descanso_alimentacion) desde noviembre 2026 y sigue ?dias=N (issue #18)", async () => {
+    const res = await request(app).get("/api/coach/docs?seccion=flujo-semana").set(AUTH);
+    const md = res.body.secciones[0].markdown as string;
+    expect(md).toContain("`sueno`");
+    expect(md).toMatch(/noviembre (de )?2026/);
+    expect(md).toContain("descanso_alimentacion"); // el nombre viejo, para leer el historial
+    expect(md).not.toMatch(/últimos 7 días fijos/);
+  });
+
   it("?seccion=<inexistente> devuelve 404", async () => {
     const res = await request(app).get("/api/coach/docs?seccion=no-existe").set(AUTH);
     expect(res.status).toBe(404);
