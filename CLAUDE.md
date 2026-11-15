@@ -27,7 +27,7 @@ real completa (fecha/hora se autosetean). Dashboard/Stats y el análisis del coa
 ```
 mi-coach/
 ├── server/src/   db.ts · index.ts · auth.ts · types.ts
-│                 routes/{exercises,bodyweight,program,mesociclos,stats,coach,settings,trac}.ts
+│                 routes/{exercises,bodyweight,program,mesociclos,stats,coach,settings,trac,pasos}.ts
 │                 test/   (vitest + supertest, DB en memoria)
 ├── client/src/   App.tsx · api.ts · swr.ts · types.ts · main.tsx · styles.css
 │                 pages/{Dashboard,Bodyweight,Programs,Trac,Login}.tsx
@@ -35,6 +35,7 @@ mi-coach/
 │                 components/{BottomNav,Toast,TrendChart,CoachNotes,icons}.tsx
 │                 constants/trac.ts
 ├── docs/deploy/  mi-coach.service · README.md (deploy genérico) · TAILSCALE.md (acceso remoto)
+│                 ATAJO-PASOS.md (atajo de iOS que manda los Pasos diarios)
 ├── docs/agents/  issue tracker, triage labels, domain docs (meta-docs para skills)
 └── .claude/memory/ notas históricas de proyecto para el agente
 ```
@@ -71,7 +72,9 @@ Cascadas `ON DELETE CASCADE` week→day→exercise→set.
 - `exercises` — library seedeada (`EXERCISE_LIBRARY` en db.ts). `es_basico=1` marca los 3 básicos.
 - `bodyweight` — `fecha, peso_kg, kcal_objetivo, proteina_g, hambre, digestion, notas`.
 - `trac` — bienestar diario 1–5 (`fatiga_pierna/empuje/traccion, descanso_alimentacion, recuperacion, motivacion, tecnica`), una fila por fecha (upsert).
-- `settings` — clave/valor: `rm_squat/bench/deadlift`, hashes de auth, `coach_api_key`.
+- `pasos_diarios` — Pasos diarios que manda el atajo de iOS: `fecha` (UNIQUE), `pasos` (entero ≥ 0).
+  Upsert por fecha (`PUT /api/pasos`); sin fila = "no llegó", nunca 0 pasos.
+- `settings` — clave/valor: `rm_squat/bench/deadlift`, hashes de auth, `coach_api_key`, `device_api_key`.
 
 **Vistas (nunca recalcular a mano, siempre leer de acá):**
 - `v_program_sets_e1rm` — `program_sets.* + e1rm + e1rm_confianza + tonelaje + rir`. e1RM = serie
@@ -106,7 +109,8 @@ Tabla completa de endpoints en el `README.md` (raíz). Resumen de lo no obvio:
   Esto **reemplaza** al viejo botón "Registrar día": no existe más `POST /days/:id/complete`.
 - **`PATCH /program/sets/:id/target`** — el coach corrige la prescripción (`target_*`) sin tocar lo real.
 - **`GET /coach/analisis?dias=42`** — todo lo que el coach necesita en un JSON: e1RM, progresión,
-  RPE, peso corporal, volumen por categoría, sesiones realizadas, Trac reciente, library, mesociclos.
+  RPE, peso corporal, volumen por categoría, sesiones realizadas, Trac reciente, Ingesta diaria,
+  Pasos diarios (`pasos_diarios`: solo las fechas que llegaron), library, mesociclos.
 - **`POST /program/weeks`** — crea la semana completa desde JSON (semana, días, ejercicios, series
   target). Ejemplo del payload en el README. `409` si ya existe esa semana en el mesociclo.
 - Semanas/días/ejercicios tienen PATCH de merge parcial (solo pisa campos presentes en el body) y
@@ -129,6 +133,9 @@ firmada con HMAC (secret en `settings["auth_session_secret"]`), 30 días.
 - **Coach key:** `requireAuth` también acepta el header `X-Coach-Key` contra
   `settings["coach_api_key"]` (auto-generado al arrancar, se imprime una vez en el log; compare
   timing-safe). Es la vía del coach (caja negra) para leer/escribir sin sesión de browser.
+- **Device key:** header `X-Device-Key` contra `settings["device_api_key"]` (mismo ciclo de vida
+  que la del coach). Es la del atajo de iOS de Pasos diarios y **solo** vale para `PUT /api/pasos`
+  (`RUTA_DISPOSITIVO` en auth.ts, falla cerrado); con ella cualquier otra ruta da 401.
 - Con `NODE_ENV=production` la cookie es `secure` → el login de browser requiere HTTPS.
 
 > **Deuda conocida:** el token de sesión no expira server-side (la cookie sí, a 30d). Sin `exp`
@@ -148,7 +155,8 @@ firmada con HMAC (secret en `settings["auth_session_secret"]`), 30 días.
 ## Deploy
 
 Genérico (Linux + systemd, cualquier PC/homelab/VPS): `docs/deploy/README.md`. Acceso remoto
-opcional con Tailscale Funnel: `docs/deploy/TAILSCALE.md`. `coach.db` vive fuera del repo
+opcional con Tailscale Funnel: `docs/deploy/TAILSCALE.md`. Atajo de iOS para los Pasos diarios:
+`docs/deploy/ATAJO-PASOS.md`. `coach.db` vive fuera del repo
 (`COACH_DB_PATH`) → `git pull` + `npm run build` + restart no tocan los datos.
 
 ---
