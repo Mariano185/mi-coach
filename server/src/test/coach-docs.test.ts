@@ -99,6 +99,17 @@ describe("GET /api/coach/docs", () => {
     expect(ejercicios).toEqual({ bloque: "ejercicios", opt_in: true });
   });
 
+  it("generado.analisis_bloques marca accesorios como opt_in, aunque no venga en el default", async () => {
+    const [docs, analisis] = await Promise.all([
+      request(app).get("/api/coach/docs").set(AUTH),
+      request(app).get("/api/coach/analisis").set(AUTH),
+    ]);
+    expect(analisis.body).not.toHaveProperty("accesorios");
+
+    const bloques = docs.body.generado.analisis_bloques as Array<{ bloque: string; opt_in: boolean }>;
+    expect(bloques.find((b) => b.bloque === "accesorios")).toEqual({ bloque: "accesorios", opt_in: true });
+  });
+
   it("generado.version_deploy es un string no vacío", async () => {
     const res = await request(app).get("/api/coach/docs").set(AUTH);
     expect(typeof res.body.generado.version_deploy).toBe("string");

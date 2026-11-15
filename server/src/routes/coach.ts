@@ -4,6 +4,8 @@ import { dirname, resolve, basename } from "node:path";
 import { fileURLToPath } from "node:url";
 import { db } from "../db.js";
 import type {
+  AccesorioAnalisis,
+  AccesorioSerie,
   AdherenciaPorEjercicio,
   AdherenciaPorLargo,
   AdherenciaPorPosicion,
@@ -33,9 +35,11 @@ export function setEndpointsCoach(endpoints: CoachDocsEndpoint[]): void {
 const RASTREA_E1RM = "e.rastrea_e1rm = 1";
 
 // Bloques que NO viajan por defecto: hay que pedirlos con ?incluir=bloque1,bloque2.
-// Hoy solo `ejercicios` (148 filas, ~55% del payload de /analisis, cuando el coach usa
-// 6-7 por semana) — ya existe GET /api/exercises para pedir el catálogo completo aparte.
-const BLOQUES_OPT_IN = ["ejercicios"] as const;
+//   - `ejercicios`: 148 filas, ~55% del payload de /analisis, cuando el coach usa 6-7 por
+//     semana — ya existe GET /api/exercises para pedir el catálogo completo aparte.
+//   - `accesorios`: series hechas de todo lo que no rastrea e1RM; solo hace falta cuando
+//     el coach revisa la doble progresión, no en cada lectura.
+const BLOQUES_OPT_IN = ["ejercicios", "accesorios"] as const;
 type BloqueOptIn = (typeof BLOQUES_OPT_IN)[number];
 
 // Arma el objeto de /analisis. Extraído a función para que GET /docs pueda pedir
@@ -150,6 +154,13 @@ function buildAnalisis(dias: number, incluir: Set<BloqueOptIn> = new Set()): Rec
         )
         .all()
     : undefined;
+
+  // 7b) Accesorios (OPT-IN, ?incluir=accesorios): la doble progresión de todo lo que NO
+  // rastrea e1RM (los básicos ya están en progresion_basicos) — hip thrust y RDL incluidos,
+  // porque no son movimientos de competencia. Una entrada por ejercicio de catálogo con al
+  // menos una serie hecha en la ventana; nombre_libre (exercise_id NULL) queda fuera, sin
+  // identidad estable no hay progresión que seguir (mismo criterio que /progresion).
+  const accesorios = incluir.has("accesorios") ? buildAccesorios(desde) : undefined;
 
   // 8) Mesociclos con su semana máxima (para numerar la próxima semana de cada uno = max + 1).
   const mesociclos = db
@@ -293,6 +304,7 @@ function buildAnalisis(dias: number, incluir: Set<BloqueOptIn> = new Set()): Rec
     // objeto (no "ejercicios": null) — así Object.keys() la refleja bien tanto en
     // /analisis como en generado.analisis_bloques de /coach/docs.
     ...(ejercicios !== undefined ? { ejercicios } : {}),
+    ...(accesorios !== undefined ? { accesorios } : {}),
     mesociclos,
     sesiones_realizadas,
     trac_reciente,
@@ -301,10 +313,64 @@ function buildAnalisis(dias: number, incluir: Set<BloqueOptIn> = new Set()): Rec
   };
 }
 
+function buildAccesorios(desde: string): AccesorioAnalisis[] {
+  // Mismo filtro de serie hecha que /progresion: hecha=1 no implica peso+reps (PATCH acepta
+  // `hecha` explícito), y una fila sin fecha no tiene lugar en una lista cronológica.
+  // COALESCE: rastrea_e1rm puede ser NULL en filas agregadas antes de la columna.
+  const filas = db
+    .prepare(
+      `SELECT e.id AS exercise_id, e.nombre, pe.id AS pe_id,
+              pd.fecha, pd.week_id, pd.dia, pe.reps_text AS rango_objetivo,
+              ps.real_reps AS reps, ps.real_peso AS peso, ps.real_rpe AS rpe
+       FROM program_sets ps
+       JOIN program_exercises pe ON pe.id = ps.program_exercise_id
+       JOIN program_days pd      ON pd.id = pe.day_id
+       JOIN exercises e          ON e.id = pe.exercise_id
+       WHERE COALESCE(e.rastrea_e1rm, 0) = 0
+         AND ps.hecha = 1
+         AND ps.real_peso IS NOT NULL
+         AND ps.real_reps IS NOT NULL
+         AND pd.fecha IS NOT NULL
+         AND pd.fecha >= date('now', ?)
+       ORDER BY e.nombre, e.id, pd.fecha, pd.orden, pd.id, pe.orden, pe.id, ps.n_serie`
+    )
+    .all(desde) as Array<{
+    exercise_id: number;
+    nombre: string;
+    pe_id: number;
+    fecha: string;
+    week_id: number;
+    dia: number;
+    rango_objetivo: string | null;
+    reps: number;
+    peso: number;
+    rpe: number | null;
+  }>;
+
+  // Las filas vienen ordenadas; solo se reagrupan por ejercicio → program_exercise.
+  const porEjercicio = new Map<number, AccesorioAnalisis>();
+  const sesionPorPe = new Map<number, AccesorioAnalisis["sesiones"][number]>();
+  for (const f of filas) {
+    let acc = porEjercicio.get(f.exercise_id);
+    if (!acc) {
+      acc = { exercise_id: f.exercise_id, nombre: f.nombre, sesiones: [] };
+      porEjercicio.set(f.exercise_id, acc);
+    }
+    let sesion = sesionPorPe.get(f.pe_id);
+    if (!sesion) {
+      sesion = { fecha: f.fecha, week_id: f.week_id, dia: f.dia, rango_objetivo: f.rango_objetivo, series: [] };
+      sesionPorPe.set(f.pe_id, sesion);
+      acc.sesiones.push(sesion);
+    }
+    sesion.series.push([f.reps, f.peso, f.rpe] satisfies AccesorioSerie);
+  }
+  return [...porEjercicio.values()];
+}
+
 // GET /api/coach/analisis — todo lo que el coach lee para programar la semana nueva,
 // en un solo JSON. El coach es caja negra: pega un curl acá, no toca SQL ni el archivo.
 //   ?dias=42     ventana de análisis (default 42 = ~6 semanas)
-//   ?incluir=    bloques opt-in, separados por coma (hoy solo "ejercicios") — no
+//   ?incluir=    bloques opt-in, separados por coma ("ejercicios", "accesorios") — no
 //                viajan por defecto, ver BLOQUES_OPT_IN.
 coachRouter.get("/analisis", (req, res) => {
   const dias = Number(req.query.dias) || 42;

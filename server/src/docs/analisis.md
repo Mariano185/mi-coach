@@ -134,6 +134,27 @@ entrenados — si armás tu propio análisis cruzando datos de más de un bloque
 ## Bloques opt-in
 
 `ejercicios` no viaja por defecto (pesa ~55% del payload para un catálogo que rara vez cambia
-entre semanas). Pedilo con `?incluir=ejercicios`. `generado.analisis_bloques` de `/coach/docs`
+entre semanas). Pedilo con `?incluir=ejercicios`.
+
+`accesorios` tampoco viaja por defecto. Pedilo con `?incluir=accesorios` (o
+`?incluir=ejercicios,accesorios`) cuando revises la **doble progresión**: es la forma de ver
+todos los accesorios de la ventana sin bajar día por día. Trae una entrada por ejercicio de
+catálogo que **no** rastrea e1RM (los 3 básicos ya están en `progresion_basicos`; hip thrust y
+RDL sí entran) y que tuvo al menos una serie hecha en `?dias=N`:
+
+```json
+{ "exercise_id": 16, "nombre": "Vuelos laterales con mancuernas",
+  "sesiones": [ { "fecha": "2026-11-14", "week_id": 24, "dia": 2, "rango_objetivo": "12-15",
+                  "series": [[15, 10, 9], [13, 10, 9]] } ] }
+```
+
+- `series` son tuplas `[reps, peso, rpe]` de las series **hechas**, en orden de serie. Las
+  salteadas no aparecen: si pautaste 3 y hay 2, la tercera se cayó. `rpe` puede ser `null`.
+- `rango_objetivo` es el `reps_text` que pautaste para esa prescripción (puede ser `null`).
+- Una sesión = una prescripción del ejercicio. Si lo pautaste dos veces el mismo día, vienen
+  dos sesiones con la misma `fecha`.
+- Ejercicios cargados como `nombre_libre` (sin id de catálogo) no aparecen.
+- No trae targets por serie, notas, e1RM ni tonelaje. Para eso, o para una ventana más larga,
+  usá `GET /coach/progresion/:exercise_id`. `generado.analisis_bloques` de `/coach/docs`
 marca `opt_in: true` en los bloques que hay que pedir explícitamente — no asumas que un bloque
 no listado en una respuesta de `/analisis` no existe, puede ser opt-in.

@@ -48,6 +48,9 @@ Usá `?dias=56` si querés más historial. El JSON incluye:
   `/analisis` para eso. Qué significa cada campo biomecánico y cuánto peso darle → sección
   `enciclopedia` de esta doc. `generado.analisis_bloques` de esta misma respuesta de `/coach/docs`
   marca qué bloques son opt-in (`opt_in: true`), por si necesitás confirmar qué existe.
+- `accesorios` — **opt-in, no viene por defecto.** Pedilo con `?incluir=accesorios` cuando
+  revises la doble progresión: series hechas (`[reps, peso, rpe]`) de cada accesorio sin e1RM,
+  sesión por sesión con su `rango_objetivo`. Detalle y formato en `analisis.md`.
 - `mesociclos` — lista de mesociclos existentes, cada uno con `id`, `nombre`, `objetivo`,
   `n_semanas` y `max_semana` (la semana más alta **dentro de ese mesociclo**). La numeración de
   semanas se reinicia por mesociclo: para numerar la próxima semana de un mesociclo dado, usá
