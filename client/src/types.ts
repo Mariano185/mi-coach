@@ -208,7 +208,18 @@ export interface UpdateMesocicloInput {
 // === Programa estructurado ===
 export type Seccion = "main" | "accesorio" | "core";
 
-export interface ProgramWeek {
+// Objetivo nutricional tal como se guarda en la semana (ADR 0003). Los cuatro valores van
+// siempre juntos: o están los cuatro o ninguno. Lo escribe solo el coach.
+export interface ObjetivoNutricionalSemana {
+  objetivo_kcal: number | null;
+  objetivo_proteina_g: number | null;
+  objetivo_carbohidratos_g: number | null;
+  objetivo_grasas_g: number | null;
+  nota_nutricional: string | null;   // Nota nutricional (separada de `notas`, que es de entrenamiento)
+  objetivos_pautados_en: string | null; // YYYY-MM-DD: desde cuándo rige dentro de su semana
+}
+
+export interface ProgramWeek extends ObjetivoNutricionalSemana {
   id: number;
   semana: number;
   nombre: string | null;
@@ -417,8 +428,29 @@ export interface UpsertIngestaDiariaInput {
   comentario?: string | null;
 }
 
-// Fila del bloque `ingesta_diaria` de GET /coach/analisis (solo fechas cargadas).
+// Fila del bloque `ingesta_diaria` de GET /coach/analisis (solo fechas cargadas), con el
+// objetivo que regía ese día (null si todavía no había ninguno).
 export type IngestaDiariaAnalisis = Pick<
   IngestaDiaria,
   "fecha" | "kcal" | "proteina_g" | "carbohidratos_g" | "grasas_g" | "comentario"
->;
+> & { objetivo: ObjetivoNutricional | null };
+
+// === Objetivo nutricional: lo pauta el coach en una Semana de programa (ADR 0003) ===
+// El que rige en una fecha: el de la semana de esa fecha o, si no tiene o lo pautó después,
+// el de la semana anterior más reciente que sí (ver server/src/calendario.ts).
+export interface ObjetivoNutricional {
+  week_id: number;     // semana donde se pautó (puede ser anterior a la de la fecha: herencia)
+  kcal: number;
+  proteina_g: number;
+  carbohidratos_g: number;
+  grasas_g: number;
+  nota: string | null; // Nota nutricional del coach (markdown corto)
+  pautado_en: string;  // YYYY-MM-DD: objetivos_pautados_en de la semana
+}
+
+// GET /api/nutricion/dia?fecha= — vista del día de Nutrición.
+export interface NutricionDia {
+  fecha: string;
+  ingesta: IngestaDiaria | null;
+  objetivo: ObjetivoNutricional | null;
+}

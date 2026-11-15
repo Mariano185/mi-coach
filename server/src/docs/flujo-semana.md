@@ -102,7 +102,10 @@ Usá `?dias=56` si querés más historial. El JSON incluye:
   fechas cargadas y decí sobre cuántas. Un `0` explícito sí es un dato real. Para una fecha
   puntual o un rango arbitrario: `GET /api/ingesta?fecha=YYYY-MM-DD` (devuelve `null` si no hay
   carga) o `GET /api/ingesta?desde=YYYY-MM-DD&hasta=YYYY-MM-DD` (solo las fechas cargadas). La
-  carga es del atleta: no la escribas vos salvo que te pida corregir un número.
+  carga es del atleta: no la escribas vos salvo que te pida corregir un número. Cada fila trae
+  además `objetivo`: el Objetivo nutricional que regía esa fecha (`null` si todavía no había
+  ninguno). Compará cada carga contra **su** objetivo. Cómo pautarlo y la regla de fechas →
+  sección `nutricion` de esta doc.
 - `dias_programados` — a diferencia de todos los bloques anteriores, **incluye días nunca
   entrenados** (`fecha: null`). Una fila por día del programa, con `mesociclo_id`,
   `mesociclo_nombre`, `semana`, `dia`, `titulo`, `tipo`, `fecha`, `series_programadas`,

@@ -42,10 +42,19 @@ describe("GET /api/coach/docs", () => {
     }
   });
 
-  it("incluye las tres secciones migradas (flujo-semana, enciclopedia, analisis)", async () => {
+  it("incluye las secciones del manual (flujo-semana, enciclopedia, analisis, nutricion)", async () => {
     const res = await request(app).get("/api/coach/docs").set(AUTH);
     const ids = (res.body.secciones as Array<{ id: string }>).map((s) => s.id).sort();
-    expect(ids).toEqual(["analisis", "enciclopedia", "flujo-semana"]);
+    expect(ids).toEqual(["analisis", "enciclopedia", "flujo-semana", "nutricion"]);
+  });
+
+  it("la sección nutricion explica los cuatro valores, el promedio único y la regla de fechas", async () => {
+    const res = await request(app).get("/api/coach/docs?seccion=nutricion").set(AUTH);
+    const md = res.body.secciones[0].markdown as string;
+    expect(md).toMatch(/cuatro valores/);
+    expect(md).toMatch(/promedio diario único/);
+    expect(md).toMatch(/objetivos_pautados_en/);
+    expect(md).toMatch(/al cerrar la anterior/);
   });
 
   it("?seccion=<id> devuelve solo esa sección", async () => {

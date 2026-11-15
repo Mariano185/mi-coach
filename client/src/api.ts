@@ -5,6 +5,7 @@ import type {
   Mesociclo,
   MesocicloConSemanas,
   NewBodyweightInput,
+  NutricionDia,
   ProgramDayDetail,
   ProgramExerciseDetail,
   ProgramSet,
@@ -132,6 +133,7 @@ export const api = {
   getIngesta: (fecha: string) => req<IngestaDiaria | null>(`/api/ingesta?fecha=${fecha}`),
   upsertIngesta: (input: UpsertIngestaDiariaInput) =>
     req<IngestaDiaria>("/api/ingesta", { method: "PUT", body: JSON.stringify(input) }),
+  getNutricionDia: (fecha: string) => req<NutricionDia>(`/api/nutricion/dia?fecha=${fecha}`),
 
   // Auth
   login: (password: string) =>

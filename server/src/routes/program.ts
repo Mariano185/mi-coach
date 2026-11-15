@@ -1,5 +1,7 @@
 import { Router } from "express";
 import { db } from "../db.js";
+import { hoyLocal } from "../calendario.js";
+import { validarObjetivo } from "../validacion/objetivo-nutricional.js";
 import type {
   NewProgramWeekInput,
   ProgramDay,
@@ -119,6 +121,8 @@ programRouter.patch("/weeks/:id", (req, res) => {
   if (body.semana !== undefined && !Number.isInteger(body.semana)) {
     return res.status(400).json({ error: "semana debe ser un entero" });
   }
+  const objetivo = validarObjetivo(req.body ?? {}, week, hoyLocal());
+  if ("error" in objetivo) return res.status(400).json({ error: objetivo.error });
   if (body.mesociclo_id !== undefined && body.mesociclo_id !== null) {
     const ok = db.prepare("SELECT 1 FROM mesociclos WHERE id = ?").get(body.mesociclo_id);
     if (!ok) return res.status(400).json({ error: `mesociclo_id inválido: ${body.mesociclo_id}` });
@@ -131,6 +135,13 @@ programRouter.patch("/weeks/:id", (req, res) => {
     nombre: pick(body.nombre, week.nombre),
     bloque: pick(body.bloque, week.bloque),
     notas: pick(body.notas, week.notas),
+    objetivo_kcal: week.objetivo_kcal,
+    objetivo_proteina_g: week.objetivo_proteina_g,
+    objetivo_carbohidratos_g: week.objetivo_carbohidratos_g,
+    objetivo_grasas_g: week.objetivo_grasas_g,
+    nota_nutricional: week.nota_nutricional,
+    objetivos_pautados_en: week.objetivos_pautados_en,
+    ...objetivo.cambios,
   };
 
   const dup = db
@@ -144,7 +155,10 @@ programRouter.patch("/weeks/:id", (req, res) => {
 
   db.prepare(
     `UPDATE program_weeks
-       SET semana=@semana, mesociclo_id=@mesociclo_id, nombre=@nombre, bloque=@bloque, notas=@notas
+       SET semana=@semana, mesociclo_id=@mesociclo_id, nombre=@nombre, bloque=@bloque, notas=@notas,
+           objetivo_kcal=@objetivo_kcal, objetivo_proteina_g=@objetivo_proteina_g,
+           objetivo_carbohidratos_g=@objetivo_carbohidratos_g, objetivo_grasas_g=@objetivo_grasas_g,
+           nota_nutricional=@nota_nutricional, objetivos_pautados_en=@objetivos_pautados_en
        WHERE id=@id`
   ).run({ id, ...next });
 
@@ -594,6 +608,8 @@ programRouter.post("/weeks", (req, res) => {
   if (!Array.isArray(body.days) || body.days.length === 0) {
     return res.status(400).json({ error: "la semana necesita al menos un día" });
   }
+  const objetivo = validarObjetivo(req.body, null, hoyLocal());
+  if ("error" in objetivo) return res.status(400).json({ error: objetivo.error });
   if (body.mesociclo_id != null) {
     const ok = db.prepare("SELECT 1 FROM mesociclos WHERE id = ?").get(body.mesociclo_id);
     if (!ok) return res.status(400).json({ error: `mesociclo_id inválido: ${body.mesociclo_id}` });
@@ -604,8 +620,12 @@ programRouter.post("/weeks", (req, res) => {
   if (dup) return res.status(409).json({ error: `la semana ${body.semana} ya existe en ese mesociclo` });
 
   const insWeek = db.prepare(
-    `INSERT INTO program_weeks (semana, nombre, bloque, notas, fecha_creada, activa, mesociclo_id)
-     VALUES (@semana, @nombre, @bloque, @notas, @fecha_creada, 1, @mesociclo_id)`
+    `INSERT INTO program_weeks (semana, nombre, bloque, notas, fecha_creada, activa, mesociclo_id,
+       objetivo_kcal, objetivo_proteina_g, objetivo_carbohidratos_g, objetivo_grasas_g,
+       nota_nutricional, objetivos_pautados_en)
+     VALUES (@semana, @nombre, @bloque, @notas, @fecha_creada, 1, @mesociclo_id,
+       @objetivo_kcal, @objetivo_proteina_g, @objetivo_carbohidratos_g, @objetivo_grasas_g,
+       @nota_nutricional, @objetivos_pautados_en)`
   );
   const insDay = db.prepare(
     `INSERT INTO program_days (week_id, dia, tipo, titulo, warmup, notas, orden)
@@ -628,6 +648,13 @@ programRouter.post("/weeks", (req, res) => {
       notas: input.notas ?? null,
       fecha_creada: new Date().toISOString().slice(0, 10),
       mesociclo_id: input.mesociclo_id ?? null,
+      objetivo_kcal: null,
+      objetivo_proteina_g: null,
+      objetivo_carbohidratos_g: null,
+      objetivo_grasas_g: null,
+      nota_nutricional: null,
+      objetivos_pautados_en: null,
+      ...objetivo.cambios,
     }).lastInsertRowid as number;
 
     input.days.forEach((d, di) => {
