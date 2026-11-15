@@ -20,6 +20,8 @@ statsRouter.get("/", (_req, res) => {
   // de cada sesión compita entero contra el de otras sesiones — así el día pesado siempre
   // gana sobre el de volumen dentro de la ventana. FROM exercises sin más joins garantiza
   // que los 3 básicos aparezcan aunque no tengan series (null → "Sin datos" en el cliente).
+  // Solo e1RM de confianza alta (RPE ≥ 7): una serie técnica @6 se ve en el historial,
+  // pero no es PR ni mueve la tendencia (ADR 0002).
   const basicos = db
     .prepare(
       `WITH dias AS (
@@ -28,7 +30,7 @@ statsRouter.get("/", (_req, res) => {
          JOIN program_exercises pe ON pe.exercise_id = e.id
          JOIN program_days      pd ON pd.id = pe.day_id
          JOIN v_program_sets_e1rm v ON v.program_exercise_id = pe.id
-         WHERE ${RASTREA_E1RM} AND v.e1rm IS NOT NULL AND pd.fecha IS NOT NULL
+         WHERE ${RASTREA_E1RM} AND v.e1rm_confianza = 'alta' AND pd.fecha IS NOT NULL
          GROUP BY e.id, pd.fecha
        ),
        rankeado AS (

@@ -273,6 +273,10 @@ export interface ProgramSet {
   rir: number | null; // derivado en v_program_sets_e1rm: MAX(0, ROUND(10 - real_rpe))
 }
 
+// Confianza del e1RM (ADR 0002): 'alta' con RPE ≥ 7; 'baja' con RPE 5–6,5 (se muestra
+// marcada, pero no cuenta para el mejor e1RM ni para la tendencia). null = sin e1RM.
+export type E1rmConfianza = "alta" | "baja";
+
 // Vistas agregadas devueltas por la API:
 export interface ProgramDayCard extends ProgramDay {
   nombre_ejercicios: string; // "Squat + Bench"
@@ -303,7 +307,9 @@ export interface ProgramExerciseDetail extends ProgramExercise {
   rastrea_e1rm: 0 | 1;
   dia: number;
   tipo: string | null;
-  sets: Array<ProgramSet & { e1rm: number | null; tonelaje: number | null }>;
+  // e1rm: de v_program_sets_e1rm (RPE + tabla RTS). null sin RPE, con RPE < 5 o si
+  // proyecta > 10 reps al fallo.
+  sets: Array<ProgramSet & { e1rm: number | null; e1rm_confianza: E1rmConfianza | null; tonelaje: number | null }>;
 }
 
 // Inputs
@@ -434,6 +440,7 @@ export interface HistoryDayDetail extends HistoryDay {
     real_rpe: number | null;
     rir: number | null;
     e1rm: number | null;
+    e1rm_confianza: E1rmConfianza | null;
   }>;
 }
 
@@ -468,15 +475,17 @@ export interface AdherenciaResponse {
 }
 
 // === Coach (progresion_basicos, bloque de /analisis) ===
-// Una fila por combinación de carga (nombre, fecha, peso_kg, reps) — no por serie ni por
-// sesión. Top set + back-off del mismo día quedan como filas separadas, cada una con su
-// e1RM propio; rpe_min/rpe_max conservan la fatiga intra-sesión que un promedio borraría.
+// Una fila por combinación (nombre, fecha, peso_kg, reps, RPE) — no por serie ni por
+// sesión. Top set + back-off del mismo día quedan como filas separadas, y la misma carga
+// a RPE distinto también (el e1RM depende del RPE). rpe_min/rpe_max se conservan por
+// compatibilidad: dentro de una fila son iguales. Incluye filas de confianza baja.
 export interface ProgresionBasico {
   nombre: string;
   fecha: string;
   peso_kg: number;
   reps: number;
   e1rm: number;
+  e1rm_confianza: E1rmConfianza;
   rpe_min: number | null;
   rpe_max: number | null;
   n_series: number;
@@ -495,7 +504,8 @@ export interface ProgresionEjercicioSerie {
   reps: number;
   rpe: number | null;
   rir: number | null; // derivado en la vista: MAX(0, ROUND(10 - real_rpe))
-  e1rm: number; // de v_program_sets_e1rm, nunca recalculado
+  e1rm: number | null; // de v_program_sets_e1rm, nunca recalculado. null = sin e1RM
+  e1rm_confianza: E1rmConfianza | null;
   tonelaje: number; // idem: real_peso * real_reps
 }
 
@@ -505,9 +515,10 @@ export interface ProgresionEjercicioSesion {
   fecha: string; // YYYY-MM-DD. Nunca null: se filtran los días sin fecha.
   day_ids: number[]; // >1 elemento = hubo fusión de dos program_days
   n_series: number; // series completadas (hecha=1 con peso Y reps)
-  /** Máximo e1RM de la sesión. OJO: mejor_e1rm y mejor_tonelaje son máximos
-   *  INDEPENDIENTES — pueden venir de series distintas. No son "la mejor serie". */
-  mejor_e1rm: number;
+  /** Máximo e1RM de confianza alta de la sesión (null si no hubo ninguno). OJO:
+   *  mejor_e1rm y mejor_tonelaje son máximos INDEPENDIENTES — pueden venir de series
+   *  distintas. No son "la mejor serie". */
+  mejor_e1rm: number | null;
   mejor_tonelaje: number;
   tonelaje_total: number; // volumen real de la sesión (suma, no máximo)
   rpe_min: number | null; // null si ninguna serie registró RPE

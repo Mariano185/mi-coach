@@ -209,7 +209,7 @@ describe("GET /api/coach/analisis — e1RM sigue funcionando tras el cutover", (
     const res = await request(app).get("/api/coach/analisis").set(AUTH);
     const mejores = res.body.mejor_e1rm_basicos as Array<{ nombre: string; mejor_e1rm: number }>;
     const bench = mejores.find((m) => m.nombre === "Flat Bench Press (barra)");
-    expect(bench?.mejor_e1rm).toBeCloseTo(60 * (1 + 8 / 30), 1);
+    expect(bench?.mejor_e1rm).toBe(81.2); // 60×8 @8 → 10 reps proyectadas → 73,9 %
   });
 
   it("una variante no contamina el e1RM del movimiento de competencia", async () => {

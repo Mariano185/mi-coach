@@ -2,6 +2,7 @@ import Database from "better-sqlite3";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { seedEnciclopedia } from "./seed/index.js";
+import { V_PROGRAM_SETS_E1RM_SQL } from "./e1rm-sql.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // coach.db: por defecto en la raíz de mi-coach/ (dos niveles arriba de server/src).
@@ -255,21 +256,13 @@ function migrate(): void {
   // match es no-op). No toca las claves de auth (coach_api_key, auth_*).
   db.exec("DELETE FROM settings WHERE clave IN ('rm_squat','rm_bench','rm_deadlift')");
 
-  // v_program_sets_e1rm ganó la columna rir; CREATE VIEW IF NOT EXISTS no actualiza una vista
-  // ya existente, así que hay que dropearla antes de que el CREATE de arriba la recree.
+  // v_program_sets_e1rm se dropea y recrea en cada arranque: CREATE VIEW IF NOT EXISTS no
+  // actualiza una vista ya existente, y una vista no guarda datos, así que recrearla
+  // recalcula el e1RM de TODO el historial con el método vigente (idempotente). Así
+  // entraron la columna rir y, después, el e1RM con RPE + tabla RTS y e1rm_confianza
+  // (issue #14, ADR 0002). El DDL vive en e1rm-sql.ts, compartido con los tests.
   db.exec("DROP VIEW IF EXISTS v_program_sets_e1rm");
-  db.exec(`
-    CREATE VIEW v_program_sets_e1rm AS
-      SELECT
-        ps.*,
-        CASE WHEN ps.real_peso IS NOT NULL AND ps.real_reps IS NOT NULL
-             THEN ROUND(ps.real_peso * (1 + ps.real_reps / 30.0), 1) END AS e1rm,
-        CASE WHEN ps.real_peso IS NOT NULL AND ps.real_reps IS NOT NULL
-             THEN ROUND(ps.real_peso * ps.real_reps, 1) END AS tonelaje,
-        CASE WHEN ps.real_rpe IS NOT NULL
-             THEN MAX(0, ROUND(10 - ps.real_rpe)) END AS rir
-      FROM program_sets ps;
-  `);
+  db.exec(V_PROGRAM_SETS_E1RM_SQL);
 
   // Volumen semanal fraccionado por músculo (reemplaza a volumen_por_categoria del
   // coach.ts, que agrupaba por implemento/región mezclados — ver ADR). Una serie de

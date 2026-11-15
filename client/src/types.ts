@@ -275,6 +275,10 @@ export interface ProgramDayDetail {
   exercises: ProgramExerciseCard[];
 }
 
+// Confianza del e1RM (ADR 0002): 'alta' con RPE ≥ 7; 'baja' con RPE 5–6,5 (se muestra
+// marcada, pero no cuenta para el mejor e1RM ni para la tendencia). null = sin e1RM.
+export type E1rmConfianza = "alta" | "baja";
+
 export interface ProgramSet {
   id: number;
   program_exercise_id: number;
@@ -287,7 +291,8 @@ export interface ProgramSet {
   real_rpe: number | null;
   hecha: number;
   notas: string | null;
-  e1rm: number | null;
+  e1rm: number | null; // de v_program_sets_e1rm (RPE + tabla RTS); null = sin e1RM
+  e1rm_confianza: E1rmConfianza | null;
   tonelaje: number | null;
   rir: number | null;
 }
@@ -411,5 +416,6 @@ export interface HistoryDayDetail extends HistoryDay {
     real_rpe: number | null;
     rir: number | null;
     e1rm: number | null;
+    e1rm_confianza: E1rmConfianza | null;
   }>;
 }

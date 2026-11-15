@@ -3,6 +3,7 @@ import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import { vi } from "vitest";
+import { V_PROGRAM_SETS_E1RM_SQL } from "../e1rm-sql.js";
 
 // DB en memoria compartida por todos los tests del mismo archivo.
 export function createTestDb() {
@@ -150,15 +151,6 @@ export function createTestDb() {
       creado_en TEXT NOT NULL DEFAULT (datetime('now')),
       actualizado_en TEXT NOT NULL DEFAULT (datetime('now'))
     );
-    CREATE VIEW IF NOT EXISTS v_program_sets_e1rm AS
-      SELECT ps.*,
-        CASE WHEN ps.real_peso IS NOT NULL AND ps.real_reps IS NOT NULL
-             THEN ROUND(ps.real_peso * (1 + ps.real_reps / 30.0), 1) END AS e1rm,
-        CASE WHEN ps.real_peso IS NOT NULL AND ps.real_reps IS NOT NULL
-             THEN ROUND(ps.real_peso * ps.real_reps, 1) END AS tonelaje,
-        CASE WHEN ps.real_rpe IS NOT NULL
-             THEN MAX(0, ROUND(10 - ps.real_rpe)) END AS rir
-      FROM program_sets ps;
     CREATE VIEW IF NOT EXISTS v_volumen_por_musculo AS
       SELECT
         (SELECT MIN(strftime('%Y-%W', pd2.fecha))
@@ -183,6 +175,9 @@ export function createTestDb() {
       GROUP BY pw.id, m.id
       ORDER BY semana_creada, week_id, m.grupo, m.nombre;
   `);
+  // Misma vista que producción (db.ts): el DDL es compartido para que los tests no
+  // validen una fórmula de e1RM que producción ya no usa.
+  db.exec(V_PROGRAM_SETS_E1RM_SQL);
 
   // Ejercicios básicos mínimos para los tests
   db.prepare("INSERT INTO exercises (nombre, categoria, rastrea_e1rm) VALUES (?, ?, ?)").run(

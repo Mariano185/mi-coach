@@ -164,31 +164,29 @@ describe("GET /api/coach/progresion/:exercise_id", () => {
   });
 
   it("caso real: mejor_e1rm y mejor_tonelaje son máximos independientes de series distintas", async () => {
-    // Prensa inclinada 45°, sesión real verificada contra producción:
-    // 130x9 RPE8 (e1rm 169.7, ton 1170), 120x10 RPE8 (e1rm 160, ton 1200), 120x8 RPE7 (e1rm 152, ton 960)
+    // Inspirado en una sesión real de Prensa inclinada 45° (130×9 / 120×10 / 120×8), que
+    // con la tabla RTS ya no tiene e1RM (todas proyectan > 10 reps). Mismas proporciones
+    // dentro del tope: 130×5 @8 (e1rm 160.3, ton 650), 110×7 @9 (e1rm 139.9, ton 770),
+    // 100×6 @7 (e1rm 131.2, ton 600).
     const id = seedEjercicio("Prensa inclinada real");
     seedSesion({
       exerciseId: id,
       fecha: diasAtras(1),
       series: [
-        { peso: 130, reps: 9, rpe: 8 },
-        { peso: 120, reps: 10, rpe: 8 },
-        { peso: 120, reps: 8, rpe: 7 },
+        { peso: 130, reps: 5, rpe: 8 },
+        { peso: 110, reps: 7, rpe: 9 },
+        { peso: 100, reps: 6, rpe: 7 },
       ],
     });
 
     const res = await request(app).get(`/api/coach/progresion/${id}?dias=30`).set(AUTH);
     const sesion = res.body.sesiones[0];
     expect(sesion.n_series).toBe(3);
-    // e1RM Epley: peso*(1+reps/30), redondeado a 1 decimal
-    const e1rm1 = Math.round(130 * (1 + 9 / 30) * 10) / 10; // serie 1
-    const e1rm2 = Math.round(120 * (1 + 10 / 30) * 10) / 10; // serie 2
-    expect(sesion.mejor_e1rm).toBe(Math.max(e1rm1, e1rm2));
-    expect(sesion.mejor_e1rm).toBe(e1rm1); // el máximo e1RM sale de la serie 1
-    expect(sesion.mejor_tonelaje).toBe(1200); // pero el máximo tonelaje sale de la serie 2
-    expect(sesion.tonelaje_total).toBe(1170 + 1200 + 960);
+    expect(sesion.mejor_e1rm).toBe(160.3); // el máximo e1RM sale de la serie 1
+    expect(sesion.mejor_tonelaje).toBe(770); // pero el máximo tonelaje sale de la serie 2
+    expect(sesion.tonelaje_total).toBe(650 + 770 + 600);
     expect(sesion.rpe_min).toBe(7);
-    expect(sesion.rpe_max).toBe(8);
+    expect(sesion.rpe_max).toBe(9);
     expect(sesion.series).toHaveLength(3);
   });
 
@@ -298,14 +296,11 @@ describe("GET /api/coach/progresion/:exercise_id", () => {
 
   it("en una sesión fusionada, mejor_e1rm es el máximo entre los dos program_exercises", async () => {
     const id = seedEjercicio("Fusionada mejor e1rm");
-    const { dayId } = seedSesion({ exerciseId: id, fecha: diasAtras(1), series: [{ peso: 40, reps: 5 }] });
-    agregarEjercicioAlDia({ dayId, exerciseId: id, series: [{ peso: 60, reps: 5 }] }); // e1rm mayor
+    const { dayId } = seedSesion({ exerciseId: id, fecha: diasAtras(1), series: [{ peso: 40, reps: 5, rpe: 8 }] });
+    agregarEjercicioAlDia({ dayId, exerciseId: id, series: [{ peso: 60, reps: 5, rpe: 8 }] }); // e1rm mayor
 
     const res = await request(app).get(`/api/coach/progresion/${id}?dias=30`).set(AUTH);
-    const e1rmMenor = Math.round(40 * (1 + 5 / 30) * 10) / 10;
-    const e1rmMayor = Math.round(60 * (1 + 5 / 30) * 10) / 10;
-    expect(res.body.sesiones[0].mejor_e1rm).toBe(e1rmMayor);
-    expect(res.body.sesiones[0].mejor_e1rm).not.toBe(e1rmMenor);
+    expect(res.body.sesiones[0].mejor_e1rm).toBe(74.0); // 60×5 @8, no 40×5 @8 (49.3)
   });
 
   // --- Ventana ---

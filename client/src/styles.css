@@ -317,6 +317,27 @@ tbody tr:hover { background: var(--panel-2); }
 .stat-card.empty .big { color: var(--muted); }
 
 .muted { color: var(--muted); }
+
+/* e1RM de una serie (components/E1rmValor). Confianza baja = RPE 5–6,5: se muestra,
+   atenuado y etiquetado, pero no cuenta para el mejor e1RM. */
+.e1rm { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.e1rm--vacio { color: var(--faint); }
+.e1rm--baja { color: var(--muted); }
+.e1rm-tag {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 0 4px;
+  font-family: var(--font-display);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  line-height: 1.5;
+  color: var(--muted);
+  border: 1px dashed var(--border);
+  border-radius: 4px;
+  vertical-align: middle;
+}
 .faint { color: var(--faint); }
 
 /* ---------- Toast ---------- */
@@ -574,7 +595,7 @@ tbody tr:hover { background: var(--panel-2); }
   align-items: center;
 }
 .sets-table.sets-table--no-ok {
-  grid-template-columns: 44px 1fr 1fr 1fr 1fr;
+  grid-template-columns: 44px 1fr 1fr 1fr 1fr 1fr;
 }
 .sets-table.sets-table--objetivo {
   grid-template-columns: 44px 1fr 1fr 1fr;
@@ -612,6 +633,17 @@ tbody tr:hover { background: var(--panel-2); }
   border-radius: var(--radius-sm);
   padding: 9px 6px;
 }
+/* e1RM por serie (calculado en el server: RPE + tabla RTS). Solo lectura. */
+.sets-table .e1rm-cell {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 14px;
+  text-align: center;
+  padding: 9px 6px;
+  font-variant-numeric: tabular-nums;
+}
+/* la etiqueta "e1RM" solo hace falta en mobile, donde no hay header de columnas */
+.sets-table .e1rm-cell-k { display: none; }
 .sets-table input {
   text-align: center;
   font-variant-numeric: tabular-nums;
@@ -848,6 +880,21 @@ tbody tr:hover { background: var(--panel-2); }
   .set-row .target-cell {
     padding: 9px 8px;
     font-size: 13px;
+  }
+  .set-row .e1rm-cell {
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    gap: 6px;
+    padding: 9px 8px;
+    font-size: 13px;
+  }
+  .set-row .e1rm-cell-k {
+    display: inline;
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--faint);
   }
   /* la celda "Carga sugerida" (span 2 en desktop) se normaliza en mobile */
   .set-row .target-cell[style*="span"] { grid-column: auto; }

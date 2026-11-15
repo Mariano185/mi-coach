@@ -74,7 +74,12 @@ Cascadas `ON DELETE CASCADE` week→day→exercise→set.
 - `settings` — clave/valor: `rm_squat/bench/deadlift`, hashes de auth, `coach_api_key`.
 
 **Vistas (nunca recalcular a mano, siempre leer de acá):**
-- `v_program_sets_e1rm` — `program_sets.* + e1rm + tonelaje + rir` (Epley; solo series reales completas).
+- `v_program_sets_e1rm` — `program_sets.* + e1rm + e1rm_confianza + tonelaje + rir`. e1RM = serie
+  proyectada al fallo con el RPE (reps + (10 − RPE), sin redondear) convertida con la tabla RTS
+  (Tuchscherer, interpolada); NULL sin RPE, con RPE < 5 o > 10 reps proyectadas. `e1rm_confianza`:
+  `alta` (RPE ≥ 7) / `baja` (RPE 5–6,5, no cuenta para mejor e1RM ni tendencia). DDL en
+  `server/src/e1rm-sql.ts`, compartido con los tests. Los e1RM históricos cambiaron al dejar
+  Epley (issue #14): la vista se recrea en cada arranque y recalcula todo el historial.
 - `v_volumen_por_musculo` — volumen fraccionado por rol (agonista 1.0, sinergista 0.5,
   estabilizador no suma), una fila por `(week_id, musculo_id)`. Trae `series_programadas` y
   `series_completadas` por separado, más `semana_programa`/`mesociclo_id`/`week_id` y la semana
@@ -148,7 +153,9 @@ opcional con Tailscale Funnel: `docs/deploy/TAILSCALE.md`. `coach.db` vive fuera
 
 ## Convenciones
 
-- **e1RM siempre desde la vista** `v_program_sets_e1rm`, nunca recalculado a mano en JS/SQL ad-hoc.
+- **e1RM siempre desde la vista** `v_program_sets_e1rm` (RPE + tabla RTS, con `e1rm_confianza`),
+  nunca recalculado a mano en JS/SQL ad-hoc. "Mejor e1RM" y tendencia filtran
+  `e1rm_confianza = 'alta'`.
 - Imports ESM con extensión `.js` en el server (TS compila a ESM).
 - Tipos compartidos espejados en `server/src/types.ts` y `client/src/types.ts` (mantener en sync).
 - Frontend: tema "Forge" (lima `#c8f54a`, Oswald display) en `client/src/styles.css`. Drill-down semana→día→ejercicio con tabs OBJETIVO/REAL.
