@@ -256,8 +256,17 @@ function migrate(): void {
   // esta columna existiera antes de que corran, la aridad no coincide y el arranque falla).
   // notas_atleta: canal del atleta (editable), separado de notas (canal del coach, read-only
   // para el atleta). Ver CLAUDE.md.
+  // Objetivo nutricional (ADR 0003): vive en la Semana de programa, junto con la fecha en
+  // que el coach lo pautó. Van acá y no arriba porque migrateSemanaUnique() recrea
+  // program_weeks con una lista de columnas fija y las perdería.
   for (const col of [
     "ALTER TABLE program_days ADD COLUMN notas_atleta TEXT",
+    "ALTER TABLE program_weeks ADD COLUMN objetivo_kcal INTEGER",
+    "ALTER TABLE program_weeks ADD COLUMN objetivo_proteina_g INTEGER",
+    "ALTER TABLE program_weeks ADD COLUMN objetivo_carbohidratos_g INTEGER",
+    "ALTER TABLE program_weeks ADD COLUMN objetivo_grasas_g INTEGER",
+    "ALTER TABLE program_weeks ADD COLUMN nota_nutricional TEXT",
+    "ALTER TABLE program_weeks ADD COLUMN objetivos_pautados_en TEXT",
   ]) {
     try { db.exec(col); } catch { /* columna ya existe */ }
   }

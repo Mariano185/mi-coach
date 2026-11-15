@@ -86,6 +86,10 @@ una fecha sin carga es "no cargado", y una fila con ceros o nulls se confunde f�
 Contá cuántas fechas de la ventana tienen carga antes de sacar un promedio, y no compares un
 promedio de 3 días cargados contra uno de 7 como si fueran equivalentes.
 
+Cada fila trae `objetivo`, el que regía **esa** fecha (regla de fechas del ADR 0003, ver la
+sección `nutricion`), no el actual: si el objetivo cambió dentro de la ventana, cada fecha se
+mide contra el suyo.
+
 ## `fecha` nullable — el detalle que rompe filtros ingenuos
 
 `program_days.fecha` es nullable y se autosetea recién cuando el atleta completa la primera

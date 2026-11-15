@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import useSWR from "swr";
 import { api } from "../api";
-import type { IngestaDiaria, UpsertIngestaDiariaInput } from "../types";
+import type { IngestaDiaria, NutricionDia, ObjetivoNutricional, UpsertIngestaDiariaInput } from "../types";
 import { swrKeys } from "../swr";
 import { useToast } from "../components/Toast";
+import { CoachNotes } from "../components/CoachNotes";
 
 // Fecha LOCAL de hoy. No toISOString(): se carga al cerrar el día, y de noche en
 // UTC−3 la fecha UTC ya es mañana.
@@ -20,6 +21,72 @@ const VALORES = [
   { key: "carbohidratos_g", label: "Carbohidratos", unidad: "g" },
   { key: "grasas_g", label: "Grasas", unidad: "g" },
 ] as const;
+
+// El objetivo nombra kcal/proteina_g/... igual que la ingesta: una barra por clave.
+function BarraNutricional({
+  label,
+  unidad,
+  cargado,
+  objetivo,
+}: {
+  label: string;
+  unidad: string;
+  cargado: number | null;
+  objetivo: number;
+}) {
+  // Arranca en 0 y en el frame siguiente pasa al valor real: la transición de width
+  // anima de 0 hasta lo cargado (con prefers-reduced-motion queda directo en el valor).
+  const [lleno, setLleno] = useState(0);
+  const proporcion = cargado === null || objetivo <= 0 ? 0 : cargado / objetivo;
+  useEffect(() => {
+    const raf = requestAnimationFrame(() => setLleno(Math.min(proporcion, 1)));
+    return () => cancelAnimationFrame(raf);
+  }, [proporcion]);
+
+  const excedido = cargado !== null && cargado > objetivo;
+  return (
+    <div className={`barra-nutri${excedido ? " excedida" : ""}`}>
+      <div className="barra-nutri-cab">
+        <span className="barra-nutri-label">{label}</span>
+        <span className="barra-nutri-num">
+          <strong>{cargado ?? "—"}</strong> / {objetivo} <span className="u">{unidad}</span>
+          {excedido && <span className="barra-nutri-exceso">+{cargado - objetivo}</span>}
+        </span>
+      </div>
+      <div
+        className="barra-nutri-track"
+        role="progressbar"
+        aria-label={label}
+        aria-valuemin={0}
+        aria-valuemax={objetivo}
+        aria-valuenow={cargado ?? 0}
+      >
+        <div className="barra-nutri-fill" style={{ width: `${lleno * 100}%` }} />
+      </div>
+    </div>
+  );
+}
+
+function ObjetivoPanel({ objetivo, ingesta }: { objetivo: ObjetivoNutricional; ingesta: IngestaDiaria | null }) {
+  return (
+    <div className="objetivo-nutri">
+      <p className="sec-label">Objetivo del coach</p>
+      {objetivo.nota && <CoachNotes text={objetivo.nota} />}
+      <div className="barras-nutri">
+        {VALORES.map(({ key, label, unidad }) => (
+          <BarraNutricional
+            key={key}
+            label={label}
+            unidad={unidad}
+            cargado={ingesta ? ingesta[key] : null}
+            objetivo={objetivo[key]}
+          />
+        ))}
+      </div>
+      <p className="muted" style={{ fontSize: 12, margin: "8px 0 0" }}>Rige desde el {objetivo.pautado_en}</p>
+    </div>
+  );
+}
 
 type ValorKey = (typeof VALORES)[number]["key"];
 type Form = Record<ValorKey, string>;
@@ -40,9 +107,11 @@ export function Nutricion() {
   const [fecha, setFecha] = useState(hoyLocal);
   // keepPreviousData: false (pisa el global): al cambiar de fecha, mostrar la ingesta de la
   // fecha anterior —y precargarla en el formulario— haría fácil guardarla en la fecha nueva.
-  const { data: ingesta, error, isLoading, mutate } = useSWR<IngestaDiaria | null>(swrKeys.ingesta(fecha), {
+  const { data: dia, error, isLoading, mutate } = useSWR<NutricionDia>(swrKeys.nutricionDia(fecha), {
     keepPreviousData: false,
   });
+  const ingesta = dia?.ingesta;
+  const objetivo = dia?.objetivo ?? null;
 
   const [form, setForm] = useState<Form>(FORM_VACIO);
   const [comentario, setComentario] = useState("");
@@ -72,7 +141,7 @@ export function Nutricion() {
     setSaving(true);
     try {
       const guardada = await api.upsertIngesta(input);
-      await mutate(guardada, { revalidate: false });
+      await mutate({ fecha, objetivo, ingesta: guardada }, { revalidate: false });
       show(ingesta ? "Ingesta corregida ✓" : "Ingesta guardada ✓");
     } catch (e) {
       show((e as Error).message, "err");
@@ -98,9 +167,19 @@ export function Nutricion() {
           />
         </div>
 
+        {/* key={fecha}: al cambiar de fecha las barras vuelven a animarse desde 0. */}
+        {objetivo && <ObjetivoPanel key={fecha} objetivo={objetivo} ingesta={ingesta ?? null} />}
+
         <p className="sec-label">Ingesta {esHoy ? "de hoy" : `del ${fecha}`}</p>
         {error && <p style={{ color: "var(--danger)" }}>{(error as Error).message}</p>}
-        {ingesta ? (
+        {ingesta && objetivo ? (
+          // Con objetivo, los números ya están junto a cada barra: solo queda el comentario.
+          ingesta.comentario ? (
+            <p className="muted" style={{ fontSize: 13, marginTop: 0 }}>“{ingesta.comentario}”</p>
+          ) : (
+            <p className="muted" style={{ fontSize: 13, marginTop: 0 }}>Cargada.</p>
+          )
+        ) : ingesta ? (
           <>
             <div className="mini-stats ingesta-stats">
               {VALORES.map(({ key, label, unidad }) => (

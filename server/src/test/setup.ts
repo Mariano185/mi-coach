@@ -93,6 +93,12 @@ export function createTestDb() {
       fecha_creada TEXT NOT NULL,
       activa INTEGER NOT NULL DEFAULT 1,
       mesociclo_id INTEGER REFERENCES mesociclos(id) ON DELETE SET NULL,
+      objetivo_kcal INTEGER,
+      objetivo_proteina_g INTEGER,
+      objetivo_carbohidratos_g INTEGER,
+      objetivo_grasas_g INTEGER,
+      nota_nutricional TEXT,
+      objetivos_pautados_en TEXT,
       UNIQUE (mesociclo_id, semana)
     );
     CREATE TABLE IF NOT EXISTS program_days (
@@ -237,6 +243,7 @@ export async function createTestApp(db: TestDb) {
   const { exercisesRouter } = await import("../routes/exercises.js");
   const { tracRouter } = await import("../routes/trac.js");
   const { ingestaRouter } = await import("../routes/ingesta.js");
+  const { nutricionRouter } = await import("../routes/nutricion.js");
   const { mesociclosRouter } = await import("../routes/mesociclos.js");
   const { catalogoRouter } = await import("../routes/catalogo.js");
 
@@ -259,6 +266,7 @@ export async function createTestApp(db: TestDb) {
   app.use("/api/exercises", exercisesRouter);
   app.use("/api/trac", tracRouter);
   app.use("/api/ingesta", ingestaRouter);
+  app.use("/api/nutricion", nutricionRouter);
   app.use("/api/mesociclos", mesociclosRouter);
   app.use("/api", catalogoRouter);
 
@@ -271,6 +279,7 @@ export async function createTestApp(db: TestDb) {
       ...rutasDelRouter("/api/mesociclos", mesociclosRouter),
       ...rutasDelRouter("/api/coach", coachRouter),
       ...rutasDelRouter("/api/ingesta", ingestaRouter),
+      ...rutasDelRouter("/api/nutricion", nutricionRouter),
       ...rutasDelRouter("/api", catalogoRouter),
     ].sort((a, b) => a.ruta.localeCompare(b.ruta) || a.metodo.localeCompare(b.metodo))
   );
