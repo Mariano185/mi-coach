@@ -12,6 +12,7 @@ import type {
   CoachDocsResponse,
   CoachDocsSeccion,
   DiaProgramado,
+  IngestaDiariaAnalisis,
   ProgresionBasico,
   ProgresionEjercicio,
   ProgresionEjercicioSerie,
@@ -219,6 +220,18 @@ function buildAnalisis(dias: number, incluir: Set<BloqueOptIn> = new Set()): Rec
     )
     .all();
 
+  // 10b) Ingesta diaria de la ventana (?dias=N): solo las fechas cargadas. Sin serie de
+  //      fechas + LEFT JOIN a propósito (a diferencia del Trac): una fecha sin carga es
+  //      "no cargado", y rellenarla con nulls o ceros invitaría a leerla como "comió 0".
+  const ingesta_diaria = db
+    .prepare(
+      `SELECT fecha, kcal, proteina_g, carbohidratos_g, grasas_g, comentario
+       FROM ingesta_diaria
+       WHERE fecha >= date('now', ?)
+       ORDER BY fecha ASC`
+    )
+    .all(desde) as IngestaDiariaAnalisis[];
+
   // 11) Días programados vs. completados, incluyendo días NUNCA empezados (fecha NULL).
   //     A diferencia de todos los bloques anteriores, este NO filtra por pd.fecha —
   //     un día sin entrenar no tiene fecha, así que ese filtro lo dejaría invisible
@@ -283,6 +296,7 @@ function buildAnalisis(dias: number, incluir: Set<BloqueOptIn> = new Set()): Rec
     mesociclos,
     sesiones_realizadas,
     trac_reciente,
+    ingesta_diaria,
     dias_programados,
   };
 }

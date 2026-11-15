@@ -32,6 +32,34 @@ describe("initDb() — migración idempotente", () => {
     expect(cols.some((c) => c.name === "rastrea_e1rm")).toBe(true);
   });
 
+  it("crea ingesta_diaria (una fila por fecha, cuatro valores obligatorios ≥ 0) y es idempotente (issue #22)", async () => {
+    const { db, initDb } = await import("../db.js");
+    expect(() => initDb()).not.toThrow();
+
+    const cols = (db.prepare("PRAGMA table_info(ingesta_diaria)").all() as Array<{ name: string; notnull: number }>)
+      .reduce<Record<string, number>>((acc, c) => ({ ...acc, [c.name]: c.notnull }), {});
+    expect(cols).toMatchObject({ fecha: 1, kcal: 1, proteina_g: 1, carbohidratos_g: 1, grasas_g: 1, comentario: 0 });
+
+    db.prepare(
+      "INSERT INTO ingesta_diaria (fecha, kcal, proteina_g, carbohidratos_g, grasas_g) VALUES ('2026-11-10', 2400, 180, 250, 70)"
+    ).run();
+    expect(() =>
+      db.prepare(
+        "INSERT INTO ingesta_diaria (fecha, kcal, proteina_g, carbohidratos_g, grasas_g) VALUES ('2026-11-10', 1, 1, 1, 1)"
+      ).run()
+    ).toThrow(/UNIQUE/);
+    expect(() =>
+      db.prepare(
+        "INSERT INTO ingesta_diaria (fecha, kcal, proteina_g, carbohidratos_g, grasas_g) VALUES ('2026-11-11', -1, 1, 1, 1)"
+      ).run()
+    ).toThrow(/CHECK/);
+
+    // Reiniciar el servicio no pierde las cargas.
+    expect(() => initDb()).not.toThrow();
+    const n = (db.prepare("SELECT COUNT(*) AS n FROM ingesta_diaria").get() as { n: number }).n;
+    expect(n).toBe(1);
+  });
+
   it("una DB con la vista Epley vieja recalcula el e1RM de todo el historial con RTS al arrancar (issue #14)", async () => {
     const { db, initDb } = await import("../db.js");
 

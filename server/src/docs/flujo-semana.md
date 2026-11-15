@@ -89,6 +89,16 @@ Usá `?dias=56` si querés más historial. El JSON incluye:
   - `tecnica` — comodidad técnica percibida
 
   Cualquier campo puede venir `null` si el atleta no cargó ese día o no completó esa dimensión (es normal, especialmente `tecnica`/`motivacion` en días sin entrenar — no lo trates como dato faltante grave, es esperable). **Usalo para cruzar con `sesiones_realizadas` y `rpe_basicos`:** una racha de `recuperacion` o `descanso_alimentacion` bajos (1-2) en los días previos a una sesión con RPE alto es una señal más directa de fatiga acumulada que el RPE solo. Fatiga alta y sostenida en un patrón específico (ej. `fatiga_traccion` bajo varios días) sugiere bajar volumen o intensidad en los ejercicios de ese patrón en la próxima semana, no en todos.
+- `ingesta_diaria` — lo que el atleta **realmente comió** cada fecha de la ventana (`?dias=N`),
+  cargado por él al cerrar el día con los totales de MyFitnessPal. Una fila por fecha cargada,
+  orden ascendente: `fecha`, `kcal`, `proteina_g`, `carbohidratos_g`, `grasas_g` (enteros, gramos)
+  y `comentario` (texto libre del atleta o `null`, ej. "la cena fue a ojo" → tomá esa fecha como
+  estimación). Los cuatro valores vienen siempre juntos. **Una fecha que no aparece es "no
+  cargado", no "0 kcal"**: no la promedies como cero ni la rellenes; promediá solo sobre las
+  fechas cargadas y decí sobre cuántas. Un `0` explícito sí es un dato real. Para una fecha
+  puntual o un rango arbitrario: `GET /api/ingesta?fecha=YYYY-MM-DD` (devuelve `null` si no hay
+  carga) o `GET /api/ingesta?desde=YYYY-MM-DD&hasta=YYYY-MM-DD` (solo las fechas cargadas). La
+  carga es del atleta: no la escribas vos salvo que te pida corregir un número.
 - `dias_programados` — a diferencia de todos los bloques anteriores, **incluye días nunca
   entrenados** (`fecha: null`). Una fila por día del programa, con `mesociclo_id`,
   `mesociclo_nombre`, `semana`, `dia`, `titulo`, `tipo`, `fecha`, `series_programadas`,

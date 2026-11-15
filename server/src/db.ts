@@ -158,6 +158,21 @@ function migrate(): void {
       actualizado_en        TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
+    -- Ingesta diaria: lo que el atleta comió en una fecha (totales de MyFitnessPal), cargado
+    -- al cerrar el día. Una fila por fecha (upsert). Los cuatro valores son obligatorios:
+    -- una fecha sin fila es "no cargado", nunca "0 kcal".
+    CREATE TABLE IF NOT EXISTS ingesta_diaria (
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      fecha           TEXT UNIQUE NOT NULL,
+      kcal            INTEGER NOT NULL CHECK (kcal >= 0),
+      proteina_g      INTEGER NOT NULL CHECK (proteina_g >= 0),
+      carbohidratos_g INTEGER NOT NULL CHECK (carbohidratos_g >= 0),
+      grasas_g        INTEGER NOT NULL CHECK (grasas_g >= 0),
+      comentario      TEXT,
+      creado_en       TEXT NOT NULL DEFAULT (datetime('now')),
+      actualizado_en  TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
   `);
 
   // Columnas nuevas en tablas ya desplegadas (idempotente: ignorar si ya existen).

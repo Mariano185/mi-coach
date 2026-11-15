@@ -12,6 +12,7 @@ la sección `flujo-semana`.
 | `GET /coach/adherencia` | `?dias=90` | Un patrón de posición necesita varias semanas para no ser ruido de una sesión mala. |
 | `dias_programados` (en `/analisis`) | Mismo `?dias=` que `/analisis` | Ventana propia, contada por `fecha_creada` de la semana, no por `pd.fecha` — ver abajo. |
 | `volumen_por_musculo` (en `/analisis`) | Mismo `?dias=` que `/analisis` | Ventana por `fecha_creada` de la semana de programa (no por semana ISO) — mismo criterio que `dias_programados`, ver abajo. |
+| `ingesta_diaria` (en `/analisis`) | Mismo `?dias=` que `/analisis` | Por `fecha` calendario de la carga (no por semana de programa); solo fechas cargadas. |
 | `GET /coach/progresion/:exercise_id` | `?dias=180` (~26 semanas) | Un accesorio se entrena ~1x/semana: 42 días son ~6 sesiones, muy poco para leer una tendencia. |
 
 ## Denominadores que NO son comparables entre sí
@@ -76,6 +77,14 @@ fila). `mesociclo_id` es `null` mientras la semana no tenga mesociclo asignado.
 
 La ventana usa el mismo criterio que `dias_programados` (ver abajo): filtra por `fecha_creada`
 de la semana, con la ISO como red de seguridad para semanas viejas entrenadas hace poco.
+
+## `ingesta_diaria` — sin carga no es cero
+
+Es el único bloque de calendario que **no** rellena las fechas vacías: el Trac trae una fila por
+día con huecos en `null`, la Ingesta diaria trae solo las fechas que el atleta cargó. A propósito:
+una fecha sin carga es "no cargado", y una fila con ceros o nulls se confunde fácil con "comió 0".
+Contá cuántas fechas de la ventana tienen carga antes de sacar un promedio, y no compares un
+promedio de 3 días cargados contra uno de 7 como si fueran equivalentes.
 
 ## `fecha` nullable — el detalle que rompe filtros ingenuos
 

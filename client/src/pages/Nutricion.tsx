@@ -1,0 +1,164 @@
+import { useEffect, useState } from "react";
+import useSWR from "swr";
+import { api } from "../api";
+import type { IngestaDiaria, UpsertIngestaDiariaInput } from "../types";
+import { swrKeys } from "../swr";
+import { useToast } from "../components/Toast";
+
+// Fecha LOCAL de hoy. No toISOString(): se carga al cerrar el día, y de noche en
+// UTC−3 la fecha UTC ya es mañana.
+function hoyLocal(): string {
+  const d = new Date();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${mm}-${dd}`;
+}
+
+const VALORES = [
+  { key: "kcal", label: "Kcal", unidad: "kcal" },
+  { key: "proteina_g", label: "Proteína", unidad: "g" },
+  { key: "carbohidratos_g", label: "Carbohidratos", unidad: "g" },
+  { key: "grasas_g", label: "Grasas", unidad: "g" },
+] as const;
+
+type ValorKey = (typeof VALORES)[number]["key"];
+type Form = Record<ValorKey, string>;
+
+const FORM_VACIO: Form = { kcal: "", proteina_g: "", carbohidratos_g: "", grasas_g: "" };
+
+function aForm(ingesta: IngestaDiaria | null | undefined): Form {
+  if (!ingesta) return FORM_VACIO;
+  return {
+    kcal: String(ingesta.kcal),
+    proteina_g: String(ingesta.proteina_g),
+    carbohidratos_g: String(ingesta.carbohidratos_g),
+    grasas_g: String(ingesta.grasas_g),
+  };
+}
+
+export function Nutricion() {
+  const [fecha, setFecha] = useState(hoyLocal);
+  // keepPreviousData: false (pisa el global): al cambiar de fecha, mostrar la ingesta de la
+  // fecha anterior —y precargarla en el formulario— haría fácil guardarla en la fecha nueva.
+  const { data: ingesta, error, isLoading, mutate } = useSWR<IngestaDiaria | null>(swrKeys.ingesta(fecha), {
+    keepPreviousData: false,
+  });
+
+  const [form, setForm] = useState<Form>(FORM_VACIO);
+  const [comentario, setComentario] = useState("");
+  const [saving, setSaving] = useState(false);
+  const { show, node } = useToast();
+
+  // Precargar con lo ya guardado en la fecha; sin ingesta, el formulario queda vacío
+  // (nunca en 0: un día sin ingesta no es "0 kcal").
+  useEffect(() => {
+    setForm(aForm(ingesta));
+    setComentario(ingesta?.comentario ?? "");
+  }, [ingesta, fecha]);
+
+  async function save() {
+    const valores = {} as Record<ValorKey, number>;
+    for (const { key, label } of VALORES) {
+      const raw = form[key].trim();
+      const n = Number(raw);
+      if (raw === "" || !Number.isInteger(n) || n < 0) {
+        show(`${label}: cargá un entero ≥ 0`, "err");
+        return;
+      }
+      valores[key] = n;
+    }
+    const input: UpsertIngestaDiariaInput = { fecha, ...valores, comentario: comentario.trim() || null };
+
+    setSaving(true);
+    try {
+      const guardada = await api.upsertIngesta(input);
+      await mutate(guardada, { revalidate: false });
+      show(ingesta ? "Ingesta corregida ✓" : "Ingesta guardada ✓");
+    } catch (e) {
+      show((e as Error).message, "err");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const esHoy = fecha === hoyLocal();
+
+  return (
+    <div>
+      <div className="panel">
+        <h2>Nutrición</h2>
+        <div className="field">
+          <label htmlFor="nutri-fecha">Fecha</label>
+          <input
+            id="nutri-fecha"
+            type="date"
+            value={fecha}
+            max={hoyLocal()}
+            onChange={(e) => e.target.value && setFecha(e.target.value)}
+          />
+        </div>
+
+        <p className="sec-label">Ingesta {esHoy ? "de hoy" : `del ${fecha}`}</p>
+        {error && <p style={{ color: "var(--danger)" }}>{(error as Error).message}</p>}
+        {ingesta ? (
+          <>
+            <div className="mini-stats ingesta-stats">
+              {VALORES.map(({ key, label, unidad }) => (
+                <div className="ms" key={key}>
+                  <div className="k">{label}</div>
+                  <div className="v">
+                    {ingesta[key]} <span className="u">{unidad}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+            {ingesta.comentario && (
+              <p className="muted" style={{ fontSize: 13, marginTop: 10 }}>“{ingesta.comentario}”</p>
+            )}
+          </>
+        ) : (
+          <p className="muted">{isLoading ? "Cargando…" : "Sin ingesta para esta fecha."}</p>
+        )}
+      </div>
+
+      <div className="panel">
+        <h2>{ingesta ? "Corregir ingesta" : "Cargar ingesta"}</h2>
+        <p className="muted" style={{ fontSize: 13, marginTop: 0 }}>
+          Copiá los totales del resumen diario de MyFitnessPal. Los cuatro valores son obligatorios.
+        </p>
+        <div className="row">
+          {VALORES.map(({ key, label, unidad }) => (
+            <div className="field" key={key} style={{ flex: "1 1 120px" }}>
+              <label htmlFor={`nutri-${key}`}>
+                {unidad === "g" ? `${label} (g)` : label}
+              </label>
+              <input
+                id={`nutri-${key}`}
+                type="number"
+                inputMode="numeric"
+                min={0}
+                step={1}
+                value={form[key]}
+                onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
+              />
+            </div>
+          ))}
+        </div>
+        <div className="field">
+          <label htmlFor="nutri-comentario">Comentario (opcional)</label>
+          <textarea
+            id="nutri-comentario"
+            rows={2}
+            placeholder="ej. la cena fue a ojo"
+            value={comentario}
+            onChange={(e) => setComentario(e.target.value)}
+          />
+        </div>
+        <button className="btn" onClick={save} disabled={saving || isLoading}>
+          {saving ? "Guardando…" : ingesta ? "Guardar corrección" : "Guardar"}
+        </button>
+      </div>
+      {node}
+    </div>
+  );
+}

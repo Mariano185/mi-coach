@@ -1,6 +1,7 @@
 // Cliente fetch tipado. Una función por endpoint. Rutas relativas (proxy de Vite → :3001).
 import type {
   Exercise,
+  IngestaDiaria,
   Mesociclo,
   MesocicloConSemanas,
   NewBodyweightInput,
@@ -13,6 +14,7 @@ import type {
   TracEntry,
   UpdateProgramSetInput,
   UpdateProgramSetTargetInput,
+  UpsertIngestaDiariaInput,
   UpsertTracInput,
 } from "./types";
 import { setAuthedFlag } from "./authState";
@@ -127,6 +129,9 @@ export const api = {
   getTrac: (fecha: string) => req<TracEntry | null>(`/api/trac?fecha=${fecha}`),
   upsertTrac: (input: UpsertTracInput) =>
     req<TracEntry>("/api/trac", { method: "PUT", body: JSON.stringify(input) }),
+  getIngesta: (fecha: string) => req<IngestaDiaria | null>(`/api/ingesta?fecha=${fecha}`),
+  upsertIngesta: (input: UpsertIngestaDiariaInput) =>
+    req<IngestaDiaria>("/api/ingesta", { method: "PUT", body: JSON.stringify(input) }),
 
   // Auth
   login: (password: string) =>

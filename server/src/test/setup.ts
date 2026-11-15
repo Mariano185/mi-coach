@@ -151,6 +151,17 @@ export function createTestDb() {
       creado_en TEXT NOT NULL DEFAULT (datetime('now')),
       actualizado_en TEXT NOT NULL DEFAULT (datetime('now'))
     );
+    CREATE TABLE IF NOT EXISTS ingesta_diaria (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      fecha TEXT UNIQUE NOT NULL,
+      kcal INTEGER NOT NULL CHECK (kcal >= 0),
+      proteina_g INTEGER NOT NULL CHECK (proteina_g >= 0),
+      carbohidratos_g INTEGER NOT NULL CHECK (carbohidratos_g >= 0),
+      grasas_g INTEGER NOT NULL CHECK (grasas_g >= 0),
+      comentario TEXT,
+      creado_en TEXT NOT NULL DEFAULT (datetime('now')),
+      actualizado_en TEXT NOT NULL DEFAULT (datetime('now'))
+    );
     CREATE VIEW IF NOT EXISTS v_volumen_por_musculo AS
       SELECT
         (SELECT MIN(strftime('%Y-%W', pd2.fecha))
@@ -225,6 +236,7 @@ export async function createTestApp(db: TestDb) {
   const { coachRouter, setEndpointsCoach } = await import("../routes/coach.js");
   const { exercisesRouter } = await import("../routes/exercises.js");
   const { tracRouter } = await import("../routes/trac.js");
+  const { ingestaRouter } = await import("../routes/ingesta.js");
   const { mesociclosRouter } = await import("../routes/mesociclos.js");
   const { catalogoRouter } = await import("../routes/catalogo.js");
 
@@ -246,6 +258,7 @@ export async function createTestApp(db: TestDb) {
   app.use("/api/coach", coachRouter);
   app.use("/api/exercises", exercisesRouter);
   app.use("/api/trac", tracRouter);
+  app.use("/api/ingesta", ingestaRouter);
   app.use("/api/mesociclos", mesociclosRouter);
   app.use("/api", catalogoRouter);
 
@@ -257,6 +270,7 @@ export async function createTestApp(db: TestDb) {
       ...rutasDelRouter("/api/program", programRouter),
       ...rutasDelRouter("/api/mesociclos", mesociclosRouter),
       ...rutasDelRouter("/api/coach", coachRouter),
+      ...rutasDelRouter("/api/ingesta", ingestaRouter),
       ...rutasDelRouter("/api", catalogoRouter),
     ].sort((a, b) => a.ruta.localeCompare(b.ruta) || a.metodo.localeCompare(b.metodo))
   );
