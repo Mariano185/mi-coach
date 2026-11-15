@@ -224,6 +224,90 @@ describe("GET /api/coach/analisis — e1RM sigue funcionando tras el cutover", (
   });
 });
 
+describe("GET /api/coach/analisis — mejor_e1rm_basicos con contexto", () => {
+  let app: Awaited<ReturnType<typeof createTestApp>>;
+
+  beforeEach(async () => {
+    db.exec("DELETE FROM program_weeks;");
+    seedEnciclopedia(db);
+    app = await createTestApp(db);
+  });
+
+  const haceDias = (n: number) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
+  const banca = () =>
+    (db.prepare("SELECT id FROM exercises WHERE nombre = 'Flat Bench Press (barra)'").get() as { id: number }).id;
+
+  // Una serie suelta en su propio día: [peso, reps, rpe] en la fecha y el día de programa dados.
+  function serie(peso: number, reps: number, rpe: number, fecha: string, dia = 1, weekId = crearSemana()): number {
+    const dayId = db
+      .prepare("INSERT INTO program_days (week_id, dia, fecha, orden) VALUES (?, ?, ?, 0)")
+      .run(weekId, dia, fecha).lastInsertRowid as number;
+    const peId = db
+      .prepare("INSERT INTO program_exercises (day_id, exercise_id, seccion, orden) VALUES (?, ?, 'main', 0)")
+      .run(dayId, banca()).lastInsertRowid as number;
+    db.prepare(
+      "INSERT INTO program_sets (program_exercise_id, n_serie, real_peso, real_reps, real_rpe, hecha) VALUES (?, 1, ?, ?, ?, 1)"
+    ).run(peId, peso, reps, rpe);
+    return weekId;
+  }
+
+  async function benchDe(query = "") {
+    const res = await request(app).get(`/api/coach/analisis${query}`).set(AUTH);
+    expect(res.status).toBe(200);
+    return (res.body.mejor_e1rm_basicos as Array<Record<string, unknown>>).find(
+      (m) => m.nombre === "Flat Bench Press (barra)"
+    );
+  }
+
+  it("trae la fecha y la serie que dieron el mejor e1RM", async () => {
+    const weekId = serie(80, 5, 7, haceDias(7), 3); // 8 proyectadas → 78,6 % → 101,8
+    serie(60, 8, 8, haceDias(2)); // 81,2: menor
+
+    expect(await benchDe()).toEqual({
+      nombre: "Flat Bench Press (barra)",
+      mejor_e1rm: 101.8,
+      fecha: haceDias(7),
+      week_id: weekId,
+      dia: 3,
+      peso_kg: 80,
+      reps: 5,
+      rpe: 7,
+      dias_desde: 7,
+      mejor_e1rm_ventana: 101.8,
+    });
+  });
+
+  it("si el mejor histórico quedó fuera de la ventana, mejor_e1rm_ventana es el mejor reciente", async () => {
+    serie(80, 5, 7, haceDias(30)); // 101,8, fuera de ?dias=14
+    serie(60, 8, 8, haceDias(2)); // 81,2, dentro
+
+    const bench = await benchDe("?dias=14");
+    expect(bench).toMatchObject({ mejor_e1rm: 101.8, fecha: haceDias(30), dias_desde: 30, mejor_e1rm_ventana: 81.2 });
+  });
+
+  it("sin series de confianza alta en la ventana, mejor_e1rm_ventana es null", async () => {
+    serie(80, 5, 7, haceDias(60));
+
+    const bench = await benchDe("?dias=14");
+    expect(bench).toMatchObject({ mejor_e1rm: 101.8, dias_desde: 60, mejor_e1rm_ventana: null });
+  });
+
+  it("ante un empate de e1RM gana la serie más reciente", async () => {
+    serie(80, 5, 7, haceDias(20));
+    serie(80, 5, 7, haceDias(4), 2);
+
+    expect(await benchDe()).toMatchObject({ mejor_e1rm: 101.8, fecha: haceDias(4), dia: 2, dias_desde: 4 });
+  });
+
+  it("las series de confianza baja no cuentan ni para el histórico ni para la ventana", async () => {
+    serie(80, 5, 7, haceDias(30)); // 101,8 alta, fuera de la ventana
+    serie(150, 3, 5, haceDias(1)); // 190,8 baja, dentro
+
+    const bench = await benchDe("?dias=14");
+    expect(bench).toMatchObject({ mejor_e1rm: 101.8, fecha: haceDias(30), mejor_e1rm_ventana: null });
+  });
+});
+
 describe("GET /api/coach/analisis — accesorios (opt-in)", () => {
   let app: Awaited<ReturnType<typeof createTestApp>>;
 

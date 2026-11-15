@@ -18,6 +18,7 @@ import type {
   DiaProgramado,
   IngestaDiariaAnalisis,
   PasosDiariosAnalisis,
+  MejorE1rmBasico,
   ProgresionBasico,
   ProgresionEjercicio,
   ProgresionEjercicioSerie,
@@ -63,16 +64,35 @@ function buildAnalisis(dias: number, incluir: Set<BloqueOptIn> = new Set()): Rec
   const desde = `-${dias} days`;
 
   // 1) Mejor e1RM histórico por básico. Solo confianza alta (RPE ≥ 7, ADR 0002).
+  //    Trae la serie que lo dio (fecha, semana/día, peso×reps@RPE) y dias_desde: un PR de
+  //    hace dos meses no sirve como referencia para programar la semana que viene. Por eso
+  //    también va mejor_e1rm_ventana, el mejor dentro de ?dias=N (null si no hubo series de
+  //    confianza alta en la ventana). Empate de e1RM → gana la serie más reciente.
   const mejor_e1rm_basicos = db
     .prepare(
-      `SELECT e.nombre, MAX(v.e1rm) AS mejor_e1rm
-       FROM exercises e
-       JOIN program_exercises pe ON pe.exercise_id = e.id
-       JOIN v_program_sets_e1rm v ON v.program_exercise_id = pe.id
-       WHERE ${RASTREA_E1RM} AND v.e1rm_confianza = 'alta'
-       GROUP BY e.id, e.nombre`
+      `WITH series AS (
+         SELECT e.id AS exercise_id, e.nombre, v.e1rm, pd.fecha, pd.week_id, pd.dia,
+                v.real_peso AS peso_kg, v.real_reps AS reps, v.real_rpe AS rpe,
+                ROW_NUMBER() OVER (
+                  PARTITION BY e.id
+                  ORDER BY v.e1rm DESC, pd.fecha IS NULL, pd.fecha DESC, pd.id DESC, v.n_serie DESC
+                ) AS rn
+         FROM exercises e
+         JOIN program_exercises pe ON pe.exercise_id = e.id
+         JOIN program_days pd ON pd.id = pe.day_id
+         JOIN v_program_sets_e1rm v ON v.program_exercise_id = pe.id
+         WHERE ${RASTREA_E1RM} AND v.e1rm_confianza = 'alta'
+       )
+       SELECT s.nombre, s.e1rm AS mejor_e1rm, s.fecha, s.week_id, s.dia,
+              s.peso_kg, s.reps, s.rpe,
+              CAST(julianday(date('now')) - julianday(s.fecha) AS INTEGER) AS dias_desde,
+              (SELECT MAX(w.e1rm) FROM series w
+                WHERE w.exercise_id = s.exercise_id AND w.fecha >= date('now', ?)) AS mejor_e1rm_ventana
+       FROM series s
+       WHERE s.rn = 1
+       ORDER BY s.nombre`
     )
-    .all();
+    .all(desde) as MejorE1rmBasico[];
 
   // 2) Progresión e1RM por básico en la ventana. Agrupada por (nombre, fecha, peso_kg,
   //    reps, RPE) — no por serie ni por sesión. El e1RM es función de peso×reps×RPE

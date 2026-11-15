@@ -131,7 +131,8 @@ entrenados — si armás tu propio análisis cruzando datos de más de un bloque
   `GET /coach/progresion/:exercise_id`.
 - **Confianza del e1RM** (`e1rm_confianza`): `"alta"` con RPE ≥ 7; `"baja"` con RPE 5–6,5. Una
   serie de confianza baja (típicamente técnica) trae su e1RM, pero **no cuenta** para
-  `mejor_e1rm_basicos`, el mejor/actual de `/stats` ni el `mejor_e1rm` de `/coach/progresion`:
+  `mejor_e1rm_basicos` (ni su `mejor_e1rm_ventana`), el mejor/actual de `/stats` ni el
+  `mejor_e1rm` de `/coach/progresion`:
   no es una caída de fuerza, es una serie lejos del fallo. `progresion_basicos` sí trae esas
   filas, marcadas, para que las veas.
 - **Los e1RM históricos cambiaron** (2026-11, issue #14): antes se calculaban con Epley sobre
