@@ -200,25 +200,26 @@ function buildAnalisis(dias: number, incluir: Set<BloqueOptIn> = new Set()): Rec
     )
     .all(desde);
 
-  // 10) Trac: bienestar/recuperación de los últimos 7 días (fijo, no ligado a ?dias=).
-  //     Serie de fechas generada explícitamente + LEFT JOIN, para que los días sin
-  //     registro aparezcan con huecos en null en vez de faltar directamente.
+  // 10) Trac: bienestar/recuperación de la ventana (?dias=N), misma ventana que el resto
+  //     de los bloques (hoy y los N días anteriores). Serie de fechas generada
+  //     explícitamente + LEFT JOIN, para que los días sin registro aparezcan con huecos
+  //     en null en vez de faltar directamente.
   const trac_reciente = db
     .prepare(
       `WITH RECURSIVE fechas(fecha) AS (
-         SELECT date('now', '-6 days')
+         SELECT date('now', ?)
          UNION ALL
          SELECT date(fecha, '+1 day') FROM fechas WHERE fecha < date('now')
        )
        SELECT
          f.fecha,
          t.fatiga_pierna, t.fatiga_empuje, t.fatiga_traccion,
-         t.descanso_alimentacion, t.recuperacion, t.motivacion, t.tecnica
+         t.sueno, t.recuperacion, t.motivacion, t.tecnica
        FROM fechas f
        LEFT JOIN trac t ON t.fecha = f.fecha
        ORDER BY f.fecha ASC`
     )
-    .all();
+    .all(desde);
 
   // 10b) Ingesta diaria de la ventana (?dias=N): solo las fechas cargadas. Sin serie de
   //      fechas + LEFT JOIN a propósito (a diferencia del Trac): una fecha sin carga es

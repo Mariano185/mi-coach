@@ -93,7 +93,7 @@ export function Dashboard() {
       <div className="panel" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <div>
           <h2 style={{ margin: 0 }}>¿Cómo llegaste hoy?</h2>
-          <p className="muted" style={{ margin: "4px 0 0" }}>Cargá fatiga, descanso y motivación del día.</p>
+          <p className="muted" style={{ margin: "4px 0 0" }}>Cargá fatiga, sueño y motivación del día.</p>
         </div>
         <button className="btn" onClick={() => navigate("/trac")}>Trac</button>
       </div>

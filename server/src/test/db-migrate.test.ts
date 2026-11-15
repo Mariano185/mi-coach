@@ -60,6 +60,37 @@ describe("initDb() — migración idempotente", () => {
     expect(n).toBe(1);
   });
 
+  it("una DB con el Trac viejo renombra descanso_alimentacion a sueno conservando los valores (issue #18)", async () => {
+    const { db, initDb } = await import("../db.js");
+
+    // Simula una DB desplegada antes del cambio: la columna se llama descanso_alimentacion.
+    db.exec("DROP TABLE trac");
+    db.exec(`CREATE TABLE trac (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      fecha TEXT UNIQUE NOT NULL,
+      fatiga_pierna INTEGER, fatiga_empuje INTEGER, fatiga_traccion INTEGER,
+      descanso_alimentacion INTEGER CHECK (descanso_alimentacion IS NULL OR descanso_alimentacion BETWEEN 1 AND 5),
+      recuperacion INTEGER, motivacion INTEGER, tecnica INTEGER,
+      creado_en TEXT NOT NULL DEFAULT (datetime('now')),
+      actualizado_en TEXT NOT NULL DEFAULT (datetime('now'))
+    )`);
+    db.prepare("INSERT INTO trac (fecha, descanso_alimentacion, motivacion) VALUES ('2026-10-01', 2, 4)").run();
+    db.prepare("INSERT INTO trac (fecha, descanso_alimentacion) VALUES ('2026-10-02', NULL)").run();
+
+    initDb();
+    initDb(); // idempotente
+
+    const cols = (db.prepare("PRAGMA table_info(trac)").all() as Array<{ name: string }>).map((c) => c.name);
+    expect(cols).toContain("sueno");
+    expect(cols).not.toContain("descanso_alimentacion");
+    expect(db.prepare("SELECT fecha, sueno, motivacion FROM trac ORDER BY fecha").all()).toEqual([
+      { fecha: "2026-10-01", sueno: 2, motivacion: 4 },
+      { fecha: "2026-10-02", sueno: null, motivacion: null },
+    ]);
+    // El CHECK de rango sigue vigente sobre la columna renombrada.
+    expect(() => db.prepare("INSERT INTO trac (fecha, sueno) VALUES ('2026-10-03', 6)").run()).toThrow(/CHECK/);
+  });
+
   it("una DB con la vista Epley vieja recalcula el e1RM de todo el historial con RTS al arrancar (issue #14)", async () => {
     const { db, initDb } = await import("../db.js");
 

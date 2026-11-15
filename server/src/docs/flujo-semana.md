@@ -81,14 +81,15 @@ Usá `?dias=56` si querés más historial. El JSON incluye:
     prefijadas con "Notas del atleta:". Si ves ese patrón en días viejos, es contenido del atleta
     en el campo equivocado, no algo que hayas escrito vos. **No repliques esa práctica**: no copies
     lo que dice el atleta dentro de `notas_coach`, ya llega por su canal propio.
-- `trac_reciente` — **últimos 7 días fijos** (hoy + 6 anteriores, orden ascendente), entrene o no el atleta ese día. 7 dimensiones en escala 1-5 (1=peor, 5=mejor) por día:
+- `trac_reciente` — **una fila por fecha de la ventana `?dias=N`** (hoy y los N días anteriores, la misma ventana que el resto de los bloques; orden ascendente), entrene o no el atleta ese día. Hasta noviembre de 2026 eran siempre los últimos 7 días, sin importar `?dias`. 7 dimensiones en escala 1-5 (1=peor, 5=mejor) por día:
   - `fatiga_pierna`, `fatiga_empuje`, `fatiga_traccion` — dolor muscular/fatiga por patrón de movimiento
-  - `descanso_alimentacion` — calidad de sueño + alimentación combinada
+  - `sueno` — cómo siente el atleta que durmió (percepción, no horas)
+    > **Cambio de significado (noviembre de 2026):** antes este valor se llamaba `descanso_alimentacion` y mezclaba sueño y comida. Se renombró conservando los valores: todo lo cargado hasta el deploy de este cambio (mediados de noviembre de 2026; incluye las primeras semanas de noviembre) que veas en `sueno` es en realidad esa nota combinada, no sueño puro. Desde ese deploy es solo sueño; lo que comió el atleta va en `ingesta_diaria`.
   - `recuperacion` — nivel de frescura general
   - `motivacion` — ganas de entrenar (escala 1-5)
   - `tecnica` — comodidad técnica percibida
 
-  Cualquier campo puede venir `null` si el atleta no cargó ese día o no completó esa dimensión (es normal, especialmente `tecnica`/`motivacion` en días sin entrenar — no lo trates como dato faltante grave, es esperable). **Usalo para cruzar con `sesiones_realizadas` y `rpe_basicos`:** una racha de `recuperacion` o `descanso_alimentacion` bajos (1-2) en los días previos a una sesión con RPE alto es una señal más directa de fatiga acumulada que el RPE solo. Fatiga alta y sostenida en un patrón específico (ej. `fatiga_traccion` bajo varios días) sugiere bajar volumen o intensidad en los ejercicios de ese patrón en la próxima semana, no en todos.
+  Cualquier campo puede venir `null` si el atleta no cargó ese día o no completó esa dimensión (es normal, especialmente `tecnica`/`motivacion` en días sin entrenar — no lo trates como dato faltante grave, es esperable). **Usalo para cruzar con `sesiones_realizadas` y `rpe_basicos`:** una racha de `recuperacion` o `sueno` bajos (1-2) en los días previos a una sesión con RPE alto es una señal más directa de fatiga acumulada que el RPE solo. Fatiga alta y sostenida en un patrón específico (ej. `fatiga_traccion` bajo varios días) sugiere bajar volumen o intensidad en los ejercicios de ese patrón en la próxima semana, no en todos.
 - `ingesta_diaria` — lo que el atleta **realmente comió** cada fecha de la ventana (`?dias=N`),
   cargado por él al cerrar el día con los totales de MyFitnessPal. Una fila por fecha cargada,
   orden ascendente: `fecha`, `kcal`, `proteina_g`, `carbohidratos_g`, `grasas_g` (enteros, gramos)

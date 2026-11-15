@@ -8,7 +8,7 @@ const DIMENSIONES = [
   "fatiga_pierna",
   "fatiga_empuje",
   "fatiga_traccion",
-  "descanso_alimentacion",
+  "sueno",
   "recuperacion",
   "motivacion",
   "tecnica",
@@ -48,14 +48,14 @@ tracRouter.put("/", (req, res) => {
 
   db.prepare(
     `INSERT INTO trac (fecha, fatiga_pierna, fatiga_empuje, fatiga_traccion,
-                        descanso_alimentacion, recuperacion, motivacion, tecnica, actualizado_en)
+                        sueno, recuperacion, motivacion, tecnica, actualizado_en)
      VALUES (@fecha, @fatiga_pierna, @fatiga_empuje, @fatiga_traccion,
-             @descanso_alimentacion, @recuperacion, @motivacion, @tecnica, datetime('now'))
+             @sueno, @recuperacion, @motivacion, @tecnica, datetime('now'))
      ON CONFLICT(fecha) DO UPDATE SET
        fatiga_pierna = excluded.fatiga_pierna,
        fatiga_empuje = excluded.fatiga_empuje,
        fatiga_traccion = excluded.fatiga_traccion,
-       descanso_alimentacion = excluded.descanso_alimentacion,
+       sueno = excluded.sueno,
        recuperacion = excluded.recuperacion,
        motivacion = excluded.motivacion,
        tecnica = excluded.tecnica,

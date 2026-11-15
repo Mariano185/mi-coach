@@ -16,12 +16,14 @@ export const FATIGA_OPTIONS: TracOption[] = [
   { value: 5, label: "Sin fatiga ni rigidez" },
 ];
 
-export const DESCANSO_ALIMENTACION_OPTIONS: TracOption[] = [
-  { value: 1, label: "Alimentación y descanso deficientes" },
-  { value: 2, label: "Alimentación o descanso regulares" },
-  { value: 3, label: "Alimentación y descanso aceptables" },
-  { value: 4, label: "Buena alimentación y descanso" },
-  { value: 5, label: "Óptima alimentación y descanso" },
+// Cómo siente el atleta que durmió (percepción, no horas). Hasta noviembre de 2026 este
+// mismo valor era "descanso/alimentación"; la comida ahora va en la Ingesta diaria.
+export const SUENO_OPTIONS: TracOption[] = [
+  { value: 1, label: "Dormí muy mal" },
+  { value: 2, label: "Dormí mal" },
+  { value: 3, label: "Dormí aceptable" },
+  { value: 4, label: "Dormí bien" },
+  { value: 5, label: "Dormí muy bien" },
 ];
 
 export const RECUPERACION_OPTIONS: TracOption[] = [
