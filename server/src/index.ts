@@ -7,7 +7,7 @@ import { existsSync } from "node:fs";
 import { initDb } from "./db.js";
 import { authRouter, bootstrapAuth, requireAuth } from "./auth.js";
 import { exercisesRouter } from "./routes/exercises.js";
-import { bodyweightRouter } from "./routes/bodyweight.js";
+import { cuerpoRouter } from "./routes/cuerpo.js";
 import { programRouter } from "./routes/program.js";
 import { mesociclosRouter } from "./routes/mesociclos.js";
 import { statsRouter } from "./routes/stats.js";
@@ -37,7 +37,7 @@ app.use("/api/auth", authRouter);
 app.use("/api", requireAuth);
 
 app.use("/api/exercises", exercisesRouter);
-app.use("/api/bodyweight", bodyweightRouter);
+app.use("/api/cuerpo", cuerpoRouter);
 app.use("/api/program", programRouter);
 app.use("/api/mesociclos", mesociclosRouter);
 app.use("/api/stats", statsRouter);
@@ -73,6 +73,7 @@ setEndpointsCoach(
     ...rutasDelRouter("/api/mesociclos", mesociclosRouter),
     ...rutasDelRouter("/api/coach", coachRouter),
     ...rutasDelRouter("/api/ingesta", ingestaRouter),
+    ...rutasDelRouter("/api/cuerpo", cuerpoRouter),
     ...rutasDelRouter("/api/nutricion", nutricionRouter),
     ...rutasDelRouter("/api", catalogoRouter),
   ].sort((a, b) => a.ruta.localeCompare(b.ruta) || a.metodo.localeCompare(b.metodo))

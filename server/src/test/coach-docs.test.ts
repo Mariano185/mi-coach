@@ -73,6 +73,25 @@ describe("GET /api/coach/docs", () => {
     expect(md).not.toMatch(/últimos 7 días fijos/);
   });
 
+  it("incluye el Protocolo de medición de los Perímetros y explica peso_corporal con ?dias=N (issue #21)", async () => {
+    const res = await request(app).get("/api/coach/docs?seccion=flujo-semana").set(AUTH);
+    const md = res.body.secciones[0].markdown as string;
+    expect(md).toContain("Protocolo de medición");
+    expect(md).toMatch(/brazo derecho flexionado y contraído en el punto más grueso del bíceps/i);
+    expect(md).toMatch(/muslo derecho a mitad entre ingle y rodilla, de pie/i);
+    expect(md).toMatch(/abdomen a la altura del ombligo, relajado, tras exhalar, en ayunas/i);
+    for (const campo of ["`brazo_cm`", "`pierna_cm`", "`abdomen_cm`"]) expect(md).toContain(campo);
+    expect(md).not.toMatch(/`peso_corporal` — tendencia con PM 7d$/m);
+  });
+
+  it("generado.endpoints incluye el Registro corporal", async () => {
+    const res = await request(app).get("/api/coach/docs").set(AUTH);
+    const rutas = (res.body.generado.endpoints as Array<{ metodo: string; ruta: string }>).map(
+      (e) => `${e.metodo} ${e.ruta}`
+    );
+    expect(rutas).toEqual(expect.arrayContaining(["GET /api/cuerpo/", "PUT /api/cuerpo/"]));
+  });
+
   it("?seccion=<inexistente> devuelve 404", async () => {
     const res = await request(app).get("/api/coach/docs?seccion=no-existe").set(AUTH);
     expect(res.status).toBe(404);

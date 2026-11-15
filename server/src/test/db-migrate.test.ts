@@ -107,6 +107,51 @@ describe("initDb() — migración idempotente", () => {
     expect(() => db.prepare("INSERT INTO trac (fecha, sueno) VALUES ('2026-10-03', 6)").run()).toThrow(/CHECK/);
   });
 
+  it("una DB con la tabla de peso vieja migra al Registro corporal: fecha única, perímetros, sin columnas viejas (issue #21)", async () => {
+    const { db, initDb } = await import("../db.js");
+
+    // Simula una DB desplegada antes del cambio: tabla bodyweight con los campos de nutrición.
+    db.exec("DROP TABLE IF EXISTS registro_corporal");
+    db.exec(`CREATE TABLE bodyweight (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      fecha TEXT NOT NULL, peso_kg REAL NOT NULL,
+      kcal_objetivo INTEGER, proteina_g INTEGER, hambre INTEGER, digestion TEXT, notas TEXT
+    )`);
+    const ins = db.prepare(
+      "INSERT INTO bodyweight (fecha, peso_kg, kcal_objetivo, proteina_g, hambre, digestion, notas) VALUES (?, ?, ?, ?, ?, ?, ?)"
+    );
+    // La fila con campos de nutrición es de prueba (en producción, la única: 2026-06-14): se descarta.
+    ins.run("2026-06-14", 84.1, 2500, 180, 6, "10", "prueba");
+    ins.run("2026-06-15", 83.9, null, null, null, null, null);
+    // Fecha repetida: gana la carga más reciente.
+    ins.run("2026-06-16", 83.5, null, null, null, null, "primera");
+    ins.run("2026-06-16", 83.2, null, null, null, null, "corregida");
+
+    initDb();
+    initDb(); // idempotente
+
+    const tablas = (db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all() as Array<{ name: string }>).map(
+      (t) => t.name
+    );
+    expect(tablas).toContain("registro_corporal");
+    expect(tablas).not.toContain("bodyweight");
+
+    const cols = (db.prepare("PRAGMA table_info(registro_corporal)").all() as Array<{ name: string }>).map((c) => c.name);
+    expect(cols).toEqual(expect.arrayContaining(["fecha", "peso_kg", "brazo_cm", "pierna_cm", "abdomen_cm", "notas"]));
+    for (const vieja of ["kcal_objetivo", "proteina_g", "hambre", "digestion"]) expect(cols).not.toContain(vieja);
+
+    expect(db.prepare("SELECT fecha, peso_kg, brazo_cm, notas FROM registro_corporal ORDER BY fecha").all()).toEqual([
+      { fecha: "2026-06-15", peso_kg: 83.9, brazo_cm: null, notas: null },
+      { fecha: "2026-06-16", peso_kg: 83.2, brazo_cm: null, notas: "corregida" },
+    ]);
+    // La fecha queda única y los CHECK vigentes.
+    expect(() => db.prepare("INSERT INTO registro_corporal (fecha, peso_kg) VALUES ('2026-06-15', 80)").run()).toThrow(/UNIQUE/);
+    expect(() => db.prepare("INSERT INTO registro_corporal (fecha, peso_kg) VALUES ('2026-06-20', 0)").run()).toThrow(/CHECK/);
+    expect(() =>
+      db.prepare("INSERT INTO registro_corporal (fecha, peso_kg, abdomen_cm) VALUES ('2026-06-20', 80, -1)").run()
+    ).toThrow(/CHECK/);
+  });
+
   it("una DB con la vista Epley vieja recalcula el e1RM de todo el historial con RTS al arrancar (issue #14)", async () => {
     const { db, initDb } = await import("../db.js");
 

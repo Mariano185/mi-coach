@@ -60,15 +60,19 @@ function migrate(): void {
       UNIQUE (exercise_id, musculo_id)
     );
 
-    CREATE TABLE IF NOT EXISTS bodyweight (
-      id            INTEGER PRIMARY KEY AUTOINCREMENT,
-      fecha         TEXT NOT NULL,
-      peso_kg       REAL NOT NULL,
-      kcal_objetivo INTEGER,
-      proteina_g    INTEGER,
-      hambre        INTEGER,
-      digestion     TEXT,
-      notas         TEXT
+    -- Registro corporal: peso (obligatorio) y Perímetros en cm (opcionales, ver Protocolo de
+    -- medición en GLOSSARY.md) de una fecha. Una fila por fecha (upsert). Reemplaza a la
+    -- tabla bodyweight, que mezclaba peso con campos de nutrición (ver migrarBodyweight()).
+    CREATE TABLE IF NOT EXISTS registro_corporal (
+      id             INTEGER PRIMARY KEY AUTOINCREMENT,
+      fecha          TEXT UNIQUE NOT NULL,
+      peso_kg        REAL NOT NULL CHECK (peso_kg > 0),
+      brazo_cm       REAL CHECK (brazo_cm IS NULL OR brazo_cm > 0),
+      pierna_cm      REAL CHECK (pierna_cm IS NULL OR pierna_cm > 0),
+      abdomen_cm     REAL CHECK (abdomen_cm IS NULL OR abdomen_cm > 0),
+      notas          TEXT,
+      creado_en      TEXT NOT NULL DEFAULT (datetime('now')),
+      actualizado_en TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
     -- Mesociclo: agrupador de semanas (ej. "Acumulación octubre", "Fuerza pre-test").
@@ -223,6 +227,10 @@ function migrate(): void {
   // desde noviembre de 2026: solo sueño (la comida pasó a la Ingesta diaria). Idempotente.
   renameDescansoASueno();
 
+  // bodyweight → registro_corporal (issue #21). Debe correr después del CREATE TABLE de
+  // registro_corporal de arriba. Idempotente: solo corre si bodyweight sigue existiendo.
+  migrarBodyweight();
+
   // es_basico duplicaba rastrea_e1rm (verificado en producción: 0 divergencias en
   // 148 ejercicios, issue #11). Idempotente: solo corre si la columna sigue presente.
   dropEsBasico();
@@ -348,6 +356,28 @@ function renameDescansoASueno(): void {
   if (!cols.some((c) => c.name === "descanso_alimentacion")) return;
   // RENAME COLUMN (SQLite ≥ 3.25) conserva los valores y reescribe el CHECK de la columna.
   db.exec("ALTER TABLE trac RENAME COLUMN descanso_alimentacion TO sueno");
+}
+
+// Copia peso y notas de cada fecha (si una fecha estaba repetida, gana la carga más reciente:
+// mayor id) y dropea bodyweight. Las columnas kcal_objetivo/proteina_g/hambre/digestion
+// desaparecen (la nutrición vive ahora en ingesta_diaria), y las filas que las tenían cargadas
+// se descartan enteras: la única de producción (2026-06-14, digestion = '10') era de prueba
+// (issue #21).
+function migrarBodyweight(): void {
+  const existe = db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='bodyweight'").get();
+  if (!existe) return;
+  db.transaction(() => {
+    db.exec(`
+      INSERT OR IGNORE INTO registro_corporal (fecha, peso_kg, notas)
+      SELECT b.fecha, b.peso_kg, b.notas
+        FROM bodyweight b
+       WHERE b.id = (SELECT MAX(b2.id) FROM bodyweight b2 WHERE b2.fecha = b.fecha)
+         AND b.peso_kg > 0
+         AND b.kcal_objetivo IS NULL AND b.proteina_g IS NULL
+         AND b.hambre IS NULL AND b.digestion IS NULL;
+      DROP TABLE bodyweight;
+    `);
+  })();
 }
 
 function dropEsBasico(): void {

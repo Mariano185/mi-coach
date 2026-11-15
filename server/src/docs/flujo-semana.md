@@ -23,7 +23,28 @@ Usá `?dias=56` si querés más historial. El JSON incluye:
 - `mejor_e1rm_basicos` — mejor e1RM histórico por básico, **solo con confianza alta** (RPE ≥ 7).
   Ojo: los e1RM históricos cambiaron con el método RTS (2026-11) — no compares contra números
   de análisis viejos.
-- `peso_corporal` — tendencia con PM 7d
+- `peso_corporal` — el **Registro corporal** de cada fecha de la ventana `?dias=N` (solo las
+  fechas con registro, orden ascendente; hasta noviembre de 2026 traía todo el historial sin
+  importar `?dias`): `fecha`, `peso_kg`, `pm_7d` (promedio móvil de los últimos 7 registros,
+  calculado sobre todo el historial: el primer día de la ventana ya promedia con los previos),
+  los **Perímetros** `brazo_cm`, `pierna_cm` y `abdomen_cm` (en cm, `null` en las fechas en que
+  no se midieron — lo normal es medirlos cada una o dos semanas, no todos los días) y `notas`
+  (texto libre del atleta o `null`). En una recomposición los perímetros dicen más que el peso:
+  peso estable con `abdomen_cm` que baja y `brazo_cm`/`pierna_cm` que se sostienen o suben es
+  la recomposición funcionando. Compará perímetros solo entre fechas medidas con el Protocolo de
+  medición (abajo). Para una fecha puntual: `GET /api/cuerpo?fecha=YYYY-MM-DD` (`null` si no
+  hay registro); `GET /api/cuerpo` trae el historial completo. El registro es del atleta: no lo
+  escribas vos salvo que te pida corregir un número. Ojo: `PUT /api/cuerpo` **reemplaza el
+  registro entero** de esa fecha — si corregís solo el peso, mandá también los perímetros y las
+  notas que ya tenía (leelos antes con `?fecha=`), o se borran.
+
+  **Protocolo de medición** — la forma fija de tomar cada Perímetro, para que sean comparables
+  entre fechas (es lo que el atleta ve en la app debajo de cada campo):
+  - `brazo_cm` — brazo derecho flexionado y contraído en el punto más grueso del bíceps.
+  - `pierna_cm` — muslo derecho a mitad entre ingle y rodilla, de pie.
+  - `abdomen_cm` — abdomen a la altura del ombligo, relajado, tras exhalar, en ayunas.
+
+  Si vas a pedirle al atleta que se mida, pedíselo con este protocolo (no "medite la cintura").
 - `volumen_por_musculo` — series por semana de programa y músculo, fraccionado por rol (agonista
   suma 1.0, sinergista 0.5, estabilizador no suma). Cada fila trae `series_programadas` (todo lo
   prescrito, hecho o no) y `series_completadas` (solo lo que el atleta cerró) — compará las dos
