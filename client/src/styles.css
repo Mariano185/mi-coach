@@ -251,6 +251,10 @@ th {
   letter-spacing: 0.05em;
   text-transform: uppercase;
 }
+/* Tabla larga dentro de un panel: scroll interno (~10 filas) con el header fijo arriba.
+   El th necesita fondo opaco para tapar las filas que pasan por debajo. */
+.tabla-scroll { max-height: 380px; overflow-y: auto; overscroll-behavior: contain; }
+.tabla-scroll thead th { position: sticky; top: 0; z-index: 1; background: var(--panel); }
 tbody tr { transition: background 0.12s ease; }
 tbody tr:hover { background: var(--panel-2); }
 
