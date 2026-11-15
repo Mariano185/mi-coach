@@ -51,12 +51,12 @@ export function crearCalendario(semanasEntrada: SemanaCalendario[], hoy: string)
   let ultimaSesionPrevia: string | null = null;
   semanas.forEach((s, i) => {
     const desde = ultimaSesionPrevia === null ? null : diaSiguiente(ultimaSesionPrevia);
-    const propia = ultima(s.sesiones);
+    const ultimaSesion = ultima(s.sesiones);
     const esUltima = i === semanas.length - 1;
-    const hasta = esUltima ? hoy : propia;
+    const hasta = esUltima ? hoy : ultimaSesion;
     rangos.push(hasta === null ? null : { desde, hasta });
-    if (propia !== null && (ultimaSesionPrevia === null || propia > ultimaSesionPrevia)) {
-      ultimaSesionPrevia = propia;
+    if (ultimaSesion !== null && (ultimaSesionPrevia === null || ultimaSesion > ultimaSesionPrevia)) {
+      ultimaSesionPrevia = ultimaSesion;
     }
   });
 

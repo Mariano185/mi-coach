@@ -428,7 +428,8 @@ export interface UpsertIngestaDiariaInput {
   comentario?: string | null;
 }
 
-// Fila del bloque `ingesta_diaria` de GET /coach/analisis (solo fechas cargadas).
+// Fila del bloque `ingesta_diaria` de GET /coach/analisis (solo fechas cargadas), con el
+// objetivo que regía ese día (null si todavía no había ninguno).
 export type IngestaDiariaAnalisis = Pick<
   IngestaDiaria,
   "fecha" | "kcal" | "proteina_g" | "carbohidratos_g" | "grasas_g" | "comentario"
