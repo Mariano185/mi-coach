@@ -59,6 +59,7 @@ En el primer arranque el server:
 
 - hashea `AUTH_PASSWORD` con bcrypt y lo guarda en la DB (después la DB es la fuente de verdad; el env var deja de importar), y
 - genera la **coach API key** y la imprime **una sola vez** en el log. Guardala: es la que usa el coach (IA o humano) en el header `X-Coach-Key`. Para recuperarla: `journalctl -u mi-coach | grep coach_api_key`, o leerla de la tabla `settings`.
+- genera la **clave del dispositivo** (`device_api_key`) y la imprime una sola vez en el log. Es la del atajo de iOS que manda los Pasos diarios (header `X-Device-Key`) y solo autoriza `PUT /api/pasos`. Ver [`ATAJO-PASOS.md`](./ATAJO-PASOS.md).
 
 > **Cookie y HTTPS:** con `NODE_ENV=production` la cookie de sesión se marca `secure`, así que el login de browser necesita HTTPS (Tailscale Funnel, un reverse proxy con TLS, etc.). Si vas a usar la app solo por HTTP plano en tu LAN, quitá `Environment=NODE_ENV=production` del service.
 
@@ -79,6 +80,7 @@ systemctl restart mi-coach
 Para usar la app fuera de tu red (p. ej. desde el celular en el gym) sin abrir puertos:
 
 - **Tailscale / Tailscale Funnel** — guía paso a paso en [`TAILSCALE.md`](./TAILSCALE.md), incluye cómo instalar la PWA en iOS y cómo resetear el password.
+- **Pasos diarios desde el iPhone** — con la app expuesta por HTTPS, el atajo de iOS que manda los pasos de ayer cada noche: [`ATAJO-PASOS.md`](./ATAJO-PASOS.md).
 - Cualquier alternativa equivalente funciona igual: WireGuard u otra VPN, o un reverse proxy con TLS (Caddy, nginx + certbot) apuntando a `localhost:3001`. La app ya trae auth por password.
 
 ## 7. Backups

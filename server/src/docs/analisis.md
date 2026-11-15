@@ -14,6 +14,7 @@ la sección `flujo-semana`.
 | `volumen_por_musculo` (en `/analisis`) | Mismo `?dias=` que `/analisis` | Ventana por `fecha_creada` de la semana de programa (no por semana ISO) — mismo criterio que `dias_programados`, ver abajo. |
 | `peso_corporal` (en `/analisis`) | Mismo `?dias=` que `/analisis` | Por `fecha` calendario del Registro corporal; solo fechas con registro. `pm_7d` se calcula sobre todo el historial antes de recortar. |
 | `ingesta_diaria` (en `/analisis`) | Mismo `?dias=` que `/analisis` | Por `fecha` calendario de la carga (no por semana de programa); solo fechas cargadas. |
+| `pasos_diarios` (en `/analisis`) | Mismo `?dias=` que `/analisis` | Por `fecha` calendario (no por semana de programa); solo fechas que llegaron. |
 | `GET /coach/progresion/:exercise_id` | `?dias=180` (~26 semanas) | Un accesorio se entrena ~1x/semana: 42 días son ~6 sesiones, muy poco para leer una tendencia. |
 
 ## Denominadores que NO son comparables entre sí
@@ -90,6 +91,18 @@ promedio de 3 días cargados contra uno de 7 como si fueran equivalentes.
 Cada fila trae `objetivo`, el que regía **esa** fecha (regla de fechas del ADR 0003, ver la
 sección `nutricion`), no el actual: si el objetivo cambió dentro de la ventana, cada fecha se
 mide contra el suyo.
+
+## `pasos_diarios` — sin envío no es cero
+
+Los **Pasos diarios** son el total de pasos de una fecha calendario completa según Apple Health.
+No los carga el atleta a mano: un atajo de iOS los manda solo cada madrugada (00:05) con la
+**fecha del día que terminó**, así que la fila de hoy nunca está todavía y la de ayer aparece
+recién pasada la medianoche. Si el atleta reenvía la misma fecha, el valor se corrige.
+
+Cada fila es `{ fecha, pasos }`. Igual que `ingesta_diaria`, trae **solo las fechas que llegaron**:
+una fecha sin fila es "no llegó" (el atajo no corrió, el teléfono estaba apagado o sin red), no
+"0 pasos". Un `0` real sí viene como fila. Contá cuántas fechas de la ventana tienen dato antes de
+promediar, y no leas un hueco como un día sedentario.
 
 ## `fecha` nullable — el detalle que rompe filtros ingenuos
 

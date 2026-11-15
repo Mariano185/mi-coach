@@ -16,6 +16,7 @@ import type {
   CoachDocsSeccion,
   DiaProgramado,
   IngestaDiariaAnalisis,
+  PasosDiariosAnalisis,
   ProgresionBasico,
   ProgresionEjercicio,
   ProgresionEjercicioSerie,
@@ -257,6 +258,18 @@ function buildAnalisis(dias: number, incluir: Set<BloqueOptIn> = new Set()): Rec
       .all(desde) as Array<Omit<IngestaDiariaAnalisis, "objetivo">>
   ).map((fila) => ({ ...fila, objetivo: calendario.objetivoEn(fila.fecha) }));
 
+  // 10c) Pasos diarios de la ventana (?dias=N): solo las fechas que llegaron, igual que la
+  //      Ingesta diaria y por lo mismo: una fecha sin envío es "no llegó" (el atajo no
+  //      corrió, el teléfono estaba apagado), no "0 pasos".
+  const pasos_diarios = db
+    .prepare(
+      `SELECT fecha, pasos
+       FROM pasos_diarios
+       WHERE fecha >= date('now', ?)
+       ORDER BY fecha ASC`
+    )
+    .all(desde) as PasosDiariosAnalisis[];
+
   // 11) Días programados vs. completados, incluyendo días NUNCA empezados (fecha NULL).
   //     A diferencia de todos los bloques anteriores, este NO filtra por pd.fecha —
   //     un día sin entrenar no tiene fecha, así que ese filtro lo dejaría invisible
@@ -323,6 +336,7 @@ function buildAnalisis(dias: number, incluir: Set<BloqueOptIn> = new Set()): Rec
     sesiones_realizadas,
     trac_reciente,
     ingesta_diaria,
+    pasos_diarios,
     dias_programados,
   };
 }

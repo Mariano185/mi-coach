@@ -158,10 +158,10 @@ describe("Vista del día de Nutrición — GET /api/nutricion/dia", () => {
     expect(res.body.objetivo).toMatchObject({ week_id: s2, kcal: 2300, nota: "**B**" });
   });
 
-  it("sin ingesta ni objetivo devuelve null en ambos", async () => {
+  it("sin ingesta, objetivo ni pasos devuelve null en los tres", async () => {
     const res = await request(app).get("/api/nutricion/dia?fecha=2026-11-05").set(AUTH);
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ fecha: "2026-11-05", ingesta: null, objetivo: null });
+    expect(res.body).toEqual({ fecha: "2026-11-05", ingesta: null, objetivo: null, pasos: null });
   });
 
   it("400 sin fecha o con fecha inválida", async () => {

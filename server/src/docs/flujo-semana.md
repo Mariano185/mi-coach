@@ -129,6 +129,12 @@ Usá `?dias=56` si querés más historial. El JSON incluye:
   además `objetivo`: el Objetivo nutricional que regía esa fecha (`null` si todavía no había
   ninguno). Compará cada carga contra **su** objetivo. Cómo pautarlo y la regla de fechas →
   sección `nutricion` de esta doc.
+- `pasos_diarios` — los **Pasos diarios** de la ventana (`?dias=N`): `{ fecha, pasos }`, una fila
+  por fecha que llegó, orden ascendente. No los carga el atleta: un atajo de iOS manda el total de
+  Apple Health de cada día a la madrugada siguiente, así que hoy nunca está todavía. **Una fecha
+  que no aparece es "no llegó", no "0 pasos"**: promediá solo sobre las fechas que llegaron. Útil
+  para leer el gasto fuera del gimnasio junto a `ingesta_diaria` y `peso_corporal`. Detalle →
+  sección `analisis`.
 - `dias_programados` — a diferencia de todos los bloques anteriores, **incluye días nunca
   entrenados** (`fecha: null`). Una fila por día del programa, con `mesociclo_id`,
   `mesociclo_nombre`, `semana`, `dia`, `titulo`, `tipo`, `fecha`, `series_programadas`,

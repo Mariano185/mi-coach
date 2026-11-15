@@ -73,6 +73,15 @@ describe("GET /api/coach/docs", () => {
     expect(md).not.toMatch(/últimos 7 días fijos/);
   });
 
+  it("la sección analisis describe el bloque pasos_diarios: ventana ?dias=N y sin envío no es cero (issue #24)", async () => {
+    const res = await request(app).get("/api/coach/docs?seccion=analisis").set(AUTH);
+    const md = res.body.secciones[0].markdown as string;
+    expect(md).toContain("`pasos_diarios`");
+    expect(md).toMatch(/Pasos diarios/);
+    expect(md).toMatch(/fecha del día que terminó/);
+    expect(md).toMatch(/no llegó/);
+  });
+
   it("incluye el Protocolo de medición de los Perímetros y explica peso_corporal con ?dias=N (issue #21)", async () => {
     const res = await request(app).get("/api/coach/docs?seccion=flujo-semana").set(AUTH);
     const md = res.body.secciones[0].markdown as string;

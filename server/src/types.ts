@@ -457,6 +457,7 @@ export interface NutricionDia {
   fecha: string;
   ingesta: IngestaDiaria | null;
   objetivo: ObjetivoNutricional | null;
+  pasos: PasosDiarios | null; // solo lectura: los manda el atajo de iOS
 }
 
 // Fila del bloque `ingesta_diaria` de GET /coach/analisis (solo fechas cargadas), con el
@@ -662,3 +663,22 @@ export interface CoachDocsResponse {
   generado: CoachDocsGenerado;
   secciones: CoachDocsSeccion[];
 }
+
+// === Pasos diarios: total de una fecha según Apple Health, los manda un atajo de iOS ===
+// Una fila por fecha; un envío nuevo para la misma fecha la corrige.
+export interface PasosDiarios {
+  id: number;
+  fecha: string; // YYYY-MM-DD del día que terminó (no el del envío)
+  pasos: number; // entero ≥ 0
+  creado_en: string;
+  actualizado_en: string;
+}
+
+// PUT /api/pasos
+export interface UpsertPasosDiariosInput {
+  fecha: string;
+  pasos: number;
+}
+
+// Fila del bloque `pasos_diarios` de GET /coach/analisis (solo fechas que llegaron).
+export type PasosDiariosAnalisis = Pick<PasosDiarios, "fecha" | "pasos">;

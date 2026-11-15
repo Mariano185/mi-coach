@@ -60,6 +60,20 @@ describe("initDb() — migración idempotente", () => {
     expect(n).toBe(1);
   });
 
+  it("crea pasos_diarios (una fila por fecha, pasos obligatorio ≥ 0) y es idempotente (issue #24)", async () => {
+    const { db, initDb } = await import("../db.js");
+    expect(() => initDb()).not.toThrow();
+
+    db.prepare("INSERT INTO pasos_diarios (fecha, pasos) VALUES ('2026-11-14', 8234)").run();
+    expect(() => db.prepare("INSERT INTO pasos_diarios (fecha, pasos) VALUES ('2026-11-14', 1)").run()).toThrow(/UNIQUE/);
+    expect(() => db.prepare("INSERT INTO pasos_diarios (fecha, pasos) VALUES ('2026-11-15', -1)").run()).toThrow(/CHECK/);
+    expect(() => db.prepare("INSERT INTO pasos_diarios (fecha) VALUES ('2026-11-16')").run()).toThrow(/NOT NULL/);
+
+    expect(() => initDb()).not.toThrow();
+    const n = (db.prepare("SELECT COUNT(*) AS n FROM pasos_diarios").get() as { n: number }).n;
+    expect(n).toBe(1);
+  });
+
   it("agrega a program_weeks el Objetivo nutricional y objetivos_pautados_en (issue #23)", async () => {
     const { db, initDb } = await import("../db.js");
     expect(() => initDb()).not.toThrow();
