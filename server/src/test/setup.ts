@@ -277,3 +277,11 @@ export async function createTestApp(db: TestDb) {
 
   return app;
 }
+
+// Fecha/hora local de hoy a una hora fija, para controlar "ahora" con
+// vi.useFakeTimers({ toFake: ["Date"] }) + vi.setSystemTime(...).
+export function hoyALas(hh: number, mm: number): Date {
+  const d = new Date();
+  d.setHours(hh, mm, 0, 0);
+  return d;
+}
