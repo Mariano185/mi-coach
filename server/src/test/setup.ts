@@ -150,7 +150,7 @@ export function createTestDb() {
       fatiga_pierna INTEGER CHECK (fatiga_pierna IS NULL OR fatiga_pierna BETWEEN 1 AND 5),
       fatiga_empuje INTEGER CHECK (fatiga_empuje IS NULL OR fatiga_empuje BETWEEN 1 AND 5),
       fatiga_traccion INTEGER CHECK (fatiga_traccion IS NULL OR fatiga_traccion BETWEEN 1 AND 5),
-      descanso_alimentacion INTEGER CHECK (descanso_alimentacion IS NULL OR descanso_alimentacion BETWEEN 1 AND 5),
+      sueno INTEGER CHECK (sueno IS NULL OR sueno BETWEEN 1 AND 5),
       recuperacion INTEGER CHECK (recuperacion IS NULL OR recuperacion BETWEEN 1 AND 5),
       motivacion INTEGER CHECK (motivacion IS NULL OR motivacion BETWEEN 1 AND 5),
       tecnica INTEGER CHECK (tecnica IS NULL OR tecnica BETWEEN 1 AND 5),

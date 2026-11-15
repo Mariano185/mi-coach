@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import request from "supertest";
 import { createTestDb, createTestApp, type TestDb } from "./setup.js";
 import { seedEnciclopedia } from "../seed/index.js";
+import type { AccesorioAnalisis } from "../types.js";
 
 const db: TestDb = createTestDb();
 
@@ -220,5 +221,92 @@ describe("GET /api/coach/analisis — e1RM sigue funcionando tras el cutover", (
     const mejores = res.body.mejor_e1rm_basicos as Array<{ nombre: string }>;
     // La banca con pausa no aparece: su 1RM no es comparable con el de competencia.
     expect(mejores.find((m) => m.nombre === "Press banca con pausa 3s en el pecho")).toBeUndefined();
+  });
+});
+
+describe("GET /api/coach/analisis — accesorios (opt-in)", () => {
+  let app: Awaited<ReturnType<typeof createTestApp>>;
+
+  beforeEach(async () => {
+    db.exec("DELETE FROM program_weeks;");
+    seedEnciclopedia(db);
+    app = await createTestApp(db);
+  });
+
+  const idDe = (nombre: string) =>
+    (db.prepare("SELECT id FROM exercises WHERE nombre = ?").get(nombre) as { id: number }).id;
+
+
+  it("sin ?incluir=accesorios la clave no existe", async () => {
+    registrarSeries(idDe("Remo con barra"), 2);
+    const res = await request(app).get("/api/coach/analisis").set(AUTH);
+    expect(res.body).not.toHaveProperty("accesorios");
+  });
+
+  it("trae los ejercicios sin e1RM y no los que tienen e1RM", async () => {
+    registrarSeries(idDe("Remo con barra"), 2);
+    registrarSeries(idDe("Flat Bench Press (barra)"), 2);
+
+    const res = await request(app).get("/api/coach/analisis?incluir=accesorios").set(AUTH);
+    const nombres = (res.body.accesorios as AccesorioAnalisis[]).map((a) => a.nombre);
+    expect(nombres).toEqual(["Remo con barra"]);
+  });
+
+  it("incluye hip thrust y RDL: no son movimientos de competencia", async () => {
+    registrarSeries(idDe("Hip Thrust con barra"), 1);
+    registrarSeries(idDe("Romanian Deadlift"), 1);
+
+    const res = await request(app).get("/api/coach/analisis?incluir=accesorios").set(AUTH);
+    const nombres = (res.body.accesorios as AccesorioAnalisis[]).map((a) => a.nombre).sort();
+    expect(nombres).toEqual(["Hip Thrust con barra", "Romanian Deadlift"]);
+  });
+
+  it("solo series hechas, en orden de serie, como [reps, peso, rpe], con los datos de la sesión", async () => {
+    const remoId = idDe("Remo con barra");
+    const weekId = crearSemana();
+    const dayId = db
+      .prepare("INSERT INTO program_days (week_id, dia, fecha, orden) VALUES (?, 2, ?, 0)")
+      .run(weekId, hoy).lastInsertRowid as number;
+    const peId = db
+      .prepare("INSERT INTO program_exercises (day_id, exercise_id, seccion, reps_text, orden) VALUES (?, ?, 'accesorio', '12-15', 0)")
+      .run(dayId, remoId).lastInsertRowid as number;
+    const serie = db.prepare(
+      "INSERT INTO program_sets (program_exercise_id, n_serie, target_reps, real_peso, real_reps, real_rpe, hecha) VALUES (?, ?, 15, ?, ?, ?, ?)"
+    );
+    // Insertadas desordenadas a propósito: el orden tiene que salir de n_serie.
+    serie.run(peId, 3, null, null, null, 0); // salteada
+    serie.run(peId, 2, 10, 13, 9, 1);
+    serie.run(peId, 1, 10, 15, 9, 1);
+    serie.run(peId, 4, 10, 12, null, 1); // sin RPE
+
+    const res = await request(app).get("/api/coach/analisis?incluir=accesorios").set(AUTH);
+    expect(res.body.accesorios).toEqual([
+      {
+        exercise_id: remoId,
+        nombre: "Remo con barra",
+        sesiones: [
+          { fecha: hoy, week_id: weekId, dia: 2, rango_objetivo: "12-15", series: [[15, 10, 9], [13, 10, 9], [12, 10, null]] },
+        ],
+      },
+    ]);
+  });
+
+  it("respeta la ventana ?dias=N", async () => {
+    const remoId = idDe("Remo con barra");
+    const hace20 = new Date(Date.now() - 20 * 86400000).toISOString().slice(0, 10);
+    registrarSeries(remoId, 1, hace20);
+    registrarSeries(remoId, 1, hoy);
+
+    const corta = await request(app).get("/api/coach/analisis?dias=14&incluir=accesorios").set(AUTH);
+    expect((corta.body.accesorios as AccesorioAnalisis[])[0].sesiones.map((s) => s.fecha)).toEqual([hoy]);
+
+    const larga = await request(app).get("/api/coach/analisis?dias=42&incluir=accesorios").set(AUTH);
+    expect((larga.body.accesorios as AccesorioAnalisis[])[0].sesiones.map((s) => s.fecha)).toEqual([hace20, hoy]);
+  });
+
+  it("convive con ?incluir=ejercicios en la misma lista", async () => {
+    const res = await request(app).get("/api/coach/analisis?incluir=ejercicios,accesorios").set(AUTH);
+    expect(res.body).toHaveProperty("ejercicios");
+    expect(res.body).toHaveProperty("accesorios");
   });
 });

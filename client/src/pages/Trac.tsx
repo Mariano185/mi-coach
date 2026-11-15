@@ -6,10 +6,10 @@ import type { TracEntry, UpsertTracInput } from "../types";
 import { swrKeys } from "../swr";
 import { useToast } from "../components/Toast";
 import {
-  DESCANSO_ALIMENTACION_OPTIONS,
   FATIGA_OPTIONS,
   MOTIVACION_TRAC_OPTIONS,
   RECUPERACION_OPTIONS,
+  SUENO_OPTIONS,
   TECNICA_OPTIONS,
   type TracOption,
 } from "../constants/trac";
@@ -66,7 +66,7 @@ export function Trac() {
   const [fatigaPierna, setFatigaPierna] = useState<FieldValue>("");
   const [fatigaEmpuje, setFatigaEmpuje] = useState<FieldValue>("");
   const [fatigaTraccion, setFatigaTraccion] = useState<FieldValue>("");
-  const [descansoAlimentacion, setDescansoAlimentacion] = useState<FieldValue>("");
+  const [sueno, setSueno] = useState<FieldValue>("");
   const [recuperacion, setRecuperacion] = useState<FieldValue>("");
   const [motivacion, setMotivacion] = useState<FieldValue>("");
   const [tecnica, setTecnica] = useState<FieldValue>("");
@@ -78,7 +78,7 @@ export function Trac() {
     setFatigaPierna(toFieldValue(data?.fatiga_pierna ?? null));
     setFatigaEmpuje(toFieldValue(data?.fatiga_empuje ?? null));
     setFatigaTraccion(toFieldValue(data?.fatiga_traccion ?? null));
-    setDescansoAlimentacion(toFieldValue(data?.descanso_alimentacion ?? null));
+    setSueno(toFieldValue(data?.sueno ?? null));
     setRecuperacion(toFieldValue(data?.recuperacion ?? null));
     setMotivacion(toFieldValue(data?.motivacion ?? null));
     setTecnica(toFieldValue(data?.tecnica ?? null));
@@ -91,7 +91,7 @@ export function Trac() {
       fatiga_pierna: toApiValue(fatigaPierna),
       fatiga_empuje: toApiValue(fatigaEmpuje),
       fatiga_traccion: toApiValue(fatigaTraccion),
-      descanso_alimentacion: toApiValue(descansoAlimentacion),
+      sueno: toApiValue(sueno),
       recuperacion: toApiValue(recuperacion),
       motivacion: toApiValue(motivacion),
       tecnica: toApiValue(tecnica),
@@ -126,7 +126,7 @@ export function Trac() {
 
         <div className="groupbox">
           <p className="groupbox-title">Recuperación</p>
-          <SelectField label="Descanso/Alimentación" value={descansoAlimentacion} options={DESCANSO_ALIMENTACION_OPTIONS} onChange={setDescansoAlimentacion} />
+          <SelectField label="Sueño" value={sueno} options={SUENO_OPTIONS} onChange={setSueno} />
           <SelectField label="Recuperación" value={recuperacion} options={RECUPERACION_OPTIONS} onChange={setRecuperacion} />
           <SelectField label="Motivación" value={motivacion} options={MOTIVACION_TRAC_OPTIONS} onChange={setMotivacion} />
           <SelectField label="Técnica" value={tecnica} options={TECNICA_OPTIONS} onChange={setTecnica} />

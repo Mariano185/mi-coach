@@ -64,6 +64,15 @@ describe("GET /api/coach/docs", () => {
     expect(res.body.secciones[0].id).toBe("enciclopedia");
   });
 
+  it("explica que el Trac trae sueno (antes descanso_alimentacion) desde noviembre 2026 y sigue ?dias=N (issue #18)", async () => {
+    const res = await request(app).get("/api/coach/docs?seccion=flujo-semana").set(AUTH);
+    const md = res.body.secciones[0].markdown as string;
+    expect(md).toContain("`sueno`");
+    expect(md).toMatch(/noviembre (de )?2026/);
+    expect(md).toContain("descanso_alimentacion"); // el nombre viejo, para leer el historial
+    expect(md).not.toMatch(/últimos 7 días fijos/);
+  });
+
   it("?seccion=<inexistente> devuelve 404", async () => {
     const res = await request(app).get("/api/coach/docs?seccion=no-existe").set(AUTH);
     expect(res.status).toBe(404);
@@ -106,6 +115,17 @@ describe("GET /api/coach/docs", () => {
     const bloques = docs.body.generado.analisis_bloques as Array<{ bloque: string; opt_in: boolean }>;
     const ejercicios = bloques.find((b) => b.bloque === "ejercicios");
     expect(ejercicios).toEqual({ bloque: "ejercicios", opt_in: true });
+  });
+
+  it("generado.analisis_bloques marca accesorios como opt_in, aunque no venga en el default", async () => {
+    const [docs, analisis] = await Promise.all([
+      request(app).get("/api/coach/docs").set(AUTH),
+      request(app).get("/api/coach/analisis").set(AUTH),
+    ]);
+    expect(analisis.body).not.toHaveProperty("accesorios");
+
+    const bloques = docs.body.generado.analisis_bloques as Array<{ bloque: string; opt_in: boolean }>;
+    expect(bloques.find((b) => b.bloque === "accesorios")).toEqual({ bloque: "accesorios", opt_in: true });
   });
 
   it("generado.version_deploy es un string no vacío", async () => {

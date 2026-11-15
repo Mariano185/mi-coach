@@ -150,7 +150,7 @@ function migrate(): void {
       fatiga_pierna         INTEGER CHECK (fatiga_pierna IS NULL OR fatiga_pierna BETWEEN 1 AND 5),
       fatiga_empuje         INTEGER CHECK (fatiga_empuje IS NULL OR fatiga_empuje BETWEEN 1 AND 5),
       fatiga_traccion       INTEGER CHECK (fatiga_traccion IS NULL OR fatiga_traccion BETWEEN 1 AND 5),
-      descanso_alimentacion INTEGER CHECK (descanso_alimentacion IS NULL OR descanso_alimentacion BETWEEN 1 AND 5),
+      sueno                 INTEGER CHECK (sueno IS NULL OR sueno BETWEEN 1 AND 5),
       recuperacion          INTEGER CHECK (recuperacion IS NULL OR recuperacion BETWEEN 1 AND 5),
       motivacion            INTEGER CHECK (motivacion IS NULL OR motivacion BETWEEN 1 AND 5),
       tecnica               INTEGER CHECK (tecnica IS NULL OR tecnica BETWEEN 1 AND 5),
@@ -218,6 +218,10 @@ function migrate(): void {
   ]) {
     try { db.exec(col); } catch { /* columna ya existe */ }
   }
+
+  // Trac: descanso_alimentacion → sueno (issue #18). Mismo valor 1–5, significado nuevo
+  // desde noviembre de 2026: solo sueño (la comida pasó a la Ingesta diaria). Idempotente.
+  renameDescansoASueno();
 
   // es_basico duplicaba rastrea_e1rm (verificado en producción: 0 divergencias en
   // 148 ejercicios, issue #11). Idempotente: solo corre si la columna sigue presente.
@@ -337,6 +341,13 @@ function migrate(): void {
       -- en ASC, así que una semana programada-no-entrenada saldría arriba de todo.
       ORDER BY semana_creada, week_id, m.grupo, m.nombre;
   `);
+}
+
+function renameDescansoASueno(): void {
+  const cols = db.prepare("PRAGMA table_info(trac)").all() as Array<{ name: string }>;
+  if (!cols.some((c) => c.name === "descanso_alimentacion")) return;
+  // RENAME COLUMN (SQLite ≥ 3.25) conserva los valores y reescribe el CHECK de la columna.
+  db.exec("ALTER TABLE trac RENAME COLUMN descanso_alimentacion TO sueno");
 }
 
 function dropEsBasico(): void {
