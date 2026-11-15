@@ -494,6 +494,30 @@ export interface ProgresionBasico {
   n_series: number;
 }
 
+// === Coach (/analisis?incluir=accesorios) ===
+// Doble progresión de los accesorios sin bajar día por día. Forma acordada con el coach:
+// compacta a propósito (tuplas, sin targets por serie ni notas). Para el detalle de un
+// ejercicio (e1RM, tonelaje, RIR) está GET /coach/progresion/:exercise_id.
+
+/** [reps, peso_kg, rpe] de una serie hecha. rpe null si no se registró. */
+export type AccesorioSerie = [number, number, number | null];
+
+// Una sesión = un program_exercise (una prescripción), no un día calendario: cada
+// prescripción trae su propio rango pautado.
+export interface AccesorioSesion {
+  fecha: string; // YYYY-MM-DD, nunca null
+  week_id: number;
+  dia: number;
+  rango_objetivo: string | null; // program_exercises.reps_text, ej. "12-15"
+  series: AccesorioSerie[]; // solo las hechas, en orden de serie
+}
+
+export interface AccesorioAnalisis {
+  exercise_id: number;
+  nombre: string;
+  sesiones: AccesorioSesion[]; // orden cronológico ascendente
+}
+
 // === Coach (GET /coach/progresion/:exercise_id) ===
 // La historia de UN ejercicio de la library, sesión por sesión. A diferencia de
 // ProgresionBasico (bloque de /analisis, limitado a rastrea_e1rm = 1 y con una fila
