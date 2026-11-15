@@ -26,14 +26,21 @@ real completa (fecha/hora se autosetean). Dashboard/Stats y el análisis del coa
 
 ```
 mi-coach/
-├── server/src/   db.ts · index.ts · auth.ts · types.ts
-│                 routes/{exercises,bodyweight,program,mesociclos,stats,coach,settings,trac,pasos}.ts
+├── server/src/   db.ts · index.ts · auth.ts · types.ts · calendario.ts · e1rm-sql.ts
+│                 routes/{exercises,catalogo,cuerpo,program,mesociclos,stats,coach,trac,
+│                         ingesta,nutricion,pasos}.ts
+│                 docs/   manual del coach (GET /api/coach/docs): flujo-semana, analisis,
+│                         enciclopedia, nutricion
+│                 seed/   enciclopedia de ejercicios (músculos, patrones, ejercicios)
+│                 validacion/  validadores compartidos (fecha, ejercicio, objetivo nutricional)
 │                 test/   (vitest + supertest, DB en memoria)
 ├── client/src/   App.tsx · api.ts · swr.ts · types.ts · main.tsx · styles.css
-│                 pages/{Dashboard,Bodyweight,Programs,Trac,Login}.tsx
+│                 pages/{Dashboard,Nutricion,Cuerpo,Programs,Trac,Login}.tsx
 │                 pages/program/{WeekView,DayView,ExerciseView}.tsx
-│                 components/{BottomNav,Toast,TrendChart,CoachNotes,icons}.tsx
-│                 constants/trac.ts
+│                 components/{BottomNav,Toast,TrendChart,CoachNotes,E1rmValor,Expandable,
+│                             OfflineBanner,UpdatePrompt,icons}.tsx
+│                 constants/{trac,cuerpo}.ts
+├── docs/adr/     decisiones de arquitectura (enciclopedia, e1RM RTS, dos relojes)
 ├── docs/deploy/  mi-coach.service · README.md (deploy genérico) · TAILSCALE.md (acceso remoto)
 │                 ATAJO-PASOS.md (atajo de iOS que manda los Pasos diarios)
 ├── docs/agents/  issue tracker, triage labels, domain docs (meta-docs para skills)
@@ -61,17 +68,24 @@ como SPA (static + catch-all fallback). Ver `server/src/index.ts`.
 
 **Programa estructurado — única fuente de verdad del entrenamiento:**
 - `mesociclos` — `id, nombre, objetivo, notas, fecha_inicio, fecha_fin, orden, fecha_creada`. Agrupa semanas; la numeración de semana se reinicia por mesociclo.
-- `program_weeks` — `id, semana, mesociclo_id→mesociclos, nombre, bloque, notas, fecha_creada, activa`. `UNIQUE(mesociclo_id, semana)`.
-- `program_days` — `id, week_id→weeks, dia, tipo(texto libre opcional), titulo, warmup, notas, fecha, hora_inicio, hora_fin, orden`. `fecha`/`hora_inicio` se autosetean al completar la primera serie del día; `hora_fin` se corre a la hora de cada serie que pasa a hecha mientras el día sea hoy.
+- `program_weeks` — `id, semana, mesociclo_id→mesociclos, nombre, bloque, notas, fecha_creada, activa`, más el Objetivo nutricional del coach: `objetivo_kcal/proteina_g/carbohidratos_g/grasas_g` (los cuatro juntos o ninguno), `nota_nutricional`, `objetivos_pautados_en` (desde qué fecha rige; ADR 0003, `calendario.ts`). `UNIQUE(mesociclo_id, semana)`.
+- `program_days` — `id, week_id→weeks, dia, tipo(texto libre opcional), titulo, warmup, notas (del coach), notas_atleta, fecha, hora_inicio, hora_fin, orden`. `fecha`/`hora_inicio` se autosetean al completar la primera serie del día; `hora_fin` se corre a la hora de cada serie que pasa a hecha mientras el día sea hoy.
 - `program_exercises` — `id, day_id→days, exercise_id→exercises, nombre_libre, seccion(main|accesorio|core), reps_text, carga_text, rpe_text, notas, orden`.
 - `program_sets` — `id, program_exercise_id→exercises, n_serie, target_reps, target_rpe, target_peso, real_peso, real_reps, real_rpe, hecha, notas`. `hecha` se deriva de peso+reps presentes.
 
 Cascadas `ON DELETE CASCADE` week→day→exercise→set.
 
 **Resto:**
-- `exercises` — library seedeada (`EXERCISE_LIBRARY` en db.ts). `es_basico=1` marca los 3 básicos.
-- `bodyweight` — `fecha, peso_kg, kcal_objetivo, proteina_g, hambre, digestion, notas`.
-- `trac` — bienestar diario 1–5 (`fatiga_pierna/empuje/traccion, descanso_alimentacion, recuperacion, motivacion, tecnica`), una fila por fecha (upsert).
+- `exercises` — enciclopedia de ejercicios (ADR 0001, seed en `server/src/seed/`): identidad de la
+  variante (`patron_id`, `ejercicio_padre_id`, implemento, agarre…), costos y `rastrea_e1rm=1` para
+  los movimientos de competencia (reemplazó a `es_basico`, que se dropea en la migración).
+- `musculos` · `patrones` · `ejercicio_musculos` — músculos por ejercicio con `rol`
+  (agonista/sinergista/estabilizador) y `fraccion_volumen`; alimentan `v_volumen_por_musculo`.
+- `registro_corporal` — Registro corporal: `fecha` (UNIQUE), `peso_kg`, Perímetros opcionales
+  (`brazo_cm, pierna_cm, abdomen_cm`, con Protocolo de medición fijo), `notas`. Reemplazó a `bodyweight`.
+- `trac` — bienestar diario 1–5 (`fatiga_pierna/empuje/traccion, sueno, recuperacion, motivacion, tecnica`), una fila por fecha (upsert). `sueno` se llamaba `descanso_alimentacion` hasta noviembre de 2026.
+- `ingesta_diaria` — Ingesta diaria del atleta: `fecha` (UNIQUE), `kcal, proteina_g, carbohidratos_g,
+  grasas_g` (obligatorios, enteros ≥ 0), `comentario`. Sin fila = "no cargado", nunca 0 kcal.
 - `pasos_diarios` — Pasos diarios que manda el atajo de iOS: `fecha` (UNIQUE), `pasos` (entero ≥ 0).
   Upsert por fecha (`PUT /api/pasos`); sin fila = "no llegó", nunca 0 pasos.
 - `settings` — clave/valor: `rm_squat/bench/deadlift`, hashes de auth, `coach_api_key`, `device_api_key`.
@@ -109,7 +123,7 @@ Tabla completa de endpoints en el `README.md` (raíz). Resumen de lo no obvio:
   Esto **reemplaza** al viejo botón "Registrar día": no existe más `POST /days/:id/complete`.
 - **`PATCH /program/sets/:id/target`** — el coach corrige la prescripción (`target_*`) sin tocar lo real.
 - **`GET /coach/analisis?dias=42`** — todo lo que el coach necesita en un JSON: e1RM, progresión,
-  RPE, peso corporal, volumen por categoría, sesiones realizadas, Trac reciente, Ingesta diaria,
+  RPE, peso corporal, volumen por músculo (`v_volumen_por_musculo`), sesiones realizadas, Trac reciente, Ingesta diaria,
   Pasos diarios (`pasos_diarios`: solo las fechas que llegaron), library, mesociclos.
 - **`POST /program/weeks`** — crea la semana completa desde JSON (semana, días, ejercicios, series
   target). Ejemplo del payload en el README. `409` si ya existe esa semana en el mesociclo.
