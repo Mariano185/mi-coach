@@ -161,16 +161,34 @@ export interface VolumenMusculo {
   series_completadas: number;
 }
 
-export interface Bodyweight {
+// === Registro corporal: peso y Perímetros de una fecha (uno por fecha, upsert) ===
+export interface RegistroCorporal {
   id: number;
+  fecha: string; // YYYY-MM-DD
+  peso_kg: number; // siempre > 0
+  brazo_cm: number | null; // Perímetros: opcionales, > 0 si vienen (ver Protocolo de medición)
+  pierna_cm: number | null;
+  abdomen_cm: number | null;
+  notas: string | null;
+  creado_en: string;
+  actualizado_en: string;
+}
+
+// PUT /api/cuerpo — peso obligatorio; perímetros y notas opcionales (no mandarlos los borra).
+export interface UpsertRegistroCorporalInput {
   fecha: string;
   peso_kg: number;
-  kcal_objetivo: number | null;
-  proteina_g: number | null;
-  hambre: number | null;
-  digestion: string | null;
-  notas: string | null;
+  brazo_cm?: number | null;
+  pierna_cm?: number | null;
+  abdomen_cm?: number | null;
+  notas?: string | null;
 }
+
+// Fila del bloque `peso_corporal` de GET /coach/analisis (registros de la ventana ?dias=N).
+export type RegistroCorporalAnalisis = Pick<
+  RegistroCorporal,
+  "fecha" | "peso_kg" | "brazo_cm" | "pierna_cm" | "abdomen_cm" | "notas"
+> & { pm_7d: number };
 
 // === Mesociclos: agrupador de semanas ===
 export interface Mesociclo {
@@ -354,17 +372,6 @@ export interface Stats {
   basicos: BasicE1rm[];
   tendencia_peso: WeightTrendPoint[];
   volumen_semanal: WeeklyVolume[];
-}
-
-// Inputs de formularios
-export interface NewBodyweightInput {
-  fecha: string;
-  peso_kg: number;
-  kcal_objetivo: number | null;
-  proteina_g: number | null;
-  hambre: number | null;
-  digestion: string | null;
-  notas: string | null;
 }
 
 // === Trac: tracker diario de bienestar/recuperación (independiente de sessions) ===

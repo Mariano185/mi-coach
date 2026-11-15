@@ -4,17 +4,18 @@ import type {
   IngestaDiaria,
   Mesociclo,
   MesocicloConSemanas,
-  NewBodyweightInput,
   ProgramDayDetail,
   ProgramExerciseDetail,
   ProgramSet,
   ProgramWeek,
   ProgramWeekDetail,
+  RegistroCorporal,
   Stats,
   TracEntry,
   UpdateProgramSetInput,
   UpdateProgramSetTargetInput,
   UpsertIngestaDiariaInput,
+  UpsertRegistroCorporalInput,
   UpsertTracInput,
 } from "./types";
 import { setAuthedFlag } from "./authState";
@@ -79,8 +80,8 @@ export async function req<T>(url: string, options?: RequestInit): Promise<T> {
 export const api = {
   getExercises: () => req<Exercise[]>("/api/exercises"),
 
-  createBodyweight: (input: NewBodyweightInput) =>
-    req<{ id: number }>("/api/bodyweight", { method: "POST", body: JSON.stringify(input) }),
+  upsertCuerpo: (input: UpsertRegistroCorporalInput) =>
+    req<RegistroCorporal>("/api/cuerpo", { method: "PUT", body: JSON.stringify(input) }),
 
   getStats: () => req<Stats>("/api/stats"),
 

@@ -190,14 +190,14 @@ mi-coach/
 │   ├── db.ts               esquema, migraciones idempotentes, seed
 │   ├── index.ts            arranque Express, guard de auth, static SPA
 │   ├── auth.ts             login por password + X-Coach-Key
-│   ├── routes/             exercises · bodyweight · program · mesociclos
+│   ├── routes/             exercises · cuerpo · program · mesociclos
 │   │                       stats · coach · trac · ingesta
 │   └── test/               tests de API (vitest + supertest)
 ├── client/src/
 │   ├── App.tsx             router + SWRConfig + guard de login
 │   ├── api.ts              cliente HTTP tipado
 │   ├── swr.ts              swrFetcher, swrKeys, swrConfig
-│   ├── pages/              Dashboard · Nutricion · Bodyweight · Programs · Trac · Login
+│   ├── pages/              Dashboard · Nutricion · Cuerpo · Programs · Trac · Login
 │   └── pages/program/      WeekView · DayView · ExerciseView
 ├── client/public/          favicon, íconos PWA, manifest
 └── docs/deploy/            systemd service + guía de deploy + Tailscale opcional
@@ -208,7 +208,7 @@ mi-coach/
 ```
 mesociclos ─< program_weeks ─< program_days ─< program_exercises ─< program_sets
 exercises (library) ──────────────────────────┘
-bodyweight · trac · ingesta_diaria · settings
+registro_corporal · trac · ingesta_diaria · settings
 ```
 
 - Cada `program_set` tiene columnas **objetivo** (`target_peso/reps/rpe`, las pone el coach) y **reales** (`real_peso/reps/rpe`, las completa el atleta). `hecha` se deriva sola cuando hay peso + reps.
@@ -227,7 +227,7 @@ Todas las rutas (salvo las públicas) requieren cookie de sesión o header `X-Co
 | GET/POST | `/api/exercises` | library de ejercicios; `?detalle=full` trae biomecánica completa; `?musculo_id=X&rol=` filtra por músculo |
 | GET/PATCH | `/api/exercises/:id` | ejercicio con biomecánica, grilla muscular y variantes / editar (merge parcial, sin DELETE) |
 | GET | `/api/musculos` · `/api/patrones` | catálogo canónico de la enciclopedia (solo lectura) |
-| GET/POST | `/api/bodyweight` | peso corporal + nutrición |
+| GET/PUT | `/api/cuerpo?fecha=` | Registro corporal: una fecha (o `null`) o, sin parámetros, todo el historial; upsert por fecha con peso obligatorio y perímetros (brazo/pierna/abdomen, cm) opcionales |
 | GET | `/api/stats` | e1RM por básico, tendencia de peso, volumen semanal |
 | GET/PUT | `/api/trac` | bienestar diario (upsert por fecha) |
 | GET/PUT | `/api/ingesta?fecha=` · `?desde=&hasta=` | Ingesta diaria: una fecha (o `null`), un rango (solo fechas cargadas), upsert por fecha con kcal/proteína/carbos/grasas obligatorios |

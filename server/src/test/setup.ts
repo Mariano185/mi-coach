@@ -64,15 +64,16 @@ export function createTestDb() {
       fraccion_volumen REAL NOT NULL DEFAULT 1.0,
       UNIQUE (exercise_id, musculo_id)
     );
-    CREATE TABLE IF NOT EXISTS bodyweight (
+    CREATE TABLE IF NOT EXISTS registro_corporal (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      fecha TEXT NOT NULL,
-      peso_kg REAL NOT NULL,
-      kcal_objetivo INTEGER,
-      proteina_g INTEGER,
-      hambre INTEGER,
-      digestion TEXT,
-      notas TEXT
+      fecha TEXT UNIQUE NOT NULL,
+      peso_kg REAL NOT NULL CHECK (peso_kg > 0),
+      brazo_cm REAL CHECK (brazo_cm IS NULL OR brazo_cm > 0),
+      pierna_cm REAL CHECK (pierna_cm IS NULL OR pierna_cm > 0),
+      abdomen_cm REAL CHECK (abdomen_cm IS NULL OR abdomen_cm > 0),
+      notas TEXT,
+      creado_en TEXT NOT NULL DEFAULT (datetime('now')),
+      actualizado_en TEXT NOT NULL DEFAULT (datetime('now'))
     );
     CREATE TABLE IF NOT EXISTS mesociclos (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -237,6 +238,7 @@ export async function createTestApp(db: TestDb) {
   const { exercisesRouter } = await import("../routes/exercises.js");
   const { tracRouter } = await import("../routes/trac.js");
   const { ingestaRouter } = await import("../routes/ingesta.js");
+  const { cuerpoRouter } = await import("../routes/cuerpo.js");
   const { mesociclosRouter } = await import("../routes/mesociclos.js");
   const { catalogoRouter } = await import("../routes/catalogo.js");
 
@@ -259,6 +261,7 @@ export async function createTestApp(db: TestDb) {
   app.use("/api/exercises", exercisesRouter);
   app.use("/api/trac", tracRouter);
   app.use("/api/ingesta", ingestaRouter);
+  app.use("/api/cuerpo", cuerpoRouter);
   app.use("/api/mesociclos", mesociclosRouter);
   app.use("/api", catalogoRouter);
 
@@ -271,6 +274,7 @@ export async function createTestApp(db: TestDb) {
       ...rutasDelRouter("/api/mesociclos", mesociclosRouter),
       ...rutasDelRouter("/api/coach", coachRouter),
       ...rutasDelRouter("/api/ingesta", ingestaRouter),
+      ...rutasDelRouter("/api/cuerpo", cuerpoRouter),
       ...rutasDelRouter("/api", catalogoRouter),
     ].sort((a, b) => a.ruta.localeCompare(b.ruta) || a.metodo.localeCompare(b.metodo))
   );

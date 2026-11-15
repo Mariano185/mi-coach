@@ -10,7 +10,7 @@ import {
 const ITEMS: Array<{ to: string; label: string; Icon: typeof IconDashboard; end?: boolean }> = [
   { to: "/dashboard", label: "Dashboard", Icon: IconDashboard, end: true },
   { to: "/nutricion", label: "Nutrición", Icon: IconNutrition, end: true },
-  { to: "/weight", label: "Peso", Icon: IconWeight, end: true },
+  { to: "/cuerpo", label: "Cuerpo", Icon: IconWeight, end: true },
   { to: "/programs", label: "Programas", Icon: IconPrograms },
 ];
 
