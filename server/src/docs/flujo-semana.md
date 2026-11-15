@@ -64,7 +64,9 @@ Usá `?dias=56` si querés más historial. El JSON incluye:
   por fecha. Por día: `semana`, `dia`, `tipo`, `fecha`, `hora_inicio`, `hora_fin`, `duracion_min`,
   `series_hechas`, `notas_coach`, `notas_atleta`. La `fecha` y `hora_inicio` se autosetean solas en
   cuanto el atleta carga la primera serie de ese día — no hay paso manual de "registrar" (ese
-  concepto ya no existe). **Usalo
+  concepto ya no existe). La `hora_fin` también se completa sola: es la hora de la última serie
+  completada ese mismo día (si el atleta carga series de un día viejo, no se toca), así que
+  `duracion_min` ≈ primera → última serie, sin contar el warmup previo. **Usalo
   para analizar frecuencia real:** días consecutivos sin descanso, sesiones muy largas, horarios
   irregulares → todas señales de fatiga o adherencia. Ej: 3+ días seguidos o duraciones que se
   alargan progresivamente sugieren bajar volumen o intercalar descanso.

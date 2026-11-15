@@ -212,7 +212,7 @@ bodyweight · trac · ingesta_diaria · settings
 ```
 
 - Cada `program_set` tiene columnas **objetivo** (`target_peso/reps/rpe`, las pone el coach) y **reales** (`real_peso/reps/rpe`, las completa el atleta). `hecha` se deriva sola cuando hay peso + reps.
-- Al completar la primera serie de un día, `fecha` y `hora_inicio` del día se autosetean — no hay paso manual de "registrar sesión". Los días entrenados se derivan directo de `program_sets`.
+- Al completar la primera serie de un día, `fecha` y `hora_inicio` del día se autosetean — no hay paso manual de "registrar sesión". Mientras el día sea hoy, cada serie que pasa a hecha corre `hora_fin` a la hora actual (la de la última serie); editar series de un día viejo no la toca. Los días entrenados se derivan directo de `program_sets`.
 - El e1RM, tonelaje y RIR se calculan en la vista `v_program_sets_e1rm` — nunca se hardcodean en queries ad-hoc. El e1RM proyecta cada serie al fallo con el RPE (reps + (10 − RPE), sin redondear) y la convierte con la tabla RTS de Tuchscherer (interpolando entre filas): e1RM = peso ÷ %1RM. No hay e1RM sin RPE, con RPE < 5 o si proyecta más de 10 reps. `e1rm_confianza` es `alta` con RPE ≥ 7 y `baja` con RPE 5–6,5; las de confianza baja se muestran marcadas pero no cuentan para el mejor e1RM ni la tendencia. **Los e1RM históricos cambiaron** con este método (antes Epley sobre peso × reps, issue #14): la vista recalcula todo el historial.
 - Cascadas `ON DELETE`: borrar una semana borra días → ejercicios → series.
 
