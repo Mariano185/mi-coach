@@ -158,21 +158,25 @@ export function Dashboard() {
 
       <div className="panel">
         <h2>Volumen semanal (series: básicos vs accesorios)</h2>
-        <table>
-          <thead>
-            <tr><th>Semana (ISO)</th><th>Básicos</th><th>Accesorios</th><th>Total</th></tr>
-          </thead>
-          <tbody>
-            {stats.volumen_semanal.map((v) => (
-              <tr key={v.semana}>
-                <td>{v.semana}</td>
-                <td>{v.series_basicos}</td>
-                <td>{v.series_accesorios}</td>
-                <td>{v.series_basicos + v.series_accesorios}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        {/* Scroll interno con header fijo: la tabla suma una fila por semana y no tiene techo.
+            El server la manda ascendente; acá va la más nueva arriba, que es la que se mira. */}
+        <div className="tabla-scroll">
+          <table>
+            <thead>
+              <tr><th>Semana (ISO)</th><th>Básicos</th><th>Accesorios</th><th>Total</th></tr>
+            </thead>
+            <tbody>
+              {[...stats.volumen_semanal].reverse().map((v) => (
+                <tr key={v.semana}>
+                  <td>{v.semana}</td>
+                  <td>{v.series_basicos}</td>
+                  <td>{v.series_accesorios}</td>
+                  <td>{v.series_basicos + v.series_accesorios}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
