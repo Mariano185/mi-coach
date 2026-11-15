@@ -61,7 +61,7 @@ como SPA (static + catch-all fallback). Ver `server/src/index.ts`.
 **Programa estructurado — única fuente de verdad del entrenamiento:**
 - `mesociclos` — `id, nombre, objetivo, notas, fecha_inicio, fecha_fin, orden, fecha_creada`. Agrupa semanas; la numeración de semana se reinicia por mesociclo.
 - `program_weeks` — `id, semana, mesociclo_id→mesociclos, nombre, bloque, notas, fecha_creada, activa`. `UNIQUE(mesociclo_id, semana)`.
-- `program_days` — `id, week_id→weeks, dia, tipo(texto libre opcional), titulo, warmup, notas, fecha, hora_inicio, hora_fin, orden`. `fecha`/`hora_inicio` se autosetean al completar la primera serie del día.
+- `program_days` — `id, week_id→weeks, dia, tipo(texto libre opcional), titulo, warmup, notas, fecha, hora_inicio, hora_fin, orden`. `fecha`/`hora_inicio` se autosetean al completar la primera serie del día; `hora_fin` se corre a la hora de cada serie que pasa a hecha mientras el día sea hoy.
 - `program_exercises` — `id, day_id→days, exercise_id→exercises, nombre_libre, seccion(main|accesorio|core), reps_text, carga_text, rpe_text, notas, orden`.
 - `program_sets` — `id, program_exercise_id→exercises, n_serie, target_reps, target_rpe, target_peso, real_peso, real_reps, real_rpe, hecha, notas`. `hecha` se deriva de peso+reps presentes.
 
@@ -100,6 +100,9 @@ Tabla completa de endpoints en el `README.md` (raíz). Resumen de lo no obvio:
 
 - **`PATCH /program/sets/:id`** — completa/edita `real_*` de una serie; deriva `hecha` y, si
   la serie queda hecha, autosetea `fecha`/`hora_inicio` del día (`COALESCE`, no pisa valores).
+  Si la serie **recién** pasa a hecha y el día es hoy, `hora_fin` = hora actual (= última serie),
+  así sale `duracion_min` en `/coach/analisis`; días viejos o editar una serie ya hecha no la tocan.
+  "Ahora" sale de `ahoraLocal()` en JS (TZ del proceso) para poder fijarlo en tests con fake timers.
   Esto **reemplaza** al viejo botón "Registrar día": no existe más `POST /days/:id/complete`.
 - **`PATCH /program/sets/:id/target`** — el coach corrige la prescripción (`target_*`) sin tocar lo real.
 - **`GET /coach/analisis?dias=42`** — todo lo que el coach necesita en un JSON: e1RM, progresión,
