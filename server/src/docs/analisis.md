@@ -12,6 +12,7 @@ la sección `flujo-semana`.
 | `GET /coach/adherencia` | `?dias=90` | Un patrón de posición necesita varias semanas para no ser ruido de una sesión mala. |
 | `dias_programados` (en `/analisis`) | Mismo `?dias=` que `/analisis` | Ventana propia, contada por `fecha_creada` de la semana, no por `pd.fecha` — ver abajo. |
 | `volumen_por_musculo` (en `/analisis`) | Mismo `?dias=` que `/analisis` | Ventana por `fecha_creada` de la semana de programa (no por semana ISO) — mismo criterio que `dias_programados`, ver abajo. |
+| `peso_corporal` (en `/analisis`) | Mismo `?dias=` que `/analisis` | Por `fecha` calendario del Registro corporal; solo fechas con registro. `pm_7d` se calcula sobre todo el historial antes de recortar. |
 | `ingesta_diaria` (en `/analisis`) | Mismo `?dias=` que `/analisis` | Por `fecha` calendario de la carga (no por semana de programa); solo fechas cargadas. |
 | `pasos_diarios` (en `/analisis`) | Mismo `?dias=` que `/analisis` | Por `fecha` calendario (no por semana de programa); solo fechas que llegaron. |
 | `GET /coach/progresion/:exercise_id` | `?dias=180` (~26 semanas) | Un accesorio se entrena ~1x/semana: 42 días son ~6 sesiones, muy poco para leer una tendencia. |

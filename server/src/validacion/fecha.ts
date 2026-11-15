@@ -1,5 +1,6 @@
-// YYYY-MM-DD y además una fecha real del calendario (rechaza 2026-02-30: Date la
-// "normaliza" a otro día, así que se compara la vuelta).
+// YYYY-MM-DD y además una fecha real del calendario: rechaza 2026-02-30 (Date la
+// "normaliza" a otro día, así que se compara la vuelta). Compartida por las rutas que
+// guardan datos por fecha calendario (Ingesta diaria, Registro corporal).
 export function esFecha(v: unknown): v is string {
   if (typeof v !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return false;
   const d = new Date(`${v}T00:00:00Z`);

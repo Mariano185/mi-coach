@@ -21,6 +21,7 @@ import type {
   ProgresionEjercicio,
   ProgresionEjercicioSerie,
   ProgresionEjercicioSesion,
+  RegistroCorporalAnalisis,
 } from "../types.js";
 
 export const coachRouter = Router();
@@ -102,15 +103,22 @@ function buildAnalisis(dias: number, incluir: Set<BloqueOptIn> = new Set()): Rec
     )
     .all(desde);
 
-  // 4) Tendencia de peso corporal (promedio móvil 7d).
+  // 4) Registro corporal de la ventana (?dias=N): peso con promedio móvil 7d, Perímetros y
+  //    notas. El promedio se calcula sobre TODO el historial y recién después se recorta la
+  //    ventana: así el primer día de la ventana promedia con los registros previos en vez de
+  //    arrancar de cero. Solo fechas con registro (no se rellenan huecos).
   const peso_corporal = db
     .prepare(
-      `SELECT fecha, peso_kg,
-              ROUND(AVG(peso_kg) OVER (ORDER BY fecha ROWS BETWEEN 6 PRECEDING AND CURRENT ROW), 2) AS pm_7d
-       FROM bodyweight
+      `SELECT fecha, peso_kg, pm_7d, brazo_cm, pierna_cm, abdomen_cm, notas
+       FROM (
+         SELECT fecha, peso_kg, brazo_cm, pierna_cm, abdomen_cm, notas,
+                ROUND(AVG(peso_kg) OVER (ORDER BY fecha ROWS BETWEEN 6 PRECEDING AND CURRENT ROW), 2) AS pm_7d
+         FROM registro_corporal
+       )
+       WHERE fecha >= date('now', ?)
        ORDER BY fecha`
     )
-    .all();
+    .all(desde) as RegistroCorporalAnalisis[];
 
   // 5) Volumen semanal POR MÚSCULO, fraccionado, programado vs. completado. Reemplaza
   // al viejo volumen_por_categoria, que agrupaba por un campo que mezclaba implemento,

@@ -8,7 +8,7 @@ import {
   useLocation,
   useNavigate,
 } from "react-router-dom";
-import { Bodyweight } from "./pages/Bodyweight";
+import { Cuerpo } from "./pages/Cuerpo";
 import { Dashboard } from "./pages/Dashboard";
 import { Login } from "./pages/Login";
 import { Nutricion } from "./pages/Nutricion";
@@ -29,7 +29,7 @@ import { hasRecentAuth, setAuthedFlag } from "./authState";
 const NAV: Array<{ to: string; label: string; end?: boolean }> = [
   { to: "/dashboard", label: "Dashboard", end: true },
   { to: "/nutricion", label: "Nutrición", end: true },
-  { to: "/weight", label: "Peso", end: true },
+  { to: "/cuerpo", label: "Cuerpo", end: true },
   { to: "/programs", label: "Programas" },
 ];
 
@@ -168,15 +168,17 @@ export function App() {
           }
         />
         <Route
-          path="/weight"
+          path="/cuerpo"
           element={
             <RequireAuth>
               <RootLayout>
-                <Bodyweight />
+                <Cuerpo />
               </RootLayout>
             </RequireAuth>
           }
         />
+        {/* Ruta vieja de la pestaña "Peso": la PWA instalada puede tenerla guardada. */}
+        <Route path="/weight" element={<Navigate to="/cuerpo" replace />} />
         <Route
           path="/trac"
           element={

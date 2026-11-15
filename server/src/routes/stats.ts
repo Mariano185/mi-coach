@@ -61,7 +61,7 @@ statsRouter.get("/", (_req, res) => {
            ORDER BY fecha
            ROWS BETWEEN 6 PRECEDING AND CURRENT ROW
          ), 2) AS promedio_movil_7d
-       FROM bodyweight
+       FROM registro_corporal
        ORDER BY fecha ASC`
     )
     .all() as WeightTrendPoint[];

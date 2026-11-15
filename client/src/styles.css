@@ -739,6 +739,10 @@ tbody tr:hover { background: var(--panel-2); }
   background: var(--warn);
 }
 
+/* Cuerpo: tres Perímetros en fila, y la ayuda del Protocolo de medición bajo cada campo. */
+.mini-stats.cuerpo-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.field .field-hint { display: block; margin-top: 4px; font-size: 12px; line-height: 1.35; }
+
 /* fecha/horarios de sesión */
 .session-meta-grid {
   display: grid;

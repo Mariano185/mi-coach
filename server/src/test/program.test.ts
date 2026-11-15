@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import request from "supertest";
-import { createTestDb, createTestApp, type TestDb } from "./setup.js";
+import { createTestDb, createTestApp, hoyALas, type TestDb } from "./setup.js";
 
 // La DB se crea aquí y se expone al mock via closure con getter.
 const db: TestDb = createTestDb();
@@ -102,6 +102,68 @@ describe("PATCH /api/program/sets/:id", () => {
     };
     expect(after.fecha).not.toBeNull();
     expect(after.hora_inicio).not.toBeNull();
+  });
+
+  describe("hora_fin automática", () => {
+    function fechaLocal(d: Date): string {
+      const p = (n: number) => String(n).padStart(2, "0");
+      return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+    }
+    const horaDia = (dayId: number) =>
+      db.prepare("SELECT fecha, hora_inicio, hora_fin FROM program_days WHERE id = ?").get(dayId) as {
+        fecha: string | null;
+        hora_inicio: string | null;
+        hora_fin: string | null;
+      };
+
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("completar series de hoy actualiza hora_fin a la última y no pisa hora_inicio", async () => {
+      const { dayId, setIds } = seedWeekWithDay(db);
+
+      vi.setSystemTime(hoyALas(18, 0));
+      await request(app).patch(`/api/program/sets/${setIds[0]}`).set(AUTH).send({ real_peso: 95, real_reps: 5 });
+      expect(horaDia(dayId)).toMatchObject({ hora_inicio: "18:00:00", hora_fin: "18:00:00" });
+
+      vi.setSystemTime(hoyALas(19, 5));
+      await request(app).patch(`/api/program/sets/${setIds[1]}`).set(AUTH).send({ real_peso: 95, real_reps: 5 });
+      expect(horaDia(dayId)).toMatchObject({
+        fecha: fechaLocal(hoyALas(19, 5)),
+        hora_inicio: "18:00:00",
+        hora_fin: "19:05:00",
+      });
+    });
+
+    it("completar o editar una serie de un día anterior no cambia su hora_fin", async () => {
+      const { dayId, setIds } = seedWeekWithDay(db);
+      db.prepare(
+        "UPDATE program_days SET fecha = '2020-01-01', hora_inicio = '10:00:00', hora_fin = '11:00:00' WHERE id = ?"
+      ).run(dayId);
+      db.prepare("UPDATE program_sets SET real_peso = 90, real_reps = 5, hecha = 1 WHERE id = ?").run(setIds[1]);
+
+      vi.setSystemTime(hoyALas(20, 0));
+      await request(app).patch(`/api/program/sets/${setIds[0]}`).set(AUTH).send({ real_peso: 95, real_reps: 5 });
+      await request(app).patch(`/api/program/sets/${setIds[1]}`).set(AUTH).send({ real_rpe: 8 });
+
+      expect(horaDia(dayId)).toMatchObject({ fecha: "2020-01-01", hora_inicio: "10:00:00", hora_fin: "11:00:00" });
+    });
+
+    it("editar el RPE de una serie ya hecha hoy no corre la hora_fin", async () => {
+      const { dayId, setIds } = seedWeekWithDay(db);
+
+      vi.setSystemTime(hoyALas(18, 0));
+      await request(app).patch(`/api/program/sets/${setIds[0]}`).set(AUTH).send({ real_peso: 95, real_reps: 5 });
+
+      vi.setSystemTime(hoyALas(22, 30));
+      await request(app).patch(`/api/program/sets/${setIds[0]}`).set(AUTH).send({ real_rpe: 8 });
+
+      expect(horaDia(dayId).hora_fin).toBe("18:00:00");
+    });
   });
 
   it("no pisa una fecha ya existente (COALESCE es idempotente)", async () => {
