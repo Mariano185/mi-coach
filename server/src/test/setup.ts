@@ -168,6 +168,13 @@ export function createTestDb() {
       creado_en TEXT NOT NULL DEFAULT (datetime('now')),
       actualizado_en TEXT NOT NULL DEFAULT (datetime('now'))
     );
+    CREATE TABLE IF NOT EXISTS pasos_diarios (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      fecha TEXT UNIQUE NOT NULL,
+      pasos INTEGER NOT NULL CHECK (pasos >= 0),
+      creado_en TEXT NOT NULL DEFAULT (datetime('now')),
+      actualizado_en TEXT NOT NULL DEFAULT (datetime('now'))
+    );
     CREATE VIEW IF NOT EXISTS v_volumen_por_musculo AS
       SELECT
         (SELECT MIN(strftime('%Y-%W', pd2.fecha))
@@ -246,6 +253,7 @@ export async function createTestApp(db: TestDb) {
   const { nutricionRouter } = await import("../routes/nutricion.js");
   const { mesociclosRouter } = await import("../routes/mesociclos.js");
   const { catalogoRouter } = await import("../routes/catalogo.js");
+  const { pasosRouter } = await import("../routes/pasos.js");
 
   const app = express();
   app.use(cors({ origin: true, credentials: true }));
@@ -267,6 +275,7 @@ export async function createTestApp(db: TestDb) {
   app.use("/api/trac", tracRouter);
   app.use("/api/ingesta", ingestaRouter);
   app.use("/api/nutricion", nutricionRouter);
+  app.use("/api/pasos", pasosRouter);
   app.use("/api/mesociclos", mesociclosRouter);
   app.use("/api", catalogoRouter);
 
@@ -280,6 +289,7 @@ export async function createTestApp(db: TestDb) {
       ...rutasDelRouter("/api/coach", coachRouter),
       ...rutasDelRouter("/api/ingesta", ingestaRouter),
       ...rutasDelRouter("/api/nutricion", nutricionRouter),
+      ...rutasDelRouter("/api/pasos", pasosRouter),
       ...rutasDelRouter("/api", catalogoRouter),
     ].sort((a, b) => a.ruta.localeCompare(b.ruta) || a.metodo.localeCompare(b.metodo))
   );

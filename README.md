@@ -132,7 +132,7 @@ El coach es una caja negra que solo habla HTTP. El ciclo típico:
      -H "X-Coach-Key: $COACH_API_KEY"
    ```
 
-   Devuelve en un JSON: mejor e1RM por básico, progresión por carga (`progresion_basicos`: una fila por combinación `nombre`/`fecha`/`peso_kg`/`reps`/RPE, con `e1rm`, `e1rm_confianza` y `n_series` — top set y back-off del mismo día, o la misma carga a RPE distinto, quedan como filas separadas, cada una con su propio e1RM) y RPE promedio en la ventana (`?dias=42` por default), tendencia de peso corporal, volumen por músculo y semana de programa (fraccionado por rol; `series_programadas` vs. `series_completadas`, con `semana_programa`/`mesociclo_id`/`week_id` — agrupa por semana de programa, no por semana ISO, que mezcla semanas de programa distintas), sesiones realizadas (frecuencia/duración, con `notas_coach` y `notas_atleta` por separado), el Trac de la ventana (`trac_reciente`: una fila por fecha, hoy y los N días anteriores, con huecos en null; incluye `sueno`), la Ingesta diaria de la ventana (`ingesta_diaria`: solo fechas cargadas, una fecha sin carga no aparece como 0), los mesociclos con su última semana, y `dias_programados` (series programadas vs. completadas por día, incluyendo días nunca entrenados — a diferencia del resto de los bloques, que solo ven lo ya entrenado). **Límite conocido de `dias_programados`:** un día no entrenado y un día entrenado pero nunca cargado en la app se ven idénticos (`series_completadas: 0`); distinguirlos requeriría una columna nueva y está fuera de alcance.
+   Devuelve en un JSON: mejor e1RM por básico, progresión por carga (`progresion_basicos`: una fila por combinación `nombre`/`fecha`/`peso_kg`/`reps`/RPE, con `e1rm`, `e1rm_confianza` y `n_series` — top set y back-off del mismo día, o la misma carga a RPE distinto, quedan como filas separadas, cada una con su propio e1RM) y RPE promedio en la ventana (`?dias=42` por default), tendencia de peso corporal, volumen por músculo y semana de programa (fraccionado por rol; `series_programadas` vs. `series_completadas`, con `semana_programa`/`mesociclo_id`/`week_id` — agrupa por semana de programa, no por semana ISO, que mezcla semanas de programa distintas), sesiones realizadas (frecuencia/duración, con `notas_coach` y `notas_atleta` por separado), el Trac de la ventana (`trac_reciente`: una fila por fecha, hoy y los N días anteriores, con huecos en null; incluye `sueno`), la Ingesta diaria de la ventana (`ingesta_diaria`: solo fechas cargadas, una fecha sin carga no aparece como 0), los Pasos diarios de la ventana (`pasos_diarios`: solo fechas que llegaron del atajo de iOS), los mesociclos con su última semana, y `dias_programados` (series programadas vs. completadas por día, incluyendo días nunca entrenados — a diferencia del resto de los bloques, que solo ven lo ya entrenado). **Límite conocido de `dias_programados`:** un día no entrenado y un día entrenado pero nunca cargado en la app se ven idénticos (`series_completadas: 0`); distinguirlos requeriría una columna nueva y está fuera de alcance.
 
    La library completa de ejercicios (`ejercicios`) es **opt-in**: no viaja por defecto (pesa ~55% del payload, 148 ejercicios cuando una semana usa 6-7) — pedila con `?incluir=ejercicios`, o consultá `GET /api/exercises` directamente. También es opt-in `accesorios` (`?incluir=accesorios`): las series hechas `[reps, peso, rpe]` de cada ejercicio sin e1RM, sesión por sesión, para seguir la doble progresión. `generado.analisis_bloques` de `GET /api/coach/docs` marca `opt_in: true` en los bloques que hay que pedir así.
 
@@ -189,9 +189,9 @@ mi-coach/
 ├── server/src/
 │   ├── db.ts               esquema, migraciones idempotentes, seed
 │   ├── index.ts            arranque Express, guard de auth, static SPA
-│   ├── auth.ts             login por password + X-Coach-Key
+│   ├── auth.ts             login por password + X-Coach-Key + X-Device-Key
 │   ├── routes/             exercises · bodyweight · program · mesociclos
-│   │                       stats · coach · trac · ingesta
+│   │                       stats · coach · trac · ingesta · pasos
 │   └── test/               tests de API (vitest + supertest)
 ├── client/src/
 │   ├── App.tsx             router + SWRConfig + guard de login
@@ -200,7 +200,7 @@ mi-coach/
 │   ├── pages/              Dashboard · Nutricion · Bodyweight · Programs · Trac · Login
 │   └── pages/program/      WeekView · DayView · ExerciseView
 ├── client/public/          favicon, íconos PWA, manifest
-└── docs/deploy/            systemd service + guía de deploy + Tailscale opcional
+└── docs/deploy/            systemd service + guía de deploy + Tailscale opcional + atajo de pasos
 ```
 
 ## Modelo de datos
@@ -208,7 +208,7 @@ mi-coach/
 ```
 mesociclos ─< program_weeks ─< program_days ─< program_exercises ─< program_sets
 exercises (library) ──────────────────────────┘
-bodyweight · trac · ingesta_diaria · settings
+bodyweight · trac · ingesta_diaria · pasos_diarios · settings
 ```
 
 - Cada `program_set` tiene columnas **objetivo** (`target_peso/reps/rpe`, las pone el coach) y **reales** (`real_peso/reps/rpe`, las completa el atleta). `hecha` se deriva sola cuando hay peso + reps.
@@ -231,7 +231,8 @@ Todas las rutas (salvo las públicas) requieren cookie de sesión o header `X-Co
 | GET | `/api/stats` | e1RM por básico, tendencia de peso, volumen semanal |
 | GET/PUT | `/api/trac` | bienestar diario (upsert por fecha) |
 | GET/PUT | `/api/ingesta?fecha=` · `?desde=&hasta=` | Ingesta diaria: una fecha (o `null`), un rango (solo fechas cargadas), upsert por fecha con kcal/proteína/carbos/grasas obligatorios |
-| GET | `/api/nutricion/dia?fecha=` | vista del día de Nutrición: Ingesta diaria + Objetivo nutricional vigente con su nota (ADR 0003) |
+| GET | `/api/nutricion/dia?fecha=` | vista del día de Nutrición: Ingesta diaria + Objetivo nutricional vigente con su nota (ADR 0003) + Pasos diarios (o `null`) |
+| PUT | `/api/pasos` | Pasos diarios `{fecha, pasos}`, upsert por fecha. Acepta sesión, `X-Coach-Key` o `X-Device-Key` (la clave del atajo de iOS, que solo vale acá). Ver `docs/deploy/ATAJO-PASOS.md` |
 | GET/POST/PATCH/DELETE | `/api/mesociclos` · `/:id` | CRUD de mesociclos |
 | GET | `/api/program/weeks?mesociclo_id=` | listar semanas |
 | POST | `/api/program/weeks` | crear semana estructurada completa (uso del coach), con Objetivo nutricional opcional (`objetivo_kcal/_proteina_g/_carbohidratos_g/_grasas_g`, los cuatro juntos, + `nota_nutricional`, `objetivos_pautados_en`) |

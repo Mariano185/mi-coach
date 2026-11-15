@@ -173,6 +173,17 @@ function migrate(): void {
       actualizado_en  TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
+    -- Pasos diarios: total de pasos de una fecha calendario según Apple Health, enviado
+    -- por un atajo de iOS al empezar el día siguiente. Una fila por fecha (upsert): un
+    -- envío nuevo la corrige. Una fecha sin fila es "no llegó", nunca "0 pasos".
+    CREATE TABLE IF NOT EXISTS pasos_diarios (
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      fecha           TEXT UNIQUE NOT NULL,
+      pasos           INTEGER NOT NULL CHECK (pasos >= 0),
+      creado_en       TEXT NOT NULL DEFAULT (datetime('now')),
+      actualizado_en  TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
   `);
 
   // Columnas nuevas en tablas ya desplegadas (idempotente: ignorar si ya existen).

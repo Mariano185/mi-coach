@@ -73,6 +73,15 @@ describe("GET /api/coach/docs", () => {
     expect(md).not.toMatch(/últimos 7 días fijos/);
   });
 
+  it("la sección analisis describe el bloque pasos_diarios: ventana ?dias=N y sin envío no es cero (issue #24)", async () => {
+    const res = await request(app).get("/api/coach/docs?seccion=analisis").set(AUTH);
+    const md = res.body.secciones[0].markdown as string;
+    expect(md).toContain("`pasos_diarios`");
+    expect(md).toMatch(/Pasos diarios/);
+    expect(md).toMatch(/fecha del día que terminó/);
+    expect(md).toMatch(/no llegó/);
+  });
+
   it("?seccion=<inexistente> devuelve 404", async () => {
     const res = await request(app).get("/api/coach/docs?seccion=no-existe").set(AUTH);
     expect(res.status).toBe(404);

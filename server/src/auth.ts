@@ -15,13 +15,20 @@ const PASSWORD_KEY = "auth_password_hash";
 const SECRET_KEY = "auth_session_secret";
 const COACH_KEY = "coach_api_key";
 const COACH_HEADER = "x-coach-key";
+const DEVICE_KEY = "device_api_key";
+const DEVICE_HEADER = "x-device-key";
+
+// Lo único que la clave del dispositivo (el atajo de iOS) puede hacer: cargar Pasos
+// diarios. Cualquier otro método o ruta con esa clave cae al chequeo de cookie → 401.
+const RUTA_DISPOSITIVO = { metodo: "PUT", ruta: "/api/pasos" } as const;
 
 // Bootstrap: si no hay hash en DB pero hay AUTH_PASSWORD en env, hashearlo.
 // (Single-user: una sola fuente de verdad — el hash en DB. El env var es solo
 //  el "seed" para la primera corrida.)
 export function bootstrapAuth(): void {
-  // Asegurar el coach key desde el arranque (lo imprime una vez si lo genera).
+  // Asegurar las claves desde el arranque (cada una se imprime una vez si se genera).
   getCoachKey();
+  getDeviceKey();
   if (getSetting(PASSWORD_KEY)) return;
   const envPwd = process.env.AUTH_PASSWORD;
   if (!envPwd) {
@@ -58,10 +65,22 @@ export function getCoachKey(): string {
   return k;
 }
 
-// Compara el header del coach contra el key en tiempo constante.
-function coachKeyMatches(header: unknown): boolean {
+// Clave del dispositivo: la usa el atajo de iOS que manda los Pasos diarios (header
+// X-Device-Key). Mismo ciclo de vida que la del coach, pero solo autoriza
+// RUTA_DISPOSITIVO: si se filtra desde el teléfono, no da acceso al resto de los datos.
+export function getDeviceKey(): string {
+  let k = getSetting(DEVICE_KEY);
+  if (!k) {
+    k = randomBytes(24).toString("hex");
+    setSetting(DEVICE_KEY, k);
+    console.log(`[auth] device_api_key generado: ${k}`);
+  }
+  return k;
+}
+
+// Compara un header contra la clave esperada en tiempo constante.
+function claveCoincide(header: unknown, expected: string): boolean {
   if (typeof header !== "string" || !header) return false;
-  const expected = getCoachKey();
   const a = Buffer.from(header);
   const b = Buffer.from(expected);
   if (a.length !== b.length) return false;
@@ -70,6 +89,12 @@ function coachKeyMatches(header: unknown): boolean {
   } catch {
     return false;
   }
+}
+
+function esRutaDispositivo(req: Request): boolean {
+  // originalUrl (no req.path): no depende de dónde esté montado el guard.
+  const ruta = req.originalUrl.split("?")[0].replace(/\/+$/, "");
+  return req.method === RUTA_DISPOSITIVO.metodo && ruta === RUTA_DISPOSITIVO.ruta;
 }
 
 // Token = sessionId + "." + HMAC(secret, sessionId).
@@ -100,7 +125,12 @@ export function isAuthConfigured(): boolean {
 
 export function requireAuth(req: Request, res: Response, next: NextFunction): void {
   // Vía coach (caja negra): header X-Coach-Key. Bypassa el login de browser.
-  if (coachKeyMatches(req.headers[COACH_HEADER])) {
+  if (claveCoincide(req.headers[COACH_HEADER], getCoachKey())) {
+    next();
+    return;
+  }
+  // Vía atajo de iOS: header X-Device-Key, solo para cargar Pasos diarios.
+  if (esRutaDispositivo(req) && claveCoincide(req.headers[DEVICE_HEADER], getDeviceKey())) {
     next();
     return;
   }

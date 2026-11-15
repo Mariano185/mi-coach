@@ -112,6 +112,7 @@ export function Nutricion() {
   });
   const ingesta = dia?.ingesta;
   const objetivo = dia?.objetivo ?? null;
+  const pasos = dia?.pasos ?? null;
 
   const [form, setForm] = useState<Form>(FORM_VACIO);
   const [comentario, setComentario] = useState("");
@@ -141,7 +142,7 @@ export function Nutricion() {
     setSaving(true);
     try {
       const guardada = await api.upsertIngesta(input);
-      await mutate({ fecha, objetivo, ingesta: guardada }, { revalidate: false });
+      await mutate({ fecha, objetivo, pasos, ingesta: guardada }, { revalidate: false });
       show(ingesta ? "Ingesta corregida ✓" : "Ingesta guardada ✓");
     } catch (e) {
       show((e as Error).message, "err");
@@ -197,6 +198,25 @@ export function Nutricion() {
           </>
         ) : (
           <p className="muted">{isLoading ? "Cargando…" : "Sin ingesta para esta fecha."}</p>
+        )}
+
+        {/* Solo lectura: los manda el atajo de iOS a la madrugada siguiente. */}
+        <p className="sec-label">Pasos diarios</p>
+        {pasos ? (
+          <div className="mini-stats">
+            <div className="ms">
+              <div className="k">Pasos</div>
+              <div className="v">{pasos.pasos.toLocaleString("es-AR")}</div>
+            </div>
+          </div>
+        ) : (
+          !isLoading && (
+            <p className="muted" style={{ fontSize: 13, marginTop: 0 }}>
+              {esHoy
+                ? "Los pasos de hoy llegan solos desde el iPhone después de medianoche."
+                : "No llegaron pasos para esta fecha."}
+            </p>
+          )
         )}
       </div>
 
