@@ -2,14 +2,14 @@
 
 App **single-user, local-first** para programar y registrar entrenamientos de powerbuilding.
 
-La idea central: un **coach** prescribe semanas estructuradas (mesociclo → semana → día → ejercicio → serie con objetivos de peso/reps/RPE) a través de la API, y el **atleta** completa los valores reales de cada serie desde la UI web (instalable como PWA en el celular). Historial, dashboard y análisis salen de esos mismos datos — sin doble carga.
+La idea central: un **coach** prescribe semanas estructuradas (mesociclo → semana → día → ejercicio → serie con objetivos de peso/reps/RPE) a través de la API, y el **atleta** completa los valores reales de cada serie desde la UI web (instalable como PWA en el celular). Los días entrenados, el dashboard y el análisis salen de esos mismos datos — sin doble carga.
 
 El coach puede ser **cualquier agente de IA** (Claude, ChatGPT, Gemini, un script propio…) o un humano con `curl`: solo necesita hacer requests HTTP con una API key. La app no depende de ningún proveedor de IA.
 
 ## Features
 
 - **Programa estructurado** con drill-down semana → día → ejercicio, tabs Objetivo/Real por serie, autosave con indicador de sincronización.
-- **Historial** derivado automáticamente: un día aparece en el historial apenas completás la primera serie (fecha y hora se autosetean).
+- **Días entrenados** derivados automáticamente: un día cuenta como entrenado apenas completás la primera serie (fecha y hora se autosetean). Se consultan en Programas (semana → día → ejercicio).
 - **Dashboard** con e1RM estimado por básico (serie proyectada al fallo con el RPE + tabla RTS), tendencia de peso corporal (promedio móvil 7 días) y volumen semanal.
 - **Peso / Nutrición**: registro de peso corporal, kcal objetivo, proteína, hambre y digestión.
 - **Trac**: tracker diario de bienestar/recuperación (fatiga por patrón, descanso, motivación, técnica) en escala 1–5.
@@ -189,14 +189,14 @@ mi-coach/
 │   ├── db.ts               esquema, migraciones idempotentes, seed
 │   ├── index.ts            arranque Express, guard de auth, static SPA
 │   ├── auth.ts             login por password + X-Coach-Key
-│   ├── routes/             exercises · bodyweight · program · history
-│   │                       mesociclos · stats · coach · trac
+│   ├── routes/             exercises · bodyweight · program · mesociclos
+│   │                       stats · coach · trac
 │   └── test/               tests de API (vitest + supertest)
 ├── client/src/
 │   ├── App.tsx             router + SWRConfig + guard de login
 │   ├── api.ts              cliente HTTP tipado
 │   ├── swr.ts              swrFetcher, swrKeys, swrConfig
-│   ├── pages/              Dashboard · History · Bodyweight · Programs · Trac · Login
+│   ├── pages/              Dashboard · Bodyweight · Programs · Trac · Login
 │   └── pages/program/      WeekView · DayView · ExerciseView
 ├── client/public/          favicon, íconos PWA, manifest
 └── docs/deploy/            systemd service + guía de deploy + Tailscale opcional
@@ -211,7 +211,7 @@ bodyweight · trac · settings
 ```
 
 - Cada `program_set` tiene columnas **objetivo** (`target_peso/reps/rpe`, las pone el coach) y **reales** (`real_peso/reps/rpe`, las completa el atleta). `hecha` se deriva sola cuando hay peso + reps.
-- Al completar la primera serie de un día, `fecha` y `hora_inicio` del día se autosetean — no hay paso manual de "registrar sesión". El historial (`/api/history`) se deriva directo de `program_sets`.
+- Al completar la primera serie de un día, `fecha` y `hora_inicio` del día se autosetean — no hay paso manual de "registrar sesión". Los días entrenados se derivan directo de `program_sets`.
 - El e1RM, tonelaje y RIR se calculan en la vista `v_program_sets_e1rm` — nunca se hardcodean en queries ad-hoc. El e1RM proyecta cada serie al fallo con el RPE (reps + (10 − RPE), sin redondear) y la convierte con la tabla RTS de Tuchscherer (interpolando entre filas): e1RM = peso ÷ %1RM. No hay e1RM sin RPE, con RPE < 5 o si proyecta más de 10 reps. `e1rm_confianza` es `alta` con RPE ≥ 7 y `baja` con RPE 5–6,5; las de confianza baja se muestran marcadas pero no cuentan para el mejor e1RM ni la tendencia. **Los e1RM históricos cambiaron** con este método (antes Epley sobre peso × reps, issue #14): la vista recalcula todo el historial.
 - Cascadas `ON DELETE`: borrar una semana borra días → ejercicios → series.
 
@@ -228,7 +228,6 @@ Todas las rutas (salvo las públicas) requieren cookie de sesión o header `X-Co
 | GET | `/api/musculos` · `/api/patrones` | catálogo canónico de la enciclopedia (solo lectura) |
 | GET/POST | `/api/bodyweight` | peso corporal + nutrición |
 | GET | `/api/stats` | e1RM por básico, tendencia de peso, volumen semanal |
-| GET | `/api/history` · `/api/history/:dayId` | días entrenados + series reales con e1RM |
 | GET/PUT | `/api/trac` | bienestar diario (upsert por fecha) |
 | GET/POST/PATCH/DELETE | `/api/mesociclos` · `/:id` | CRUD de mesociclos |
 | GET | `/api/program/weeks?mesociclo_id=` | listar semanas |

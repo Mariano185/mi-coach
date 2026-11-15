@@ -442,7 +442,7 @@ coachRouter.get("/progresion/:exercise_id", (req, res) => {
   // El triple filtro es redundante SOLO en apariencia: hecha=1 no implica peso+reps.
   // PATCH /program/sets/:id acepta `hecha` explícito en el body, que cortocircuita la
   // derivación automática (ver program.ts) — así queda una serie hecha=1 sin valores,
-  // que sumaría a n_series sin aportar e1RM ni tonelaje. Mismo criterio que history.ts.
+  // que sumaría a n_series sin aportar e1RM ni tonelaje.
   //
   // pd.fecha IS NOT NULL: en el flujo de la API una serie completada siempre autosetea
   // la fecha del día, pero una inserción directa (seed, migración, fixture) puede dejar
@@ -496,8 +496,7 @@ coachRouter.get("/progresion/:exercise_id", (req, res) => {
 
   // Segunda query en vez de agrupar filas planas en JS: así los máximos y las sumas los
   // calcula SQLite sobre v_program_sets_e1rm y el JS solo reasocia por fecha, sin hacer
-  // aritmética de e1RM/tonelaje a mano (convención del proyecto). Mismo patrón de dos
-  // queries + composición que GET /api/history/:dayId.
+  // aritmética de e1RM/tonelaje a mano (convención del proyecto).
   const series = db
     .prepare(
       `SELECT pd.fecha, pd.id AS day_id, v.n_serie,

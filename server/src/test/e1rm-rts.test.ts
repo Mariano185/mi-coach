@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import request from "supertest";
 import { createTestDb, createTestApp, type TestDb } from "./setup.js";
+import type { E1rmConfianza } from "../types.js";
 
 // e1RM proyectado con RPE (tabla RTS) y confianza del e1RM — issue #14, ADR 0002.
 // Los números esperados salen de los criterios de aceptación de la issue, no de una
@@ -51,7 +52,8 @@ function seedDia(fecha: string, series: Array<[number, number, number | null]>):
   return dayId;
 }
 
-type SerieHistorial = { n_serie: number; e1rm: number | null; e1rm_confianza: "alta" | "baja" | null };
+// Forma de cada serie en GET /program/exercises/:id (filas de v_program_sets_e1rm).
+type SerieConE1rm = { n_serie: number; e1rm: number | null; e1rm_confianza: E1rmConfianza | null; rir: number | null };
 
 describe("e1RM con RPE (tabla RTS)", () => {
   let app: Awaited<ReturnType<typeof createTestApp>>;
@@ -61,11 +63,12 @@ describe("e1RM con RPE (tabla RTS)", () => {
     app = await createTestApp(db);
   });
 
-  async function seriesDe(series: Array<[number, number, number | null]>): Promise<SerieHistorial[]> {
+  async function seriesDe(series: Array<[number, number, number | null]>): Promise<SerieConE1rm[]> {
     const dayId = seedDia("2026-01-10", series);
-    const res = await request(app).get(`/api/history/${dayId}`).set(AUTH);
+    const peId = (db.prepare("SELECT id FROM program_exercises WHERE day_id = ?").get(dayId) as { id: number }).id;
+    const res = await request(app).get(`/api/program/exercises/${peId}`).set(AUTH);
     expect(res.status).toBe(200);
-    return res.body.sets as SerieHistorial[];
+    return res.body.sets as SerieConE1rm[];
   }
 
   it.each([
@@ -91,18 +94,14 @@ describe("e1RM con RPE (tabla RTS)", () => {
     expect(s.e1rm_confianza).toBeNull();
   });
 
+  it("expone el RIR de la serie (10 − RPE, redondeado)", async () => {
+    const [s] = await seriesDe([[100, 5, 7]]);
+    expect(s.rir).toBe(3);
+  });
+
   it("10 reps proyectadas exactas todavía tienen e1RM (el tope es > 10)", async () => {
     const [s] = await seriesDe([[73.9, 8, 8]]);
     expect(s.e1rm).toBe(100);
-  });
-
-  it("GET /program/exercises/:id también expone e1rm_confianza por serie", async () => {
-    const dayId = seedDia("2026-01-10", [[80, 4, 6]]);
-    const peId = (db.prepare("SELECT id FROM program_exercises WHERE day_id = ?").get(dayId) as { id: number }).id;
-    const res = await request(app).get(`/api/program/exercises/${peId}`).set(AUTH);
-    expect(res.status).toBe(200);
-    expect(res.body.sets[0].e1rm).toBe(101.8);
-    expect(res.body.sets[0].e1rm_confianza).toBe("baja");
   });
 
   describe("una serie de confianza baja no entra en el mejor e1RM", () => {
@@ -151,7 +150,7 @@ describe("e1RM con RPE (tabla RTS)", () => {
       expect(res.status).toBe(200);
       const [sesion] = res.body.sesiones;
       expect(sesion.mejor_e1rm).toBe(95.6);
-      expect(sesion.series.map((s: SerieHistorial) => s.e1rm_confianza)).toEqual(["baja", "alta"]);
+      expect(sesion.series.map((s: SerieConE1rm) => s.e1rm_confianza)).toEqual(["baja", "alta"]);
     });
 
     it("/coach/progresion: una sesión sin ninguna serie de confianza alta tiene mejor_e1rm null", async () => {

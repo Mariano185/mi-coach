@@ -221,7 +221,6 @@ function rutasDelRouter(prefijo: string, router: any): Array<{ metodo: string; r
 export async function createTestApp(db: TestDb) {
   // Importar los routers después de que vi.mock haya reemplazado db.
   const { programRouter } = await import("../routes/program.js");
-  const { historyRouter } = await import("../routes/history.js");
   const { statsRouter } = await import("../routes/stats.js");
   const { coachRouter, setEndpointsCoach } = await import("../routes/coach.js");
   const { exercisesRouter } = await import("../routes/exercises.js");
@@ -243,7 +242,6 @@ export async function createTestApp(db: TestDb) {
   });
 
   app.use("/api/program", programRouter);
-  app.use("/api/history", historyRouter);
   app.use("/api/stats", statsRouter);
   app.use("/api/coach", coachRouter);
   app.use("/api/exercises", exercisesRouter);

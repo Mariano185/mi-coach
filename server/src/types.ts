@@ -417,33 +417,6 @@ export interface Stats {
   volumen_semanal: WeeklyVolume[];
 }
 
-// === Historial (reemplaza sessions/sets — lee directo de program_sets) ===
-export interface HistoryDay {
-  day_id: number;
-  fecha: string;
-  semana: number;
-  dia: number;
-  tipo: string | null;
-  titulo: string | null;
-  hora_inicio: string | null;
-  hora_fin: string | null;
-  n_series: number;
-}
-
-export interface HistoryDayDetail extends HistoryDay {
-  sets: Array<{
-    exercise_id: number | null;
-    exercise_nombre: string;
-    n_serie: number;
-    real_peso: number;
-    real_reps: number;
-    real_rpe: number | null;
-    rir: number | null;
-    e1rm: number | null;
-    e1rm_confianza: E1rmConfianza | null;
-  }>;
-}
-
 // === Coach (adherencia) ===
 export interface AdherenciaPorPosicion {
   posicion: number;

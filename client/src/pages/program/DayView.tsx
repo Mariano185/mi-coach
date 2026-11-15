@@ -211,7 +211,7 @@ export function DayView() {
           </div>
           <div style={{ fontFamily: "var(--font-display)", fontSize: 22, fontWeight: 700 }}>
             {progreso.hechas} / {progreso.total} series
-            {progreso.hechas > 0 ? <span className="done-chip" style={{ marginLeft: 12 }}>✓ en historial</span> : null}
+            {progreso.hechas > 0 ? <span className="done-chip" style={{ marginLeft: 12 }}>✓ entrenado</span> : null}
           </div>
         </div>
       </div>
