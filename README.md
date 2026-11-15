@@ -12,7 +12,7 @@ El coach puede ser **cualquier agente de IA** (Claude, ChatGPT, Gemini, un scrip
 - **Días entrenados** derivados automáticamente: un día cuenta como entrenado apenas completás la primera serie (fecha y hora se autosetean). Se consultan en Programas (semana → día → ejercicio).
 - **Dashboard** con e1RM estimado por básico (serie proyectada al fallo con el RPE + tabla RTS), tendencia de peso corporal (promedio móvil 7 días) y volumen semanal.
 - **Peso**: registro de peso corporal (todavía con los campos viejos de kcal objetivo, proteína, hambre y digestión, que se van cuando la pestaña pase a ser Cuerpo).
-- **Nutrición**: carga de la Ingesta diaria (kcal, proteína, carbohidratos y grasas que da MyFitnessPal al cerrar el día, más un comentario opcional), una por fecha.
+- **Nutrición**: carga de la Ingesta diaria (kcal, proteína, carbohidratos y grasas que da MyFitnessPal al cerrar el día, más un comentario opcional), una por fecha. Arriba, el Objetivo nutricional que pautó el coach para esa fecha, con su nota y cuatro barras animadas (cargado / objetivo, marcadas al pasarse).
 - **Trac**: tracker diario de bienestar/recuperación (fatiga por patrón, sueño, motivación, técnica) en escala 1–5.
 - **Mesociclos**: agrupador de semanas con numeración propia por bloque.
 - **Endpoint de análisis para el coach** (`/api/coach/analisis`): progresión de e1RM, RPE, volumen, frecuencia y bienestar en un solo JSON.
@@ -212,7 +212,7 @@ registro_corporal · trac · ingesta_diaria · settings
 ```
 
 - Cada `program_set` tiene columnas **objetivo** (`target_peso/reps/rpe`, las pone el coach) y **reales** (`real_peso/reps/rpe`, las completa el atleta). `hecha` se deriva sola cuando hay peso + reps.
-- Al completar la primera serie de un día, `fecha` y `hora_inicio` del día se autosetean — no hay paso manual de "registrar sesión". Los días entrenados se derivan directo de `program_sets`.
+- Al completar la primera serie de un día, `fecha` y `hora_inicio` del día se autosetean — no hay paso manual de "registrar sesión". Mientras el día sea hoy, cada serie que pasa a hecha corre `hora_fin` a la hora actual (la de la última serie); editar series de un día viejo no la toca. Los días entrenados se derivan directo de `program_sets`.
 - El e1RM, tonelaje y RIR se calculan en la vista `v_program_sets_e1rm` — nunca se hardcodean en queries ad-hoc. El e1RM proyecta cada serie al fallo con el RPE (reps + (10 − RPE), sin redondear) y la convierte con la tabla RTS de Tuchscherer (interpolando entre filas): e1RM = peso ÷ %1RM. No hay e1RM sin RPE, con RPE < 5 o si proyecta más de 10 reps. `e1rm_confianza` es `alta` con RPE ≥ 7 y `baja` con RPE 5–6,5; las de confianza baja se muestran marcadas pero no cuentan para el mejor e1RM ni la tendencia. **Los e1RM históricos cambiaron** con este método (antes Epley sobre peso × reps, issue #14): la vista recalcula todo el historial.
 - Cascadas `ON DELETE`: borrar una semana borra días → ejercicios → series.
 
@@ -231,10 +231,11 @@ Todas las rutas (salvo las públicas) requieren cookie de sesión o header `X-Co
 | GET | `/api/stats` | e1RM por básico, tendencia de peso, volumen semanal |
 | GET/PUT | `/api/trac` | bienestar diario (upsert por fecha) |
 | GET/PUT | `/api/ingesta?fecha=` · `?desde=&hasta=` | Ingesta diaria: una fecha (o `null`), un rango (solo fechas cargadas), upsert por fecha con kcal/proteína/carbos/grasas obligatorios |
+| GET | `/api/nutricion/dia?fecha=` | vista del día de Nutrición: Ingesta diaria + Objetivo nutricional vigente con su nota (ADR 0003) |
 | GET/POST/PATCH/DELETE | `/api/mesociclos` · `/:id` | CRUD de mesociclos |
 | GET | `/api/program/weeks?mesociclo_id=` | listar semanas |
-| POST | `/api/program/weeks` | crear semana estructurada completa (uso del coach) |
-| GET/PATCH/DELETE | `/api/program/weeks/:id` | semana + días / editar / borrar |
+| POST | `/api/program/weeks` | crear semana estructurada completa (uso del coach), con Objetivo nutricional opcional (`objetivo_kcal/_proteina_g/_carbohidratos_g/_grasas_g`, los cuatro juntos, + `nota_nutricional`, `objetivos_pautados_en`) |
+| GET/PATCH/DELETE | `/api/program/weeks/:id` | semana + días / editar (también el Objetivo nutricional; corregirlo no mueve `objetivos_pautados_en`) / borrar |
 | GET/PATCH | `/api/program/days/:id` | día + ejercicios / editar metadata (título, fecha, horarios, notas del coach, notas del atleta) |
 | POST | `/api/program/days/:id/exercises` | agregar ejercicio (con series) a un día |
 | GET/PATCH/DELETE | `/api/program/exercises/:id` | ejercicio + series / swap-editar / borrar |

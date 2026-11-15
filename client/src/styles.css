@@ -691,6 +691,54 @@ tbody tr:hover { background: var(--panel-2); }
   .mini-stats.ingesta-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
+/* Nutrición: Objetivo nutricional del coach + una barra por valor (cargado / objetivo) */
+.objetivo-nutri {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  margin-bottom: 18px;
+}
+.objetivo-nutri .sec-label { margin-top: 0; }
+.objetivo-nutri .coach-notes { margin-bottom: 12px; }
+.barras-nutri { display: flex; flex-direction: column; gap: 14px; }
+.barra-nutri-cab {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.barra-nutri-label { font-size: 12px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); }
+.barra-nutri-num { font-variant-numeric: tabular-nums; font-size: 14px; color: var(--muted); white-space: nowrap; }
+.barra-nutri-num strong { font-family: var(--font-display); font-size: 18px; color: var(--text); }
+.barra-nutri-num .u { font-size: 12px; }
+.barra-nutri-track {
+  height: 10px;
+  background: var(--panel-3);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.barra-nutri-fill {
+  height: 100%;
+  width: 0;
+  background: var(--lime);
+  border-radius: inherit;
+  transition: width 0.9s cubic-bezier(0.22, 1, 0.36, 1);
+}
+/* Pasarse del objetivo: barra en ámbar + el exceso en números (no solo color). */
+.barra-nutri.excedida .barra-nutri-fill { background: var(--warn); }
+.barra-nutri.excedida .barra-nutri-num strong { color: var(--warn); }
+.barra-nutri-exceso {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--bg);
+  background: var(--warn);
+}
+
 /* Cuerpo: tres Perímetros en fila, y la ayuda del Protocolo de medición bajo cada campo. */
 .mini-stats.cuerpo-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
 .field .field-hint { display: block; margin-top: 4px; font-size: 12px; line-height: 1.35; }

@@ -1,5 +1,7 @@
 import { Router } from "express";
 import { db } from "../db.js";
+import { hoyLocal } from "../calendario.js";
+import { validarObjetivo } from "../validacion/objetivo-nutricional.js";
 import type {
   NewProgramWeekInput,
   ProgramDay,
@@ -18,6 +20,17 @@ export const programRouter = Router();
 
 // Nombre visible de un program_exercise: el de la tabla exercises, o el libre.
 const EX_NAME_SQL = "COALESCE(e.nombre, pe.nombre_libre)";
+
+// Fecha (YYYY-MM-DD) y hora (HH:MM:SS) locales del server, mismo formato que
+// date()/time() de SQLite con 'localtime'. Se calcula en JS para poder controlarla en tests.
+function ahoraLocal(): { fecha: string; hora: string } {
+  const d = new Date();
+  const p = (n: number) => String(n).padStart(2, "0");
+  return {
+    fecha: `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`,
+    hora: `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`,
+  };
+}
 
 // Ejercicios de un día con sus conteos de series (programadas/hechas). Compartido entre
 // GET /days/:id y POST /days/:id/exercises/reorder para no duplicar el SQL.
@@ -119,6 +132,8 @@ programRouter.patch("/weeks/:id", (req, res) => {
   if (body.semana !== undefined && !Number.isInteger(body.semana)) {
     return res.status(400).json({ error: "semana debe ser un entero" });
   }
+  const objetivo = validarObjetivo(req.body ?? {}, week, hoyLocal());
+  if ("error" in objetivo) return res.status(400).json({ error: objetivo.error });
   if (body.mesociclo_id !== undefined && body.mesociclo_id !== null) {
     const ok = db.prepare("SELECT 1 FROM mesociclos WHERE id = ?").get(body.mesociclo_id);
     if (!ok) return res.status(400).json({ error: `mesociclo_id inválido: ${body.mesociclo_id}` });
@@ -131,6 +146,13 @@ programRouter.patch("/weeks/:id", (req, res) => {
     nombre: pick(body.nombre, week.nombre),
     bloque: pick(body.bloque, week.bloque),
     notas: pick(body.notas, week.notas),
+    objetivo_kcal: week.objetivo_kcal,
+    objetivo_proteina_g: week.objetivo_proteina_g,
+    objetivo_carbohidratos_g: week.objetivo_carbohidratos_g,
+    objetivo_grasas_g: week.objetivo_grasas_g,
+    nota_nutricional: week.nota_nutricional,
+    objetivos_pautados_en: week.objetivos_pautados_en,
+    ...objetivo.cambios,
   };
 
   const dup = db
@@ -144,7 +166,10 @@ programRouter.patch("/weeks/:id", (req, res) => {
 
   db.prepare(
     `UPDATE program_weeks
-       SET semana=@semana, mesociclo_id=@mesociclo_id, nombre=@nombre, bloque=@bloque, notas=@notas
+       SET semana=@semana, mesociclo_id=@mesociclo_id, nombre=@nombre, bloque=@bloque, notas=@notas,
+           objetivo_kcal=@objetivo_kcal, objetivo_proteina_g=@objetivo_proteina_g,
+           objetivo_carbohidratos_g=@objetivo_carbohidratos_g, objetivo_grasas_g=@objetivo_grasas_g,
+           nota_nutricional=@nota_nutricional, objetivos_pautados_en=@objetivos_pautados_en
        WHERE id=@id`
   ).run({ id, ...next });
 
@@ -525,13 +550,24 @@ programRouter.patch("/sets/:id", (req, res) => {
     // La fecha/hora del entrenamiento es la del primer dato cargado, no la de un registro
     // manual posterior (que podía llegar días después). COALESCE = solo escribe si está NULL,
     // así que respeta cualquier edición manual previa y es idempotente entre series del mismo día.
+    // hora_fin = hora de la última serie completada, pero solo si el día es hoy y la serie
+    // recién pasa a hecha: editar una serie de un día viejo, o el RPE de una ya hecha, no la mueve.
+    // (En un UPDATE, `fecha` en el CASE es el valor previo de la fila, de ahí el COALESCE.)
     if (next.hecha === 1) {
+      const ahora = ahoraLocal();
       db.prepare(
         `UPDATE program_days
-            SET fecha = COALESCE(fecha, date('now', 'localtime')),
-                hora_inicio = COALESCE(hora_inicio, time('now', 'localtime'))
-          WHERE id = (SELECT pe.day_id FROM program_exercises pe WHERE pe.id = ?)`
-      ).run(set.program_exercise_id);
+            SET fecha = COALESCE(fecha, @hoy),
+                hora_inicio = COALESCE(hora_inicio, @hora),
+                hora_fin = CASE WHEN @recienHecha = 1 AND COALESCE(fecha, @hoy) = @hoy
+                                THEN @hora ELSE hora_fin END
+          WHERE id = (SELECT pe.day_id FROM program_exercises pe WHERE pe.id = @peId)`
+      ).run({
+        hoy: ahora.fecha,
+        hora: ahora.hora,
+        recienHecha: set.hecha === 1 ? 0 : 1,
+        peId: set.program_exercise_id,
+      });
     }
   });
   tx();
@@ -594,6 +630,8 @@ programRouter.post("/weeks", (req, res) => {
   if (!Array.isArray(body.days) || body.days.length === 0) {
     return res.status(400).json({ error: "la semana necesita al menos un día" });
   }
+  const objetivo = validarObjetivo(req.body, null, hoyLocal());
+  if ("error" in objetivo) return res.status(400).json({ error: objetivo.error });
   if (body.mesociclo_id != null) {
     const ok = db.prepare("SELECT 1 FROM mesociclos WHERE id = ?").get(body.mesociclo_id);
     if (!ok) return res.status(400).json({ error: `mesociclo_id inválido: ${body.mesociclo_id}` });
@@ -604,8 +642,12 @@ programRouter.post("/weeks", (req, res) => {
   if (dup) return res.status(409).json({ error: `la semana ${body.semana} ya existe en ese mesociclo` });
 
   const insWeek = db.prepare(
-    `INSERT INTO program_weeks (semana, nombre, bloque, notas, fecha_creada, activa, mesociclo_id)
-     VALUES (@semana, @nombre, @bloque, @notas, @fecha_creada, 1, @mesociclo_id)`
+    `INSERT INTO program_weeks (semana, nombre, bloque, notas, fecha_creada, activa, mesociclo_id,
+       objetivo_kcal, objetivo_proteina_g, objetivo_carbohidratos_g, objetivo_grasas_g,
+       nota_nutricional, objetivos_pautados_en)
+     VALUES (@semana, @nombre, @bloque, @notas, @fecha_creada, 1, @mesociclo_id,
+       @objetivo_kcal, @objetivo_proteina_g, @objetivo_carbohidratos_g, @objetivo_grasas_g,
+       @nota_nutricional, @objetivos_pautados_en)`
   );
   const insDay = db.prepare(
     `INSERT INTO program_days (week_id, dia, tipo, titulo, warmup, notas, orden)
@@ -628,6 +670,13 @@ programRouter.post("/weeks", (req, res) => {
       notas: input.notas ?? null,
       fecha_creada: new Date().toISOString().slice(0, 10),
       mesociclo_id: input.mesociclo_id ?? null,
+      objetivo_kcal: null,
+      objetivo_proteina_g: null,
+      objetivo_carbohidratos_g: null,
+      objetivo_grasas_g: null,
+      nota_nutricional: null,
+      objetivos_pautados_en: null,
+      ...objetivo.cambios,
     }).lastInsertRowid as number;
 
     input.days.forEach((d, di) => {

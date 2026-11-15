@@ -14,6 +14,7 @@ import { statsRouter } from "./routes/stats.js";
 import { coachRouter, setEndpointsCoach } from "./routes/coach.js";
 import { tracRouter } from "./routes/trac.js";
 import { ingestaRouter } from "./routes/ingesta.js";
+import { nutricionRouter } from "./routes/nutricion.js";
 import { catalogoRouter } from "./routes/catalogo.js";
 
 const PORT = Number(process.env.PORT) || 3001;
@@ -43,6 +44,7 @@ app.use("/api/stats", statsRouter);
 app.use("/api/coach", coachRouter);
 app.use("/api/trac", tracRouter);
 app.use("/api/ingesta", ingestaRouter);
+app.use("/api/nutricion", nutricionRouter);
 app.use("/api", catalogoRouter);
 
 // Introspección de rutas para GET /api/coach/docs: recorre el router.stack real
@@ -72,6 +74,7 @@ setEndpointsCoach(
     ...rutasDelRouter("/api/coach", coachRouter),
     ...rutasDelRouter("/api/ingesta", ingestaRouter),
     ...rutasDelRouter("/api/cuerpo", cuerpoRouter),
+    ...rutasDelRouter("/api/nutricion", nutricionRouter),
     ...rutasDelRouter("/api", catalogoRouter),
   ].sort((a, b) => a.ruta.localeCompare(b.ruta) || a.metodo.localeCompare(b.metodo))
 );

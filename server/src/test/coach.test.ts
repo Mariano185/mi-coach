@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import request from "supertest";
-import { createTestDb, createTestApp, type TestDb } from "./setup.js";
+import { createTestDb, createTestApp, hoyALas, type TestDb } from "./setup.js";
 import type { DiaProgramado } from "../types.js";
 
 const db: TestDb = createTestDb();
@@ -55,6 +55,36 @@ describe("GET /api/coach/analisis", () => {
     expect(sesion.notas_coach).toBe("Subí 2.5kg si el RPE acompaña.");
     expect(sesion.notas_atleta).toBe("Sentí flojo el hombro.");
     expect(sesion.notas).toBeUndefined();
+  });
+
+  it("trae duracion_min de un día con varias series completadas hoy", async () => {
+    const weekId = db
+      .prepare("INSERT INTO program_weeks (semana, nombre, fecha_creada, activa) VALUES (1, 'Test', '2024-01-01', 1)")
+      .run().lastInsertRowid as number;
+    const dayId = db
+      .prepare("INSERT INTO program_days (week_id, dia, tipo, titulo, orden) VALUES (?, 1, 'A', 'Día 1', 0)")
+      .run(weekId).lastInsertRowid as number;
+    const squat = (db.prepare("SELECT id FROM exercises WHERE nombre = 'Mid/High Bar Back Squat'").get() as { id: number }).id;
+    const exId = db
+      .prepare("INSERT INTO program_exercises (day_id, exercise_id, seccion, reps_text, orden) VALUES (?, ?, 'main', '3×5', 0)")
+      .run(dayId, squat).lastInsertRowid as number;
+    const insSet = db.prepare("INSERT INTO program_sets (program_exercise_id, n_serie, target_reps) VALUES (?, ?, 5)");
+    const setIds = [1, 2, 3].map((n) => insSet.run(exId, n).lastInsertRowid as number);
+
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      for (const [i, [hh, mm]] of [[18, 0], [18, 40], [19, 15]].entries()) {
+        vi.setSystemTime(hoyALas(hh, mm));
+        await request(app).patch(`/api/program/sets/${setIds[i]}`).set(AUTH).send({ real_peso: 100, real_reps: 5 });
+      }
+    } finally {
+      vi.useRealTimers();
+    }
+
+    const res = await request(app).get("/api/coach/analisis?dias=42").set(AUTH);
+    expect(res.status).toBe(200);
+    const sesion = res.body.sesiones_realizadas.find((s: { dia: number }) => s.dia === 1);
+    expect(sesion).toMatchObject({ hora_inicio: "18:00:00", hora_fin: "19:15:00", duracion_min: 75, series_hechas: 3 });
   });
 });
 

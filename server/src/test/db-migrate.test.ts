@@ -60,6 +60,22 @@ describe("initDb() — migración idempotente", () => {
     expect(n).toBe(1);
   });
 
+  it("agrega a program_weeks el Objetivo nutricional y objetivos_pautados_en (issue #23)", async () => {
+    const { db, initDb } = await import("../db.js");
+    expect(() => initDb()).not.toThrow();
+    const cols = (db.prepare("PRAGMA table_info(program_weeks)").all() as Array<{ name: string }>).map((c) => c.name);
+    expect(cols).toEqual(
+      expect.arrayContaining([
+        "objetivo_kcal",
+        "objetivo_proteina_g",
+        "objetivo_carbohidratos_g",
+        "objetivo_grasas_g",
+        "nota_nutricional",
+        "objetivos_pautados_en",
+      ])
+    );
+  });
+
   it("una DB con el Trac viejo renombra descanso_alimentacion a sueno conservando los valores (issue #18)", async () => {
     const { db, initDb } = await import("../db.js");
 
