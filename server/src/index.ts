@@ -13,6 +13,7 @@ import { mesociclosRouter } from "./routes/mesociclos.js";
 import { statsRouter } from "./routes/stats.js";
 import { coachRouter, setEndpointsCoach } from "./routes/coach.js";
 import { tracRouter } from "./routes/trac.js";
+import { ingestaRouter } from "./routes/ingesta.js";
 import { catalogoRouter } from "./routes/catalogo.js";
 
 const PORT = Number(process.env.PORT) || 3001;
@@ -41,6 +42,7 @@ app.use("/api/mesociclos", mesociclosRouter);
 app.use("/api/stats", statsRouter);
 app.use("/api/coach", coachRouter);
 app.use("/api/trac", tracRouter);
+app.use("/api/ingesta", ingestaRouter);
 app.use("/api", catalogoRouter);
 
 // Introspección de rutas para GET /api/coach/docs: recorre el router.stack real
@@ -68,6 +70,7 @@ setEndpointsCoach(
     ...rutasDelRouter("/api/program", programRouter),
     ...rutasDelRouter("/api/mesociclos", mesociclosRouter),
     ...rutasDelRouter("/api/coach", coachRouter),
+    ...rutasDelRouter("/api/ingesta", ingestaRouter),
     ...rutasDelRouter("/api", catalogoRouter),
   ].sort((a, b) => a.ruta.localeCompare(b.ruta) || a.metodo.localeCompare(b.metodo))
 );

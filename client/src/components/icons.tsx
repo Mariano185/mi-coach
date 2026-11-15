@@ -113,6 +113,18 @@ export function IconWeight(p: SVGProps<SVGSVGElement>) {
   );
 }
 
+// Cubiertos: tenedor + cuchillo.
+export function IconNutrition(p: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(p)}>
+      <path d="M7 3v8" />
+      <path d="M4 3v5a3 3 0 0 0 6 0V3" />
+      <path d="M7 11v10" />
+      <path d="M17 21V3c-2.2 1.2-3.5 3.6-3.5 7v3h3.5" />
+    </svg>
+  );
+}
+
 export function IconDashboard(p: SVGProps<SVGSVGElement>) {
   return (
     <svg {...base(p)}>

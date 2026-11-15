@@ -11,6 +11,7 @@ import {
 import { Bodyweight } from "./pages/Bodyweight";
 import { Dashboard } from "./pages/Dashboard";
 import { Login } from "./pages/Login";
+import { Nutricion } from "./pages/Nutricion";
 import { ProgramIndexRedirect, Programs } from "./pages/Programs";
 import { Trac } from "./pages/Trac";
 import { WeekView } from "./pages/program/WeekView";
@@ -27,7 +28,8 @@ import { hasRecentAuth, setAuthedFlag } from "./authState";
 
 const NAV: Array<{ to: string; label: string; end?: boolean }> = [
   { to: "/dashboard", label: "Dashboard", end: true },
-  { to: "/weight", label: "Peso / Nutrición", end: true },
+  { to: "/nutricion", label: "Nutrición", end: true },
+  { to: "/weight", label: "Peso", end: true },
   { to: "/programs", label: "Programas" },
 ];
 
@@ -151,6 +153,16 @@ export function App() {
             <RequireAuth>
               <RootLayout>
                 <Dashboard />
+              </RootLayout>
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/nutricion"
+          element={
+            <RequireAuth>
+              <RootLayout>
+                <Nutricion />
               </RootLayout>
             </RequireAuth>
           }

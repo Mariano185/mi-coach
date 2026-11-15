@@ -389,6 +389,36 @@ export interface UpsertTracInput {
   tecnica?: number | null;
 }
 
+// === Ingesta diaria: lo que el atleta comió en una fecha (una por fecha, upsert) ===
+// Una fecha sin fila significa "no cargado", nunca "0 kcal".
+export interface IngestaDiaria {
+  id: number;
+  fecha: string; // YYYY-MM-DD
+  kcal: number;
+  proteina_g: number;
+  carbohidratos_g: number;
+  grasas_g: number;
+  comentario: string | null;
+  creado_en: string;
+  actualizado_en: string;
+}
+
+// PUT /api/ingesta — los cuatro valores son obligatorios (enteros ≥ 0).
+export interface UpsertIngestaDiariaInput {
+  fecha: string;
+  kcal: number;
+  proteina_g: number;
+  carbohidratos_g: number;
+  grasas_g: number;
+  comentario?: string | null;
+}
+
+// Fila del bloque `ingesta_diaria` de GET /coach/analisis (solo fechas cargadas).
+export type IngestaDiariaAnalisis = Pick<
+  IngestaDiaria,
+  "fecha" | "kcal" | "proteina_g" | "carbohidratos_g" | "grasas_g" | "comentario"
+>;
+
 // Respuesta de /api/stats
 export interface BasicE1rm {
   exercise_id: number;

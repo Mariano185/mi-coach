@@ -1,13 +1,15 @@
-// Bottom tab bar (solo mobile < 600px). 3 destinos principales.
+// Bottom tab bar (solo mobile < 600px). 4 destinos principales.
 import { NavLink } from "react-router-dom";
 import {
   IconDashboard,
+  IconNutrition,
   IconPrograms,
   IconWeight,
 } from "./icons";
 
 const ITEMS: Array<{ to: string; label: string; Icon: typeof IconDashboard; end?: boolean }> = [
   { to: "/dashboard", label: "Dashboard", Icon: IconDashboard, end: true },
+  { to: "/nutricion", label: "Nutrición", Icon: IconNutrition, end: true },
   { to: "/weight", label: "Peso", Icon: IconWeight, end: true },
   { to: "/programs", label: "Programas", Icon: IconPrograms },
 ];
