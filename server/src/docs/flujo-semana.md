@@ -46,9 +46,14 @@ Usá `?dias=56` si querés más historial. El JSON incluye:
   sin e1RM (sin RPE, RPE < 5, > 10 reps proyectadas) no aparecen. El promedio de RPE por sesión,
   si lo necesitás aparte, ya está en `rpe_basicos`.
 - `rpe_basicos` — RPE promedio por sesión (señal de fatiga)
-- `mejor_e1rm_basicos` — mejor e1RM histórico por básico, **solo con confianza alta** (RPE ≥ 7).
-  Ojo: los e1RM históricos cambiaron con el método RTS (2026-11) — no compares contra números
-  de análisis viejos.
+- `mejor_e1rm_basicos` — mejor e1RM histórico por básico, **solo con confianza alta** (RPE ≥ 7),
+  con la serie que lo dio: `fecha`, `week_id`, `dia`, `peso_kg`, `reps`, `rpe` y `dias_desde`
+  (días desde esa fecha hasta hoy). Un PR viejo no es una referencia para cargar la semana que
+  viene: mirá `dias_desde`, y para el nivel actual usá `mejor_e1rm_ventana`, el mejor dentro de
+  `?dias=N` (`null` si en la ventana no hubo series de confianza alta de ese básico). Si dos
+  series empatan en e1RM, viene la más reciente. `fecha`/`dias_desde` son `null` solo si ese día
+  quedó sin fecha. Ojo: los e1RM históricos cambiaron con el método RTS (2026-11) — no compares
+  contra números de análisis viejos.
 - `peso_corporal` — el **Registro corporal** de cada fecha de la ventana `?dias=N` (solo las
   fechas con registro, orden ascendente; hasta noviembre de 2026 traía todo el historial sin
   importar `?dias`): `fecha`, `peso_kg`, `pm_7d` (promedio móvil de los últimos 7 registros,

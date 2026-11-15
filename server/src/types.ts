@@ -530,6 +530,22 @@ export interface AdherenciaResponse {
 // sesión. Top set + back-off del mismo día quedan como filas separadas, y la misma carga
 // a RPE distinto también (el e1RM depende del RPE). rpe_min/rpe_max se conservan por
 // compatibilidad: dentro de una fila son iguales. Incluye filas de confianza baja.
+// Mejor e1RM histórico de un básico (solo confianza alta) y la serie que lo dio.
+// fecha/dias_desde son null si el día de esa serie no tiene fecha (dato viejo);
+// mejor_e1rm_ventana es null si no hubo series de confianza alta dentro de ?dias=N.
+export interface MejorE1rmBasico {
+  nombre: string;
+  mejor_e1rm: number;
+  fecha: string | null;
+  week_id: number;
+  dia: number;
+  peso_kg: number;
+  reps: number;
+  rpe: number;
+  dias_desde: number | null;
+  mejor_e1rm_ventana: number | null;
+}
+
 export interface ProgresionBasico {
   nombre: string;
   fecha: string;
