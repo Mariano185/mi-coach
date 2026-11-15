@@ -16,10 +16,11 @@ la del coach, y la imprime **una sola vez** en el log:
 journalctl -u mi-coach | grep device_api_key
 ```
 
-Si el log ya rotó, leela de la tabla `settings` (clave `device_api_key`).
+Si el log ya rotó, leela de la tabla `settings` (clave `device_api_key`). No abras `coach.db` con
+otra conexión SQLite mientras el server corre (WAL): pará el servicio, leela y volvé a arrancarlo.
 
 Esa clave **solo** sirve para `PUT /api/pasos`: con ella cualquier otra ruta de `/api` da `401`.
-Si el teléfono se pierde o la clave se filtra, el daño queda acotado a poder escribir pasos.
+Si el teléfono se pierde o la clave se filtra, el daño queda acotado a poder escribir Pasos diarios.
 Para rotarla: parar el servicio, borrar la fila `device_api_key` de `settings`, arrancar (se genera
 una nueva y sale en el log) y actualizar el atajo.
 
@@ -44,6 +45,9 @@ En la app **Atajos** → pestaña **Atajos** → **+**. Nombre: `Pasos a mi-coac
 4. **Buscar muestras de salud**:
    - Tipo: **Pasos**.
    - Filtro: *Fecha de inicio* **está entre** `Ayer` y `Hoy`.
+   - **Ordenar por:** Fecha de inicio, *Más antiguo primero*; **Límite:** activado, `1`. Así,
+     si una muestra que empieza justo a las 00:00 de hoy entra en el rango, queda afuera y viaja
+     un solo número (el de ayer).
    - **Agrupar por: Día**. Importante: sin agrupar, el atajo suma las muestras crudas de todas las
      fuentes y, si usás Apple Watch, cuenta los pasos dos veces (iPhone + reloj). Agrupado por día
      devuelve el total que muestra la app Salud. Compará el número contra Salud la primera vez.

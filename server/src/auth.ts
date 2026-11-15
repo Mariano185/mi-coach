@@ -52,30 +52,29 @@ function getSecret(): string {
   return s;
 }
 
-// API key del coach: secret estable en settings, auto-generado en el primer
-// arranque. El coach (caja negra) lo manda en el header X-Coach-Key para leer/
-// escribir sin login de browser. Se imprime una vez al generarlo.
-export function getCoachKey(): string {
-  let k = getSetting(COACH_KEY);
+// Clave estable en settings, auto-generada la primera vez que se pide. Se imprime una
+// sola vez (al generarla): después hay que leerla del log o de settings.
+function claveGenerada(setting: string): string {
+  let k = getSetting(setting);
   if (!k) {
     k = randomBytes(24).toString("hex");
-    setSetting(COACH_KEY, k);
-    console.log(`[auth] coach_api_key generado: ${k}`);
+    setSetting(setting, k);
+    console.log(`[auth] ${setting} generado: ${k}`);
   }
   return k;
 }
 
+// API key del coach: el coach (caja negra) la manda en el header X-Coach-Key para leer/
+// escribir sin login de browser.
+export function getCoachKey(): string {
+  return claveGenerada(COACH_KEY);
+}
+
 // Clave del dispositivo: la usa el atajo de iOS que manda los Pasos diarios (header
-// X-Device-Key). Mismo ciclo de vida que la del coach, pero solo autoriza
-// RUTA_DISPOSITIVO: si se filtra desde el teléfono, no da acceso al resto de los datos.
+// X-Device-Key). Solo autoriza RUTA_DISPOSITIVO: si se filtra desde el teléfono, no da
+// acceso al resto de los datos.
 export function getDeviceKey(): string {
-  let k = getSetting(DEVICE_KEY);
-  if (!k) {
-    k = randomBytes(24).toString("hex");
-    setSetting(DEVICE_KEY, k);
-    console.log(`[auth] device_api_key generado: ${k}`);
-  }
-  return k;
+  return claveGenerada(DEVICE_KEY);
 }
 
 // Compara un header contra la clave esperada en tiempo constante.

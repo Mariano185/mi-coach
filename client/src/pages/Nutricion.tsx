@@ -213,8 +213,8 @@ export function Nutricion() {
           !isLoading && (
             <p className="muted" style={{ fontSize: 13, marginTop: 0 }}>
               {esHoy
-                ? "Los pasos de hoy llegan solos desde el iPhone después de medianoche."
-                : "No llegaron pasos para esta fecha."}
+                ? "Los Pasos diarios de hoy llegan solos desde el iPhone después de medianoche."
+                : "No llegaron Pasos diarios para esta fecha."}
             </p>
           )
         )}

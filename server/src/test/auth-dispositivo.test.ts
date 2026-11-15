@@ -66,6 +66,18 @@ describe("Clave del atajo de iOS (X-Device-Key)", () => {
     expect((await request(app).get("/api/pasos").set(h)).status).toBe(401);
   });
 
+  it("con la clave del atajo, la misma ruta con barra final o querystring también carga", async () => {
+    const h = { "X-Device-Key": DEVICE_KEY };
+    expect((await request(app).put("/api/pasos/").set(h).send({ fecha: "2026-11-14", pasos: 1 })).status).toBe(200);
+    expect((await request(app).put("/api/pasos?x=1").set(h).send({ fecha: "2026-11-14", pasos: 2 })).status).toBe(200);
+  });
+
+  it("con la clave del atajo, variantes que no son exactamente PUT /api/pasos fallan cerrado (401)", async () => {
+    const h = { "X-Device-Key": DEVICE_KEY };
+    expect((await request(app).put("/API/PASOS").set(h).send({ fecha: "2026-11-14", pasos: 1 })).status).toBe(401);
+    expect((await request(app).put("/api/pasos/../trac").set(h).send({ fecha: "2026-11-14", sueno: 3 })).status).toBe(401);
+  });
+
   it("una clave del atajo incorrecta da 401", async () => {
     const res = await request(app)
       .put("/api/pasos")
