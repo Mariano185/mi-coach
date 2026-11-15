@@ -166,4 +166,4 @@ opcional con Tailscale Funnel: `docs/deploy/TAILSCALE.md`. `coach.db` vive fuera
 
   ### Domain docs
 
-  Single-context repo — one `CONTEXT.md` + `docs/adr/` at the root. See `docs/agents/domain.md`.
+  Single-context repo — one `GLOSSARY.md` + `docs/adr/` at the root. See `docs/agents/domain.md`.
