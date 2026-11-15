@@ -34,7 +34,9 @@ Usá `?dias=56` si querés más historial. El JSON incluye:
   la recomposición funcionando. Compará perímetros solo entre fechas medidas con el Protocolo de
   medición (abajo). Para una fecha puntual: `GET /api/cuerpo?fecha=YYYY-MM-DD` (`null` si no
   hay registro); `GET /api/cuerpo` trae el historial completo. El registro es del atleta: no lo
-  escribas vos salvo que te pida corregir un número.
+  escribas vos salvo que te pida corregir un número. Ojo: `PUT /api/cuerpo` **reemplaza el
+  registro entero** de esa fecha — si corregís solo el peso, mandá también los perímetros y las
+  notas que ya tenía (leelos antes con `?fecha=`), o se borran.
 
   **Protocolo de medición** — la forma fija de tomar cada Perímetro, para que sean comparables
   entre fechas (es lo que el atleta ve en la app debajo de cada campo):

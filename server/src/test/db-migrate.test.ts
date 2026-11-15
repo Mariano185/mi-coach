@@ -104,7 +104,8 @@ describe("initDb() — migración idempotente", () => {
     const ins = db.prepare(
       "INSERT INTO bodyweight (fecha, peso_kg, kcal_objetivo, proteina_g, hambre, digestion, notas) VALUES (?, ?, ?, ?, ?, ?, ?)"
     );
-    ins.run("2026-06-14", 84.1, 2500, 180, 6, "ok", "prueba");
+    // La fila con campos de nutrición es de prueba (en producción, la única: 2026-06-14): se descarta.
+    ins.run("2026-06-14", 84.1, 2500, 180, 6, "10", "prueba");
     ins.run("2026-06-15", 83.9, null, null, null, null, null);
     // Fecha repetida: gana la carga más reciente.
     ins.run("2026-06-16", 83.5, null, null, null, null, "primera");
@@ -124,7 +125,6 @@ describe("initDb() — migración idempotente", () => {
     for (const vieja of ["kcal_objetivo", "proteina_g", "hambre", "digestion"]) expect(cols).not.toContain(vieja);
 
     expect(db.prepare("SELECT fecha, peso_kg, brazo_cm, notas FROM registro_corporal ORDER BY fecha").all()).toEqual([
-      { fecha: "2026-06-14", peso_kg: 84.1, brazo_cm: null, notas: "prueba" },
       { fecha: "2026-06-15", peso_kg: 83.9, brazo_cm: null, notas: null },
       { fecha: "2026-06-16", peso_kg: 83.2, brazo_cm: null, notas: "corregida" },
     ]);

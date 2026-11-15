@@ -350,9 +350,10 @@ function renameDescansoASueno(): void {
 }
 
 // Copia peso y notas de cada fecha (si una fecha estaba repetida, gana la carga más reciente:
-// mayor id) y dropea bodyweight. kcal_objetivo/proteina_g/hambre/digestion se descartan: la
-// nutrición vive ahora en ingesta_diaria, y la única fila de producción con esos valores
-// (2026-06-14) era de prueba.
+// mayor id) y dropea bodyweight. Las columnas kcal_objetivo/proteina_g/hambre/digestion
+// desaparecen (la nutrición vive ahora en ingesta_diaria), y las filas que las tenían cargadas
+// se descartan enteras: la única de producción (2026-06-14, digestion = '10') era de prueba
+// (issue #21).
 function migrarBodyweight(): void {
   const existe = db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='bodyweight'").get();
   if (!existe) return;
@@ -362,7 +363,9 @@ function migrarBodyweight(): void {
       SELECT b.fecha, b.peso_kg, b.notas
         FROM bodyweight b
        WHERE b.id = (SELECT MAX(b2.id) FROM bodyweight b2 WHERE b2.fecha = b.fecha)
-         AND b.peso_kg > 0;
+         AND b.peso_kg > 0
+         AND b.kcal_objetivo IS NULL AND b.proteina_g IS NULL
+         AND b.hambre IS NULL AND b.digestion IS NULL;
       DROP TABLE bodyweight;
     `);
   })();

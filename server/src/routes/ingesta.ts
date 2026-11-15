@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { db } from "../db.js";
+import { esFecha } from "../validacion/fecha.js";
 import type { IngestaDiaria, UpsertIngestaDiariaInput } from "../types.js";
 
 // Ingesta diaria: lo que el atleta comió en una fecha (GLOSSARY.md). Una por fecha;
@@ -8,14 +9,6 @@ import type { IngestaDiaria, UpsertIngestaDiariaInput } from "../types.js";
 export const ingestaRouter = Router();
 
 const VALORES = ["kcal", "proteina_g", "carbohidratos_g", "grasas_g"] as const;
-
-// YYYY-MM-DD y además una fecha real del calendario (rechaza 2026-02-30: Date la
-// "normaliza" a otro día, así que se compara la vuelta).
-function esFecha(v: unknown): v is string {
-  if (typeof v !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return false;
-  const d = new Date(`${v}T00:00:00Z`);
-  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === v;
-}
 
 // GET /api/ingesta?fecha=YYYY-MM-DD           — la carga de esa fecha, o null si no hay.
 // GET /api/ingesta?desde=YYYY-MM-DD&hasta=... — solo las fechas cargadas del rango

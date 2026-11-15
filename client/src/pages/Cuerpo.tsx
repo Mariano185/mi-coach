@@ -5,29 +5,17 @@ import type { RegistroCorporal, Stats, UpsertRegistroCorporalInput } from "../ty
 import { swrKeys } from "../swr";
 import { TrendChart } from "../components/TrendChart";
 import { useToast } from "../components/Toast";
+import { hoyLocal } from "../fecha";
 import { PERIMETROS, type PerimetroKey } from "../constants/cuerpo";
-
-// Fecha LOCAL de hoy (no toISOString(): de noche en UTC−3 la fecha UTC ya es mañana).
-function hoyLocal(): string {
-  const d = new Date();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${d.getFullYear()}-${mm}-${dd}`;
-}
 
 type Form = { peso_kg: string; notas: string } & Record<PerimetroKey, string>;
 
-const FORM_VACIO: Form = { peso_kg: "", brazo_cm: "", pierna_cm: "", abdomen_cm: "", notas: "" };
-
+// Sin registro, el formulario queda vacío; con registro, precargado (un perímetro sin medir
+// queda vacío, no en 0).
 function aForm(r: RegistroCorporal | undefined): Form {
-  if (!r) return FORM_VACIO;
-  return {
-    peso_kg: String(r.peso_kg),
-    brazo_cm: r.brazo_cm == null ? "" : String(r.brazo_cm),
-    pierna_cm: r.pierna_cm == null ? "" : String(r.pierna_cm),
-    abdomen_cm: r.abdomen_cm == null ? "" : String(r.abdomen_cm),
-    notas: r.notas ?? "",
-  };
+  const form = { peso_kg: r ? String(r.peso_kg) : "", notas: r?.notas ?? "" } as Form;
+  for (const { key } of PERIMETROS) form[key] = r?.[key] == null ? "" : String(r[key]);
+  return form;
 }
 
 // Acepta coma decimal (teclado numérico en español).
@@ -42,16 +30,20 @@ export function Cuerpo() {
   const trend = stats?.tendencia_peso ?? [];
 
   const [fecha, setFecha] = useState(hoyLocal);
-  const [form, setForm] = useState<Form>(FORM_VACIO);
+  const [form, setForm] = useState<Form>(() => aForm(undefined));
   const [saving, setSaving] = useState(false);
   const { show, node } = useToast();
 
   const registro = registros?.find((r) => r.fecha === fecha);
 
-  // Precargar el registro si la fecha ya tiene uno; si no, formulario vacío.
+  // Precargar el registro si la fecha ya tiene uno; si no, formulario vacío. Depende de la
+  // versión guardada (actualizado_en), no del objeto: una revalidación de SWR al volver a la
+  // app no debe pisar lo que el atleta está tipeando.
+  const version = registro?.actualizado_en;
   useEffect(() => {
     setForm(aForm(registro));
-  }, [registro, fecha]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fecha, version]);
 
   // Último valor cargado de cada Perímetro (cada uno con su fecha: no siempre se miden juntos).
   const ultimos = useMemo(
