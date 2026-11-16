@@ -192,6 +192,34 @@ input, select, textarea {
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 input::placeholder, textarea::placeholder { color: var(--faint); }
+
+/* Fecha/hora: iOS Safari les da apariencia nativa (valor centrado, ancho mínimo intrínseco
+   que desborda celdas angostas, y altura colapsada cuando están vacíos). Se normalizan
+   para que queden alineados con el resto de los inputs. */
+input[type="date"],
+input[type="time"] {
+  -webkit-appearance: none;
+  appearance: none;
+  min-width: 0;
+  display: block;
+  color-scheme: dark;
+}
+input[type="date"]::-webkit-date-and-time-value,
+input[type="time"]::-webkit-date-and-time-value {
+  text-align: left;
+  min-height: 1.45em;
+}
+
+/* Select: sin la apariencia nativa (en iOS cambia alto, fondo y radio) y con chevron propio. */
+select {
+  -webkit-appearance: none;
+  appearance: none;
+  padding-right: 34px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%238b929e' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  text-overflow: ellipsis;
+}
 input:focus, select:focus, textarea:focus {
   outline: none;
   border-color: var(--lime);
@@ -257,27 +285,6 @@ th {
 .tabla-scroll thead th { position: sticky; top: 0; z-index: 1; background: var(--panel); }
 tbody tr { transition: background 0.12s ease; }
 tbody tr:hover { background: var(--panel-2); }
-
-/* ---------- LogSession: bloque ejercicio ---------- */
-.exercise-block {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 14px;
-  margin-bottom: 12px;
-  background: var(--panel-2);
-}
-.exercise-block .head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-.exercise-block .head strong { font-size: 14px; }
-
-.set-grid {
-  display: grid;
-  grid-template-columns: 28px 1fr 1fr 1fr 1fr 32px;
-  gap: 7px;
-  align-items: center;
-  margin-bottom: 7px;
-}
-.set-grid .lbl { font-size: 11px; color: var(--muted); }
-.set-grid input { padding: 7px 9px; }
 
 /* ---------- Stat cards ---------- */
 .stat-cards { display: flex; gap: 14px; flex-wrap: wrap; }
@@ -366,6 +373,10 @@ tbody tr:hover { background: var(--panel-2); }
   animation: rise 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 .toast.err { background: var(--danger); color: #2a0606; box-shadow: none; }
+/* en mobile, por encima de la bottom-nav en vez de taparla */
+@media (max-width: 600px) {
+  .toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); max-width: calc(100vw - 32px); text-align: center; }
+}
 
 /* ---------- Pills / badges ---------- */
 .pill {
@@ -472,12 +483,14 @@ tbody tr:hover { background: var(--panel-2); }
   border-radius: 99px;
   padding: 6px 8px 6px 14px;
 }
-.week-switch label { margin: 0; }
+.week-switch label { margin: 0; white-space: nowrap; }
 .week-switch select {
   width: auto;
-  background: transparent;
+  min-width: 0;
+  background-color: transparent;
+  background-position: right 4px center;
   border: none;
-  padding: 4px 6px;
+  padding: 4px 24px 4px 6px;
   font-family: var(--font-display);
   font-weight: 600;
   letter-spacing: 0.03em;
@@ -509,7 +522,10 @@ tbody tr:hover { background: var(--panel-2); }
   transition: transform 0.14s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.14s, box-shadow 0.14s;
   animation: rise 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
-.tile:hover { transform: translateY(-3px); border-color: rgba(200, 245, 74, 0.4); box-shadow: var(--shadow-lime); }
+/* Solo con puntero real: en touch el :hover queda "pegado" después del tap. */
+@media (hover: hover) {
+  .tile:hover { transform: translateY(-3px); border-color: rgba(200, 245, 74, 0.4); box-shadow: var(--shadow-lime); }
+}
 .tile:focus-visible { outline: 2px solid var(--lime); outline-offset: 2px; }
 .tile:active { transform: translateY(-1px); }
 
@@ -609,8 +625,10 @@ tbody tr:hover { background: var(--panel-2); }
 /* Cada set es un .set-row (div) que en desktop se "aplana" con display:contents
    para que sus hijos participen del grid del .sets-table. En mobile se vuelve card. */
 .set-row { display: contents; }
-/* .obj-row agrupa "obj" + check; en desktop se aplana también, en mobile es flex. */
-.obj-row { display: contents; }
+/* .set-field envuelve cada valor con su etiqueta: en desktop se aplana (el header de
+   columnas hace de etiqueta); en mobile la etiqueta va arriba del valor. */
+.set-field { display: contents; }
+.set-field-k { display: none; }
 .sets-table .sh {
   font-family: var(--font-display);
   font-size: 11px;
@@ -655,22 +673,6 @@ tbody tr:hover { background: var(--panel-2); }
   font-variant-numeric: tabular-nums;
   font-weight: 600;
 }
-.sets-table .check {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  border: 1px solid var(--border);
-  background: var(--panel-2);
-  cursor: pointer;
-  margin: 0 auto;
-  transition: background 0.15s, border-color 0.15s, transform 0.1s;
-}
-.sets-table .check.on { background: var(--lime); border-color: var(--lime); color: var(--on-lime); }
-.sets-table .check:active { transform: scale(0.9); }
-.sets-table .check:focus-visible { outline: 2px solid var(--lime); outline-offset: 2px; }
 
 /* mini stats del ejercicio */
 .mini-stats {
@@ -767,23 +769,8 @@ tbody tr:hover { background: var(--panel-2); }
   color: var(--muted);
   font-weight: 600;
 }
-.session-meta-field input[type="date"],
-.session-meta-field input[type="time"] {
-  background: var(--surface2);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  color: var(--text);
-  font-size: 14px;
-  padding: 6px 8px;
-  width: 100%;
-  box-sizing: border-box;
-  color-scheme: dark;
-}
-.session-meta-field input[type="date"]:focus,
-.session-meta-field input[type="time"]:focus {
-  outline: none;
-  border-color: var(--lime);
-}
+/* Los inputs de fecha/hora usan el estilo base de input (el override viejo apuntaba a una
+   variable inexistente y bajaba la fuente a 14px, lo que hace zoom en iOS al tocarlos). */
 
 /* notas del coach (markdown simple) */
 .coach-notes { color: var(--muted); font-size: 13px; line-height: 1.6; }
@@ -821,21 +808,8 @@ tbody tr:hover { background: var(--panel-2); }
 
 /* notas del atleta (editable) */
 .notas-atleta {
-  background: var(--surface2);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  color: var(--text);
-  font-family: inherit;
-  font-size: 14px;
   line-height: 1.5;
-  padding: 8px 10px;
-  width: 100%;
-  box-sizing: border-box;
   resize: vertical;
-}
-.notas-atleta:focus {
-  outline: none;
-  border-color: var(--lime);
 }
 .coach-notes ul { margin: 0; padding-left: 18px; }
 .coach-notes li { margin-bottom: 4px; }
@@ -876,10 +850,10 @@ tbody tr:hover { background: var(--panel-2); }
     position: sticky;
     top: 0;
     z-index: 20;
-    padding: 14px 0 12px;
+    /* safe-area: en la PWA instalada (status bar black-translucent) el contenido arranca
+       debajo del reloj/notch; sin esto el título queda tapado. */
+    padding: calc(14px + env(safe-area-inset-top, 0px)) 14px 12px;
     margin: 0 -14px 8px;
-    padding-left: 14px;
-    padding-right: 14px;
     background: rgba(10, 11, 13, 0.85);
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
@@ -899,10 +873,21 @@ tbody tr:hover { background: var(--panel-2); }
     padding: 11px 12px;
     min-height: 44px;
   }
+  select { padding-right: 36px; }
   textarea { min-height: 88px; }
 
-  /* botón del "registrar día" full-width en mobile */
-  .panel > div > .btn { width: 100%; }
+  /* selectores de mesociclo/semana: cada uno a todo el ancho, con el nombre largo
+     recortado con "…" en vez de salirse de la pantalla */
+  .week-switch { display: flex; flex: 1 1 100%; min-width: 0; }
+  .week-switch select { flex: 1; min-height: 0; padding-top: 4px; padding-bottom: 4px; }
+
+  /* fecha / inicio / fin del día: fecha a todo el ancho, horas en dos columnas */
+  .session-meta-grid { grid-template-columns: 1fr 1fr; }
+  .session-meta-grid > :first-child { grid-column: 1 / -1; }
+
+  /* tabla con scroll interno: más baja, y al llegar al final el gesto sigue
+     scrolleando la página en vez de quedar atrapado en la tabla */
+  .tabla-scroll { max-height: 300px; overscroll-behavior: auto; }
 
   /* tiles un poco más densos */
   .tile { padding: 14px; }
@@ -920,38 +905,77 @@ tbody tr:hover { background: var(--panel-2); }
   /* back del programa más chico pero ≥ 44px (touch target) */
   .prog-back { width: 44px; height: 44px; }
 
-  /* === sets-table (ExerciseView) → cards apiladas === */
+  /* === sets-table (ExerciseView) → una card por serie ===
+     Fila 1: "Serie N" + objetivo (a la derecha). Fila 2: los tres valores con su etiqueta
+     arriba (sin header de columnas en mobile). Fila 3: e1RM. */
   .sets-table { display: block; }
   .sets-table .sh { display: none; }
   .set-row {
     display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 8px;
     padding: 12px;
     margin-bottom: 10px;
     background: var(--panel-2);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
-    align-items: stretch;
+    align-items: end;
   }
   .set-row .serie-n {
-    grid-column: 1 / -1;
+    grid-row: 1;
+    grid-column: 1 / 3;
+    align-self: center;
     text-align: left;
     color: var(--lime);
     font-size: 13px;
-    margin-bottom: 2px;
+  }
+  .set-row .serie-n::before { content: "Serie "; }
+  .set-field {
+    /* fila propia explícita: en Objetivo no hay chip arriba a la derecha y el primer
+       campo se colaba en ese hueco, al lado de "Serie N" */
+    grid-row: 2;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+  }
+  .set-field-k {
+    display: block;
+    font-family: var(--font-display);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+    text-align: center;
   }
   .set-row .target-cell {
-    padding: 9px 8px;
-    font-size: 13px;
+    padding: 11px 6px;
+    font-size: 14px;
+    min-height: 44px;
+    overflow-wrap: anywhere;
+  }
+  /* objetivo de la serie (pestaña Real): chip chico arriba a la derecha */
+  .set-row .target-cell[title="objetivo"] {
+    grid-row: 1;
+    grid-column: 3;
+    align-self: center;
+    min-height: 0;
+    padding: 4px 8px;
+    background: transparent;
+    border: 1px dashed var(--border);
+    font-size: 12px;
+    color: var(--muted);
   }
   .set-row .e1rm-cell {
+    grid-column: 1 / -1;
     display: flex;
     align-items: baseline;
-    justify-content: center;
-    gap: 6px;
-    padding: 9px 8px;
-    font-size: 13px;
+    justify-content: flex-start;
+    gap: 8px;
+    padding: 2px 2px 0;
+    font-size: 14px;
+    text-align: left;
   }
   .set-row .e1rm-cell-k {
     display: inline;
@@ -959,50 +983,6 @@ tbody tr:hover { background: var(--panel-2); }
     letter-spacing: 0.06em;
     text-transform: uppercase;
     color: var(--faint);
-  }
-  /* la celda "Carga sugerida" (span 2 en desktop) se normaliza en mobile */
-  .set-row .target-cell[style*="span"] { grid-column: auto; }
-  /* obj + check agrupados en flex: obj a la izquierda, check a la derecha */
-  .set-row .obj-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    grid-column: 1 / -1;
-  }
-  .set-row .target-cell[title="objetivo"] {
-    flex: 1;
-    background: transparent;
-    border: 1px dashed var(--border-soft);
-    font-size: 12px;
-    color: var(--faint);
-  }
-  .set-row .check {
-    flex-shrink: 0;
-    width: 44px;
-    height: 44px;
-  }
-
-  /* === set-grid (LogSession) → 2 col + ocultar header de labels === */
-  .set-grid {
-    grid-template-columns: 1fr 1fr;
-    gap: 6px;
-  }
-  /* el header de labels (primer set-grid de cada exercise-block) se oculta en mobile;
-     los placeholders de los inputs hacen de label */
-  .set-grid-head { display: none; }
-  .set-grid .set-n {
-    grid-column: 1 / -1;
-    color: var(--lime);
-    font-family: var(--font-display);
-    font-weight: 700;
-    font-size: 13px;
-    padding: 2px 0 4px;
-  }
-  .set-grid .set-del {
-    grid-column: 1 / -1;
-    min-height: 36px;
-    padding: 6px 12px;
-    font-size: 12px;
   }
 }
 
@@ -1159,7 +1139,8 @@ summary { cursor: pointer; padding: 8px 0; }
 }
 .offline-banner-retry:focus-visible { outline: 2px solid var(--lime); outline-offset: 2px; }
 @media (max-width: 600px) {
-  .offline-banner { font-size: 10.5px; gap: 8px; padding-left: 14px; padding-right: 14px; }
+  /* margen negativo = padding de .app en mobile (14px); con -20px el banner desbordaba */
+  .offline-banner { font-size: 10.5px; gap: 8px; margin: 0 -14px 12px; padding-left: 14px; padding-right: 14px; }
   .offline-banner-text { text-transform: none; letter-spacing: 0.02em; }
 }
 
@@ -1167,7 +1148,7 @@ summary { cursor: pointer; padding: 8px 0; }
 .update-prompt {
   position: fixed;
   left: 50%;
-  bottom: 84px;
+  bottom: calc(84px + env(safe-area-inset-bottom, 0px));
   transform: translateX(-50%);
   z-index: 60;
   display: flex;

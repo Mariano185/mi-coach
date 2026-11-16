@@ -7,6 +7,7 @@ import { swrKeys } from "../../swr";
 import { IconBack, IconLayers } from "../../components/icons";
 import { CoachNotes } from "../../components/CoachNotes";
 import { Expandable } from "../../components/Expandable";
+import { hoyLocal } from "../../fecha";
 
 const SECCION_LABEL: Record<Seccion, string> = {
   main: "Básicos",
@@ -15,8 +16,8 @@ const SECCION_LABEL: Record<Seccion, string> = {
 };
 const SECCION_ORDER: Seccion[] = ["main", "accesorio", "core"];
 
-function today(): string {
-  return new Date().toISOString().slice(0, 10);
+function hhmm(hora: string | null | undefined): string | null {
+  return hora ? hora.slice(0, 5) : null;
 }
 
 export function DayView() {
@@ -48,9 +49,13 @@ export function DayView() {
   // Fecha y horas siguen al server cada vez que cambian ahí (no solo la primera vez): SWR
   // puede mostrar primero el día cacheado sin fecha y recién después la que autoseteó el
   // server al cargar una serie.
+  // Las horas autoseteadas vienen con segundos ("16:08:55"): se muestran como HH:MM, que es
+  // lo que entra en el input en mobile, y solo se guardan si cambió la hora o el minuto.
+  const inicioServer = hhmm(data?.hora_inicio);
+  const finServer = hhmm(data?.hora_fin);
   useEffect(() => setFecha(data?.fecha ?? ""), [data?.fecha]);
-  useEffect(() => setHoraInicio(data?.hora_inicio ?? ""), [data?.hora_inicio]);
-  useEffect(() => setHoraFin(data?.hora_fin ?? ""), [data?.hora_fin]);
+  useEffect(() => setHoraInicio(inicioServer ?? ""), [inicioServer]);
+  useEffect(() => setHoraFin(finServer ?? ""), [finServer]);
 
   const grouped = useMemo(() => {
     const map = new Map<Seccion, ProgramExerciseCard[]>();
@@ -131,7 +136,7 @@ export function DayView() {
               value={horaInicio}
               onChange={(e) => setHoraInicio(e.target.value)}
               onBlur={() => {
-                if ((horaInicio || null) !== data.hora_inicio) patchDay({ hora_inicio: horaInicio || null });
+                if ((horaInicio || null) !== inicioServer) patchDay({ hora_inicio: horaInicio || null });
               }}
             />
           </label>
@@ -142,7 +147,7 @@ export function DayView() {
               value={horaFin}
               onChange={(e) => setHoraFin(e.target.value)}
               onBlur={() => {
-                if ((horaFin || null) !== data.hora_fin) patchDay({ hora_fin: horaFin || null });
+                if ((horaFin || null) !== finServer) patchDay({ hora_fin: horaFin || null });
               }}
             />
           </label>
@@ -151,7 +156,7 @@ export function DayView() {
           className="btn secondary"
           style={{ marginTop: 14 }}
           onClick={() => {
-            const fechaTrac = data.fecha ?? today();
+            const fechaTrac = data.fecha ?? hoyLocal();
             navigate(`/trac?fecha=${fechaTrac}&returnTo=/programs/days/${dayId}`);
           }}
         >

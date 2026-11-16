@@ -5,6 +5,7 @@ import { api } from "../api";
 import type { TracEntry, UpsertTracInput } from "../types";
 import { swrKeys } from "../swr";
 import { useToast } from "../components/Toast";
+import { hoyLocal } from "../fecha";
 import {
   FATIGA_OPTIONS,
   MOTIVACION_TRAC_OPTIONS,
@@ -13,10 +14,6 @@ import {
   TECNICA_OPTIONS,
   type TracOption,
 } from "../constants/trac";
-
-function today(): string {
-  return new Date().toISOString().slice(0, 10);
-}
 
 // "" en el <select> (sin elegir) ↔ null en el modelo. Nunca defaulteamos a un valor numérico:
 // el coach necesita ver huecos reales cuando el usuario no completó un campo.
@@ -59,7 +56,8 @@ export function Trac() {
   const returnTo = params.get("returnTo");
   const { show, node } = useToast();
 
-  const [fecha, setFecha] = useState(() => params.get("fecha") ?? today());
+  // hoyLocal, no toISOString: a la noche (UTC-3) la fecha UTC ya es mañana.
+  const [fecha, setFecha] = useState(() => params.get("fecha") ?? hoyLocal());
 
   const { data } = useSWR<TracEntry | null>(swrKeys.trac(fecha));
 
