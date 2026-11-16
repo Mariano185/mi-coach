@@ -303,11 +303,17 @@ function ObjetivoGrid({ data }: { data: ProgramExerciseDetail }) {
       {data.sets.map((s) => (
         <Row key={s.id}>
           <div className="serie-n">{s.n_serie}</div>
-          <div className="target-cell">{s.target_reps ?? data.reps_text ?? "—"}</div>
-          <div className="target-cell">{s.target_rpe ?? "—"}</div>
-          <div className="target-cell">
-            {s.target_peso != null ? `${s.target_peso} kg` : data.carga_text ?? "—"}
-          </div>
+          <Campo k="Reps">
+            <div className="target-cell">{s.target_reps ?? data.reps_text ?? "—"}</div>
+          </Campo>
+          <Campo k="RPE">
+            <div className="target-cell">{s.target_rpe ?? "—"}</div>
+          </Campo>
+          <Campo k="Carga">
+            <div className="target-cell">
+              {s.target_peso != null ? `${s.target_peso} kg` : data.carga_text ?? "—"}
+            </div>
+          </Campo>
         </Row>
       ))}
     </div>
@@ -336,30 +342,36 @@ function RealGrid({
       {data.sets.map((s) => (
         <Row key={s.id}>
           <div className="serie-n">{s.n_serie}</div>
-          <SetCell
-            value={s.real_peso}
-            placeholder="kg"
-            ariaLabel={`Peso serie ${s.n_serie}`}
-            onCommit={(v) => onPatch(s, { real_peso: v })}
-            onDirty={onDirty}
-            onBlur={onBlurFlush}
-          />
-          <SetCell
-            value={s.real_reps}
-            placeholder="reps"
-            ariaLabel={`Reps serie ${s.n_serie}`}
-            onCommit={(v) => onPatch(s, { real_reps: v })}
-            onDirty={onDirty}
-            onBlur={onBlurFlush}
-          />
-          <SetCell
-            value={s.real_rpe}
-            placeholder="rpe"
-            ariaLabel={`RPE serie ${s.n_serie}`}
-            onCommit={(v) => onPatch(s, { real_rpe: v })}
-            onDirty={onDirty}
-            onBlur={onBlurFlush}
-          />
+          <Campo k="Peso">
+            <SetCell
+              value={s.real_peso}
+              placeholder="kg"
+              ariaLabel={`Peso serie ${s.n_serie}`}
+              onCommit={(v) => onPatch(s, { real_peso: v })}
+              onDirty={onDirty}
+              onBlur={onBlurFlush}
+            />
+          </Campo>
+          <Campo k="Reps">
+            <SetCell
+              value={s.real_reps}
+              placeholder="reps"
+              ariaLabel={`Reps serie ${s.n_serie}`}
+              onCommit={(v) => onPatch(s, { real_reps: v })}
+              onDirty={onDirty}
+              onBlur={onBlurFlush}
+            />
+          </Campo>
+          <Campo k="RPE">
+            <SetCell
+              value={s.real_rpe}
+              placeholder="rpe"
+              ariaLabel={`RPE serie ${s.n_serie}`}
+              onCommit={(v) => onPatch(s, { real_rpe: v })}
+              onDirty={onDirty}
+              onBlur={onBlurFlush}
+            />
+          </Campo>
           <div className="e1rm-cell" aria-label={`e1RM serie ${s.n_serie}`}>
             <span className="e1rm-cell-k">e1RM</span>
             <E1rmValor e1rm={s.e1rm} confianza={s.e1rm_confianza} serie={s} />
@@ -375,4 +387,15 @@ function RealGrid({
 
 function Row({ children }: { children: React.ReactNode }) {
   return <div className="set-row">{children}</div>;
+}
+
+// Celda con su etiqueta. En desktop se aplana (display: contents) y el header de columnas
+// hace de etiqueta; en mobile, donde no hay header, la etiqueta queda arriba del valor.
+function Campo({ k, children }: { k: string; children: React.ReactNode }) {
+  return (
+    <div className="set-field">
+      <span className="set-field-k" aria-hidden="true">{k}</span>
+      {children}
+    </div>
+  );
 }
