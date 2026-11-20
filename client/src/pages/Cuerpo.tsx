@@ -108,10 +108,8 @@ export function Cuerpo() {
             <label htmlFor="cuerpo-peso">Peso (kg)</label>
             <input
               id="cuerpo-peso"
-              type="number"
+              type="text"
               inputMode="decimal"
-              min={0}
-              step={0.1}
               value={form.peso_kg}
               onChange={(e) => setForm((f) => ({ ...f, peso_kg: e.target.value }))}
             />
@@ -125,10 +123,8 @@ export function Cuerpo() {
               <label htmlFor={`cuerpo-${key}`}>{label} (cm)</label>
               <input
                 id={`cuerpo-${key}`}
-                type="number"
+                type="text"
                 inputMode="decimal"
-                min={0}
-                step={0.1}
                 value={form[key]}
                 aria-describedby={`cuerpo-${key}-protocolo`}
                 onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
